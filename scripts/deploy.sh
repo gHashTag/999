@@ -1,5 +1,7 @@
 #!/bin/bash
 # Deployment script for 999-multibots-telegraf
+# ⚠️ WARNING: Deployment from THIS repository is currently DISABLED.
+# Remove the comments below and ensure context is correct before enabling.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -20,12 +22,14 @@ REMOTE_DIR="/opt/app/999-multibots-telegraf"
 #     exit 1
 # fi
 
-echo "🚀 Deploying autonomously to ${REMOTE_HOST}..."
+echo "🚀 Preparing deploy command (currently DISABLED)..."
 
 # SSH command to deploy
 SSH_COMMAND="cd ${REMOTE_DIR} && docker-compose down && docker-compose up --build -d"
 
-echo "🔒 Connecting via SSH to ${REMOTE_HOST}..."
-ssh -i "${SSH_KEY}" "${REMOTE_USER}@${REMOTE_HOST}" "${SSH_COMMAND}"
+echo "🔒 Connecting via SSH to ${REMOTE_HOST}... (Command execution DISABLED)"
+# --- DEPLOYMENT DISABLED --- #
+# ssh -i "${SSH_KEY}" "${REMOTE_USER}@${REMOTE_HOST}" "${SSH_COMMAND}"
+# --- DEPLOYMENT DISABLED --- #
 
-echo "✅ Deployment command sent successfully!" 
+echo "✅ Deployment command prepared but NOT sent (DISABLED)." 
