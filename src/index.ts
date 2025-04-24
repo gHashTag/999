@@ -71,11 +71,11 @@ async function codingAgentHandler({
   step: any
 }) {
   const sandboxId = await step.run("get-sandbox-id", async () => {
-    const sandbox = await Sandbox.create() // Ensure Sandbox is imported
+    const sandbox = await Sandbox.create()
     return sandbox.sandboxId
   })
 
-  // Define tools within the handler or pass them if defined outside
+  // --->>> Tool definitions start here (no change in placement yet) <<<---
   const toolTerminal = createTool({
     name: "terminal",
     description: "Use the terminal to run commands",
@@ -182,6 +182,7 @@ async function codingAgentHandler({
       })
     },
   })
+  // --->>> Tool definitions end here <<<---
 
   const agent = createAgent({
     name: "Coding Agent",
@@ -268,3 +269,21 @@ const agentFunction = inngest.createFunction(
 
 // Export the handler for testing, and the Inngest function object
 export { inngest, agentFunction, codingAgentHandler }
+
+// --- Add HTTP Server ---
+import { serve } from "inngest/express" // Import the serve adapter
+import express from "express"
+
+const app = express()
+app.use(express.json()) // Middleware to parse JSON bodies
+
+// Serve Inngest functions at /api/inngest
+// Pass the inngest instance and the array of functions
+app.use("/api/inngest", serve({ client: inngest, functions: [agentFunction] }))
+
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
+  console.log(
+    `[NODE-APP] Inngest server listening on http://localhost:${PORT}/api/inngest`
+  )
+})

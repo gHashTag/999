@@ -8,9 +8,9 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "bash scripts/kill-ports.sh && concurrently --prefix-colors auto,blue,magenta \"pnpm:dev:serve\" \"pnpm:dev:test-report\"",
+    "dev": "bash scripts/kill-ports.sh && concurrently --names \"DEV-SERVER,AGENT\" --prefix-colors auto,blue,magenta \"pnpm:dev:serve\" \"pnpm:dev:test-report\"",
     "dev:build-watch": "tsc --watch",
-    "dev:serve": "npx inngest-cli dev",
+    "dev:serve": "concurrently --names \"INNGEST-CLI,NODE-APP\" --prefix-colors auto,red,green \"npx inngest-cli dev\" \"node dist/index.js\"",
     "dev:test-report": "npx vite preview --outDir html",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -29,10 +29,12 @@
     "@inngest/ai": "latest",
     "@inngest/middleware-encryption": "latest",
     "dotenv": "^16.4.5",
+    "express": "^4.17.1",
     "inngest": "latest",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/express": "^4.17.13",
     "@types/node": "^20.14.11",
     "@typescript-eslint/eslint-plugin": "^8.31.0",
     "@typescript-eslint/parser": "^8.31.0",
