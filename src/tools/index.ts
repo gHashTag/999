@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { createTool } from "@inngest/agent-kit"
+import { createTool, ToolHandlerArgs } from "@inngest/agent-kit"
 import { getSandbox } from "../inngest/utils.js" // Assuming utils is in the parent dir relative to tools
 
 // Define Zod schemas for tool parameters
@@ -32,10 +32,11 @@ export function createCodingTools(sandboxId: string) {
     name: "terminal",
     description: "Use the terminal to run commands",
     parameters: terminalParamsSchema,
-    // @ts-ignore
+    // FIX: Add description for expect-error
+    // @ts-expect-error step type issue in handler decorator
     handler: async (
       params: z.infer<typeof terminalParamsSchema>,
-      { step }: { step: any }
+      { step }: ToolHandlerArgs
     ) => {
       return await step?.run("terminal", async () => {
         const buffers = { stdout: "", stderr: "" }
@@ -65,10 +66,11 @@ export function createCodingTools(sandboxId: string) {
     name: "createOrUpdateFiles",
     description: "Create or update files in the sandbox",
     parameters: createOrUpdateFilesParamsSchema,
-    // @ts-ignore
+    // FIX: Add description for expect-error
+    // @ts-expect-error step type issue in handler decorator
     handler: async (
       params: z.infer<typeof createOrUpdateFilesParamsSchema>,
-      { step }: { step: any }
+      { step }: ToolHandlerArgs
     ) => {
       return await step?.run("createOrUpdateFiles", async () => {
         try {
@@ -89,10 +91,11 @@ export function createCodingTools(sandboxId: string) {
     name: "readFiles",
     description: "Read files from the sandbox",
     parameters: readFilesParamsSchema,
-    // @ts-ignore
+    // FIX: Add description for expect-error
+    // @ts-expect-error step type issue in handler decorator
     handler: async (
       params: z.infer<typeof readFilesParamsSchema>,
-      { step }: { step: any }
+      { step }: ToolHandlerArgs
     ) => {
       return await step?.run("readFiles", async () => {
         try {
@@ -115,10 +118,11 @@ export function createCodingTools(sandboxId: string) {
     name: "runCode",
     description: "Run the code in the sandbox",
     parameters: runCodeParamsSchema,
-    // @ts-ignore
+    // FIX: Add description for expect-error
+    // @ts-expect-error step type issue in handler decorator
     handler: async (
       params: z.infer<typeof runCodeParamsSchema>,
-      { step }: { step: any }
+      { step }: ToolHandlerArgs
     ) => {
       return await step?.run("runCode", async () => {
         try {

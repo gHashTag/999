@@ -1,8 +1,11 @@
-import { createNetwork, AgentRunOpts } from "@inngest/agent-kit"
+import { createNetwork, AgentRunOpts, Agent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-// FIX: Remove unused directive
 // Define the Network
-export function createDevOpsNetwork(codingAgent: any, refactoringAgent: any) {
+// FIX: Use Agent type for function parameters
+export function createDevOpsNetwork(
+  codingAgent: Agent<any>,
+  refactoringAgent: Agent<any>
+) {
   const network = createNetwork({
     name: "DevOps team",
     agents: [codingAgent, refactoringAgent],
