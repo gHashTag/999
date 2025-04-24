@@ -1,30 +1,30 @@
 /* eslint-disable */
 import "dotenv/config";
-// Removed: import * as fs from "node:fs" // No longer needed after removing artifact download step
+// import * as fs from "node:fs" // Removed unused import
+// import * as path from "node:path" // Removed unused import
 import { z } from "zod";
 import { Inngest } from "inngest";
-// Restore AgentKit core imports needed here
-import { createAgent, createNetwork, createTool } from "@inngest/agent-kit";
-// Restore model import
+import { createAgent, createTool } from "@inngest/agent-kit";
 import { deepseek } from "@inngest/ai/models";
-// Keep utils and sandbox imports
 import { getSandbox, lastAssistantTextMessageContent } from "./inngest/utils.js";
 import { Sandbox } from "@e2b/code-interpreter";
+import { createDevOpsNetwork } from "./network.js"; // Import the TDD network
 // Define the main event payload schema
 const codingAgentEventSchema = z.object({
     input: z.string(),
 });
 // Initialize Inngest Client
-const inngest = new Inngest({ id: "agentkit-coding-agent" });
+const inngest = new Inngest({ id: "agentkit-tdd-agent" });
 // --- Main Handler --- //
-async function codingAgentHandler({ event, step, }) {
-    // @ts-ignore - Suppress TS2339 for logging (restored) - Commented out temporarily
-    // console.log(`[HANDLER START] Event received: ${event.id}, Input: ${event.data?.input?.substring(0, 50) ?? "(data missing)"}...`);
+let sandboxId = null;
+async function codingAgentHandler({ event, step, // Use any type
+ }) {
+    sandboxId = null;
     try {
-        // ADDED: Wrap handler logic in try...catch
-        console.log("[HANDLER START - SIMPLIFIED] Event received."); // Simplified log
+        console.log("[HANDLER START] TDD Event received.");
         console.log("[HANDLER] Getting sandbox ID...");
-        const sandboxId = await step.run("get-sandbox-id", async () => {
+        // Assign the global sandboxId variable
+        sandboxId = await step.run("get-sandbox-id", async () => {
             console.log("[HANDLER STEP] Creating sandbox...");
             const sandbox = await Sandbox.create();
             console.log(`[HANDLER STEP] Sandbox created: ${sandbox.sandboxId}`);
@@ -32,7 +32,6 @@ async function codingAgentHandler({ event, step, }) {
         });
         console.log(`[HANDLER] Got sandbox ID: ${sandboxId}`);
         // --- Define Tools Inline Again --- //
-        console.log("[HANDLER] Defining tools...");
         const terminalParamsSchema = z.object({ command: z.string() });
         const createOrUpdateFilesParamsSchema = z.object({
             files: z.array(z.object({ path: z.string(), content: z.string() })),
@@ -44,10 +43,15 @@ async function codingAgentHandler({ event, step, }) {
             description: "Use the terminal to run commands",
             parameters: terminalParamsSchema,
             handler: async (params, { step }) => {
+                // Access sandboxId from the outer scope (closure)
+                const currentSandboxId = sandboxId; // Use the variable from codingAgentHandler scope
                 return await step?.run("terminal", async () => {
+                    // Function inside run doesn't need params now
                     const buffers = { stdout: "", stderr: "" };
                     try {
-                        const sandbox = await getSandbox(sandboxId);
+                        if (!currentSandboxId)
+                            throw new Error("Sandbox ID is null");
+                        const sandbox = await getSandbox(currentSandboxId);
                         if (!sandbox)
                             throw new Error("Sandbox not found");
                         const result = await sandbox.commands.run(params.command, {
@@ -72,9 +76,12 @@ async function codingAgentHandler({ event, step, }) {
             description: "Create or update files in the sandbox",
             parameters: createOrUpdateFilesParamsSchema,
             handler: async (params, { step }) => {
+                const currentSandboxId = sandboxId;
                 return await step?.run("createOrUpdateFiles", async () => {
                     try {
-                        const sandbox = await getSandbox(sandboxId);
+                        if (!currentSandboxId)
+                            throw new Error("Sandbox ID is null");
+                        const sandbox = await getSandbox(currentSandboxId);
                         if (!sandbox)
                             throw new Error("Sandbox not found");
                         for (const file of params.files) {
@@ -93,9 +100,12 @@ async function codingAgentHandler({ event, step, }) {
             description: "Read files from the sandbox",
             parameters: readFilesParamsSchema,
             handler: async (params, { step }) => {
+                const currentSandboxId = sandboxId;
                 return await step?.run("readFiles", async () => {
                     try {
-                        const sandbox = await getSandbox(sandboxId);
+                        if (!currentSandboxId)
+                            throw new Error("Sandbox ID is null");
+                        const sandbox = await getSandbox(currentSandboxId);
                         if (!sandbox)
                             throw new Error("Sandbox not found");
                         const contents = [];
@@ -116,121 +126,263 @@ async function codingAgentHandler({ event, step, }) {
             description: "Run the code in the sandbox",
             parameters: runCodeParamsSchema,
             handler: async (params, { step }) => {
-                return await step?.run("runCode", async () => {
-                    try {
-                        const sandbox = await getSandbox(sandboxId);
-                        if (!sandbox)
-                            throw new Error("Sandbox not found");
-                        const result = await sandbox.runCode(params.code);
-                        return result.logs.stdout.join("\n");
-                    }
-                    catch (e) {
-                        return "Error: " + e;
-                    }
-                });
+                const currentSandboxId = sandboxId;
+                if (step && typeof step.run === "function") {
+                    return await step.run("runCode", async () => {
+                        try {
+                            if (!currentSandboxId)
+                                throw new Error("Sandbox ID is null");
+                            const sandbox = await getSandbox(currentSandboxId);
+                            if (!sandbox)
+                                throw new Error("Sandbox not found");
+                            const result = await sandbox.runCode(params.code);
+                            return result.logs.stdout.join("\n");
+                        }
+                        catch (e) {
+                            return "Error: " + e;
+                        }
+                    });
+                }
+                else {
+                    console.error("Step context not available in toolRunCode handler");
+                    return "Error: Step context is required to run code.";
+                }
             },
         });
-        // --- Define Agent Inline Again --- //
-        console.log("[HANDLER] Defining agent...");
-        const agent = createAgent({
-            name: "Coding Agent",
-            description: "An expert coding agent for writing and modifying code.",
-            // Keep the improved system prompt
-            system: `You are an expert coding agent designed to help users with coding tasks. 
-          Your primary goal is to understand the user's request and use the available tools to fulfill it accurately.
-
-          **Tool Usage Instructions:**
-          - Use the 'terminal' tool to run commands in a non-interactive sandbox.
-          - Use the 'readFiles' tool to read the content of existing files.
-          - **Crucially: When asked to write code, generate scripts, or create any file content, you MUST use the 'createOrUpdateFiles' tool to save the generated content into a file within the sandbox. Do not just output the code or file content as plain text in your response.** Confirm successful file creation/update based on the tool's output.
-          - Use the 'runCode' tool to execute generated code snippets if needed for testing or verification.
-
-          **Output Format:**
-          - Think step-by-step before acting.
-          - Clearly explain your plan and the tools you intend to use.
-          - After completing all steps, provide a summary of the actions taken and the final result within <task_summary></task_summary> tags.
-          `,
+        const allTools = [
+            toolTerminal,
+            toolCreateOrUpdateFiles,
+            toolReadFiles,
+            toolRunCode,
+        ];
+        // --- Define Agents --- //
+        const testerAgent = createAgent({
+            name: "Tester Agent",
+            description: "Writes unit tests based on a task description.",
+            system: `You are a QA engineer agent. Your task is to write simple unit tests (e.g., using Node.js 'assert') for a given function description. 
+               Use the 'createOrUpdateFiles' tool to save the test code into a file named 'test.js'. 
+               Do not write the implementation code itself. Output the test code in the specified file.`,
             model: deepseek({
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
             }),
-            tools: [
-                toolTerminal,
-                toolCreateOrUpdateFiles,
-                toolReadFiles,
-                toolRunCode,
-            ],
+            tools: allTools,
+            // Update state after test creation
             lifecycle: {
                 onResponse: async ({ result, network }) => {
-                    const lastAssistantMessageText = lastAssistantTextMessageContent(result);
-                    if (lastAssistantMessageText?.includes("<task_summary>")) {
-                        const net = network || { state: { kv: new Map() } };
-                        net.state.kv.set("task_summary", lastAssistantMessageText);
+                    if (network?.state?.kv) {
+                        const state = network.state.kv.get("network_state") || {};
+                        // Revert to placeholder for now due to logging/hook issues
+                        /* try {
+                          const sandboxIdFromState = state.sandboxId;
+                          if (!sandboxIdFromState) throw new Error("Sandbox ID not found in state for TesterAgent hook");
+                          console.log(`[TesterAgent Lifecycle] Reading test.js from sandbox ${sandboxIdFromState}...`);
+                          const fileContent = await step.run("read-test-code", async () => {
+                             const sandbox = await getSandbox(sandboxIdFromState);
+                             if (!sandbox) throw new Error("Sandbox not found for reading test code");
+                             return await sandbox.files.read('test.js');
+                          });
+                          state.test_code = fileContent;
+                          console.log(`[TesterAgent Lifecycle] Stored test code content in state.`);
+                        } catch (e) {
+                          console.error(`[TesterAgent Lifecycle] Error reading test.js:`, e);
+                          state.test_code = `Error reading test.js: ${e instanceof Error ? e.message : e}`;
+                        } */
+                        state.test_code = "test.js"; // Reverted placeholder
+                        state.status = "NEEDS_CODE";
+                        network.state.kv.set("network_state", state);
+                        // Simplified log message
+                        console.log("[TesterAgent Lifecycle] State updated to NEEDS_CODE.");
                     }
                     return result;
                 },
             },
         });
-        console.log("[HANDLER] Agent defined.");
-        // --- Create Network with Single Agent Inline Again --- //
-        console.log("[HANDLER] Defining network...");
-        const network = createNetwork({
-            name: "coding-agent-network", // Revert name or keep DevOps?
-            agents: [agent],
-            defaultModel: deepseek({
-                // Router needs a model too
+        const codingAgent = createAgent({
+            name: "Coding Agent",
+            description: "Writes implementation code based on task and tests.",
+            system: `You are a software developer agent. Your task is to write the implementation code for a function based on the provided task description and unit tests. 
+               Read the tests from 'test.js' using the 'readFiles' tool. 
+               Write the implementation code and save it into 'implementation.js' using the 'createOrUpdateFiles' tool.`,
+            model: deepseek({
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
             }),
-            maxIter: 15,
-            // Simple router for single agent
-            defaultRouter: async () => agent,
+            tools: allTools,
+            // Update state after code creation
+            lifecycle: {
+                onResponse: async ({ result, network }) => {
+                    if (network?.state?.kv) {
+                        const state = network.state.kv.get("network_state") || {};
+                        // Revert to placeholder
+                        /* const implementationFilePath = 'implementation.js';
+                        try {
+                          const sandboxIdFromState = state.sandboxId;
+                          if (!sandboxIdFromState) throw new Error("Sandbox ID not found in state for CodingAgent hook");
+                          console.log(`[CodingAgent Lifecycle] Reading ${implementationFilePath} from sandbox ${sandboxIdFromState}...`);
+                          const fileContent = await step.run("read-implementation-code", async () => {
+                             const sandbox = await getSandbox(sandboxIdFromState);
+                             if (!sandbox) throw new Error("Sandbox not found for reading implementation code");
+                             return await sandbox.files.read(implementationFilePath);
+                          });
+                          state.current_code = fileContent;
+                          console.log(`[CodingAgent Lifecycle] Stored implementation code content in state.`);
+                        } catch (e) {
+                           console.error(`[CodingAgent Lifecycle] Error reading ${implementationFilePath}:`, e);
+                           state.current_code = `Error reading ${implementationFilePath}: ${e instanceof Error ? e.message : e}`;
+                        } */
+                        state.current_code = "implementation.js"; // Reverted placeholder
+                        state.status = "NEEDS_CRITIQUE";
+                        network.state.kv.set("network_state", state);
+                        // Simplified log message
+                        console.log("[CodingAgent Lifecycle] State updated to NEEDS_CRITIQUE.");
+                    }
+                    return result;
+                },
+            },
         });
-        console.log("[HANDLER] Network defined.");
-        // Validate event data
-        if (!event.data) {
-            throw new Error("Event data is missing!");
+        const criticAgent = createAgent({
+            name: "Critic Agent",
+            description: "Reviews code and tests for correctness and style.",
+            system: `You are a code reviewer agent. Your task is to review the provided implementation code ('implementation.js') and test code ('test.js') based on the original task description. 
+               Use the 'readFiles' tool to read both files. 
+               Provide your feedback as a critique.`,
+            model: deepseek({
+                apiKey: process.env.DEEPSEEK_API_KEY,
+                model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
+            }),
+            tools: allTools, // Critic might need to read files
+            // Update state after critique
+            lifecycle: {
+                onResponse: async ({ result, network }) => {
+                    const lastAssistantMessageText = lastAssistantTextMessageContent(result);
+                    if (network?.state?.kv) {
+                        const state = network.state.kv.get("network_state") || {};
+                        // Log state BEFORE updating to COMPLETED
+                        console.log("[CriticAgent Lifecycle] State BEFORE completion:", state);
+                        state.status = "COMPLETED";
+                        state.critique = lastAssistantMessageText || "No critique provided.";
+                        network.state.kv.set("network_state", state);
+                        // Log state AFTER updating to COMPLETED
+                        console.log("[CriticAgent Lifecycle] State AFTER completion:", state);
+                        console.log("[CriticAgent Lifecycle] State updated to COMPLETED");
+                    }
+                    return result;
+                },
+            },
+        });
+        // --- Create TDD Network --- //
+        const devOpsNetwork = createDevOpsNetwork(testerAgent, codingAgent, criticAgent);
+        // --- Initialize State and Run Network --- //
+        console.log("[HANDLER] Initializing TDD network state...");
+        const initialTask = event.data?.input ?? "";
+        if (!initialTask) {
+            throw new Error("Input task is missing in the event data.");
         }
-        console.log(`[${agentFunction.opts.id}] Received event (repeated log):`, event.name);
-        console.log("[HANDLER] Starting network run...");
-        // Pass the input directly to the network
-        // Original failing line: await network.run(event.data)
-        // @ts-ignore - Restore ignore due to persistent TS2339 despite correct schema
-        await network.run(event.data.input); // Corrected: Pass the input string
-        console.log("[HANDLER] Network run finished.");
-        console.log(`[${agentFunction.opts.id}] Network run completed (repeated log).`); // Add completion log
-        console.log("[HANDLER] download-artifact step skipped."); // ADDED log
-        // Return summary
-        const finalNet = network;
-        const summary = finalNet?.state?.kv?.get("task_summary");
-        console.log(`[HANDLER END] Returning summary: ${summary ? summary.substring(0, 100) + "..." : "(no summary)"}`);
-        return summary;
+        const initialState = {
+            task: initialTask,
+            status: "NEEDS_TEST",
+            sandboxId: sandboxId,
+        };
+        devOpsNetwork.state.kv.set("network_state", initialState);
+        console.log("[HANDLER] Starting TDD network run...");
+        await devOpsNetwork.run(initialTask);
+        console.log("[HANDLER] TDD Network run finished.");
+        // --- Cleanup or Read Final State --- //
+        const finalState = devOpsNetwork.state.kv.get("network_state");
+        console.log("[HANDLER] Final Network State:", finalState);
+        // Cleanup using sandboxId from handler scope
+        // const currentSandboxId = sandboxId; // Remove unused variable
+        // FIX: Temporarily disable killing the sandbox to allow inspection
+        /*
+        if (currentSandboxId) {
+          console.log(`[HANDLER] Killing sandbox ${currentSandboxId}...`)
+          await step.run("kill-sandbox", async () => {
+            if (!currentSandboxId) {
+              console.warn("[HANDLER STEP] Sandbox ID became null before killing.")
+              return
+            }
+            const sandbox = await getSandbox(currentSandboxId)
+            if (sandbox) {
+              await sandbox.kill()
+              console.log(`[HANDLER STEP] Sandbox ${currentSandboxId} killed.`)
+            } else {
+              console.warn(
+                `[HANDLER STEP] Sandbox ${currentSandboxId} not found for killing.`
+              )
+            }
+          })
+        }
+        */
+        console.log("[HANDLER END] Event processing complete.");
+        return { event, finalState };
     }
     catch (error) {
-        console.error("[HANDLER ERROR] Uncaught error in handler:", error);
-        // Optionally re-throw or return an error state
-        throw error; // Re-throw to let Inngest handle retries/failure state if configured
+        console.error("[HANDLER ERROR] An error occurred:", error);
+        // Cleanup on error using sandboxId from handler scope
+        // const errorSandboxId = sandboxId; // Remove unused variable
+        // FIX: Temporarily disable killing the sandbox on error
+        /*
+        if (errorSandboxId) {
+          console.log(
+            `[HANDLER ERROR] Attempting to kill sandbox ${errorSandboxId} after error...`
+          )
+          try {
+            await step.run("kill-sandbox-on-error", async () => {
+              if (!errorSandboxId) {
+                console.warn(
+                  "[HANDLER STEP ERROR] Sandbox ID became null before killing on error."
+                )
+                return
+              }
+              const sandbox = await getSandbox(errorSandboxId)
+              if (sandbox) {
+                await sandbox.kill()
+                console.log(
+                  `[HANDLER STEP] Sandbox ${errorSandboxId} killed after error.`
+                )
+              } else {
+                console.warn(
+                  `[HANDLER STEP] Sandbox ${errorSandboxId} not found for killing after error.`
+                )
+              }
+            })
+          } catch (killError) {
+            console.error(
+              `[HANDLER ERROR] Failed to kill sandbox ${errorSandboxId} after initial error:`,
+              killError
+            )
+          }
+        }
+        */
+        throw error;
     }
 }
-// --- Inngest Function Definition --- //
-const agentFunction = inngest.createFunction({
-    id: "Coding Agent", // Keep original ID
-    retries: 0,
-}, { event: "coding-agent/run" }, codingAgentHandler);
+// --- Register Inngest Function --- //
+// FIX: Rename exported function to avoid conflict if needed, or ensure only one definition is exported.
+// Assuming the original export near the end is the intended one. Remove this definition.
+// const codingAgent = inngest.createFunction( ... ); // REMOVE THIS BLOCK
 // --- Export for Server --- //
-export { inngest, agentFunction }; // Only export these
+// FIX: Ensure codingAgentHandler is defined before being used here.
+// Define the function before exporting it.
+const codingAgentFunction = inngest.createFunction({ id: "coding-agent-tdd-function", name: "TDD Coding Agent Function" }, // Updated ID and Name
+{ event: "coding-agent/run" }, codingAgentHandler // Use the handler function defined above
+);
+export { inngest, codingAgentFunction as codingAgent }; // Export with the original name
 // --- HTTP Server (Entry Point) --- //
 import { serve } from "inngest/express"; // Import the serve adapter
 import express from "express";
 const app = express();
 app.use(express.json()); // Middleware to parse JSON bodies
 // Serve the Inngest function(s)
-app.use("/api/inngest", serve({ client: inngest, functions: [agentFunction] }));
-const PORT = process.env.PORT || 3000;
+// FIX: Use the correctly defined function variable
+app.use("/api/inngest", serve({ client: inngest, functions: [codingAgentFunction] }));
+const APP_PORT = process.env.APP_PORT || 8484; // Changed default port to 8484
 // Only start the server if not in a test environment
 if (process.env.NODE_ENV !== "test") {
-    app.listen(PORT, () => {
-        console.log(`[NODE-APP] Inngest server listening on http://localhost:${PORT}/api/inngest`);
+    app.listen(APP_PORT, () => {
+        console.log(`[NODE-APP] Inngest server listening on http://localhost:${APP_PORT}/api/inngest` // Use APP_PORT
+        );
     });
 }
 //# sourceMappingURL=index.js.map

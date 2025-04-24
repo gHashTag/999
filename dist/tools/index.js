@@ -27,7 +27,6 @@ export function createCodingTools(sandboxId) {
         name: "terminal",
         description: "Use the terminal to run commands",
         parameters: terminalParamsSchema,
-        // @ts-ignore
         handler: async (params, { step }) => {
             return await step?.run("terminal", async () => {
                 const buffers = { stdout: "", stderr: "" };
@@ -56,7 +55,6 @@ export function createCodingTools(sandboxId) {
         name: "createOrUpdateFiles",
         description: "Create or update files in the sandbox",
         parameters: createOrUpdateFilesParamsSchema,
-        // @ts-ignore
         handler: async (params, { step }) => {
             return await step?.run("createOrUpdateFiles", async () => {
                 try {
@@ -78,7 +76,6 @@ export function createCodingTools(sandboxId) {
         name: "readFiles",
         description: "Read files from the sandbox",
         parameters: readFilesParamsSchema,
-        // @ts-ignore
         handler: async (params, { step }) => {
             return await step?.run("readFiles", async () => {
                 try {
@@ -102,7 +99,6 @@ export function createCodingTools(sandboxId) {
         name: "runCode",
         description: "Run the code in the sandbox",
         parameters: runCodeParamsSchema,
-        // @ts-ignore
         handler: async (params, { step }) => {
             return await step?.run("runCode", async () => {
                 try {

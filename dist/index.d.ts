@@ -18,8 +18,11 @@ declare const inngest: Inngest<{
 declare function codingAgentHandler({ event, step, }: {
     event: CodingAgentEvent;
     step: any;
-}): Promise<any>;
-declare const agentFunction: import("inngest").InngestFunction<Omit<import("inngest").InngestFunction.Options<Inngest<{
+}): Promise<{
+    event: CodingAgentEvent;
+    finalState: any;
+}>;
+declare const codingAgentFunction: import("inngest").InngestFunction<Omit<import("inngest").InngestFunction.Options<Inngest<{
     id: string;
 }>, import("inngest").InngestMiddleware.Stack, [{
     event: string;
@@ -40,5 +43,5 @@ declare const agentFunction: import("inngest").InngestFunction<Omit<import("inng
 }>, import("inngest").InngestMiddleware.Stack, [{
     event: string;
 }]>;
-export { inngest, agentFunction };
+export { inngest, codingAgentFunction as codingAgent };
 //# sourceMappingURL=index.d.ts.map

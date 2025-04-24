@@ -134,13 +134,12 @@
   - ⏳ Investigate E2B Methods: Найти корректные методы для `downloadArtifact` и `close` (низкий приоритет).
   - ⏳ Plan Next Steps: Определить следующие задачи для развития агента.
 
-### 5. Linting and Code Quality ✨
+### 5. ✨ Linting and Code Quality (Post-Tutorial)
 
 - ✅ Initial lint setup (`eslint`, `prettier`, `husky`).
-- ⚠️ Some lint warnings/errors temporarily ignored (`any` in `onResponse` likely).
-- ✅ Most lint errors and type issues fixed.
-- ✅ `pnpm run build` проходит чисто.
-- ⏳ Fix remaining warnings/`any` types.
+- ✅ Most lint errors and type issues fixed (incl. `ToolHandlerArgs`, `AgentRunOpts`).
+- ✅ `pnpm run build` проходит чисто (после исправления доступа к `_messages`).
+- ⚠️ Fix remaining warnings/`any` types (`Agent<any>` in `src/network.ts`).
 
 ### 6. Core Functionality Verification ✅
 
@@ -163,14 +162,13 @@
 ### 8. ✨ Linting and Code Quality (Post-Tutorial)
 
 - ✅ Initial lint setup (`eslint`, `prettier`, `husky`).
-- ⚠️ Some lint warnings/errors temporarily ignored (`any` in `onResponse` likely).
-- ✅ Most lint errors and type issues fixed.
-- ✅ `pnpm run build` проходит чисто.
-- ⏳ Fix remaining warnings/`any` types before commit.
+- ✅ Most lint errors and type issues fixed (incl. `ToolHandlerArgs`, `AgentRunOpts`).
+- ✅ `pnpm run build` проходит чисто (после исправления доступа к `_messages`).
+- ⚠️ Fix remaining warnings/`any` types (`Agent<any>` in `src/network.ts`).
 
 ### 9. 💾 Commit & Next Steps (Post-Tutorial)
 
-- ⏳ **Commit:** Зафиксировать успешные изменения (после исправления lint warnings).
+- ✅ **Commit:** Изменения линтера и фиксы сборки закоммичены (`6b91280`).
 - ⏳ Investigate E2B Methods: Найти корректные методы для `downloadArtifact` и `close` (низкий приоритет).
 - ⏳ Plan Next Steps: Определить следующие задачи для развития агента.
 

@@ -2,7 +2,7 @@
 # Script to kill processes listening on specified ports
 # Version 2: Handles multiple PIDs per port
 
-PORTS_TO_KILL=(8288 8289 4173 3000) # Ensure 3000 is included
+PORTS_TO_KILL=(8288 8289 4173 3000 5000 8484) # Ensure 3000 is included
 
 echo "🧹 Cleaning up ports: ${PORTS_TO_KILL[*]}..."
 

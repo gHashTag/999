@@ -1,21 +1,16 @@
 /* eslint-disable */
 import "dotenv/config"
 
-// Restore necessary imports
 // import * as fs from "node:fs" // Removed unused import
 // import * as path from "node:path" // Removed unused import
 
 import { z } from "zod"
 import { Inngest, EventPayload } from "inngest"
-
-// Restore AgentKit core imports needed here
-import { createAgent, createNetwork, createTool } from "@inngest/agent-kit"
-// Restore model import
+import { createAgent, createTool } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-
-// Keep utils and sandbox imports
 import { getSandbox, lastAssistantTextMessageContent } from "./inngest/utils.js"
 import { Sandbox } from "@e2b/code-interpreter"
+import { createDevOpsNetwork } from "./network.js" // Import the TDD network
 
 // Define the main event payload schema
 const codingAgentEventSchema = z.object({
@@ -28,23 +23,24 @@ type CodingAgentEvent = EventPayload<{
 }>
 
 // Initialize Inngest Client
-const inngest = new Inngest({ id: "agentkit-coding-agent" })
+const inngest = new Inngest({ id: "agentkit-tdd-agent" })
 
 // --- Main Handler --- //
+let sandboxId: string | null = null
+
 async function codingAgentHandler({
   event,
-  step,
+  step, // Use any type
 }: {
   event: CodingAgentEvent
-  step: any
+  step: any // Use any for step type
 }) {
-  let sandboxId: string | null = null // Define sandboxId outside try block
+  sandboxId = null
   try {
-    // ADDED: Wrap handler logic in try...catch
-    console.log("[HANDLER START] Event received.") // Renamed and kept at the top
+    console.log("[HANDLER START] TDD Event received.")
     console.log("[HANDLER] Getting sandbox ID...")
+    // Assign the global sandboxId variable
     sandboxId = await step.run("get-sandbox-id", async () => {
-      // Assign to outer variable
       console.log("[HANDLER STEP] Creating sandbox...")
       const sandbox = await Sandbox.create()
       console.log(`[HANDLER STEP] Sandbox created: ${sandbox.sandboxId}`)
@@ -53,7 +49,6 @@ async function codingAgentHandler({
     console.log(`[HANDLER] Got sandbox ID: ${sandboxId}`)
 
     // --- Define Tools Inline Again --- //
-    // console.log("[HANDLER] Defining tools...") // Removed redundant log
     const terminalParamsSchema = z.object({ command: z.string() })
     const createOrUpdateFilesParamsSchema = z.object({
       files: z.array(z.object({ path: z.string(), content: z.string() })),
@@ -66,12 +61,14 @@ async function codingAgentHandler({
       description: "Use the terminal to run commands",
       parameters: terminalParamsSchema,
       handler: async (params, { step }) => {
+        // Access sandboxId from the outer scope (closure)
+        const currentSandboxId = sandboxId // Use the variable from codingAgentHandler scope
         return await step?.run("terminal", async () => {
+          // Function inside run doesn't need params now
           const buffers = { stdout: "", stderr: "" }
           try {
-            // FIX: Add null check for sandboxId before passing to getSandbox
-            if (!sandboxId) throw new Error("Sandbox ID is null")
-            const sandbox = await getSandbox(sandboxId)
+            if (!currentSandboxId) throw new Error("Sandbox ID is null")
+            const sandbox = await getSandbox(currentSandboxId)
             if (!sandbox) throw new Error("Sandbox not found")
             const result = await sandbox.commands.run(params.command, {
               onStdout: (data: string) => {
@@ -97,11 +94,11 @@ async function codingAgentHandler({
       description: "Create or update files in the sandbox",
       parameters: createOrUpdateFilesParamsSchema,
       handler: async (params, { step }) => {
+        const currentSandboxId = sandboxId
         return await step?.run("createOrUpdateFiles", async () => {
           try {
-            // FIX: Add null check for sandboxId
-            if (!sandboxId) throw new Error("Sandbox ID is null")
-            const sandbox = await getSandbox(sandboxId)
+            if (!currentSandboxId) throw new Error("Sandbox ID is null")
+            const sandbox = await getSandbox(currentSandboxId)
             if (!sandbox) throw new Error("Sandbox not found")
             for (const file of params.files) {
               await sandbox.files.write(file.path, file.content)
@@ -119,11 +116,11 @@ async function codingAgentHandler({
       description: "Read files from the sandbox",
       parameters: readFilesParamsSchema,
       handler: async (params, { step }) => {
+        const currentSandboxId = sandboxId
         return await step?.run("readFiles", async () => {
           try {
-            // FIX: Add null check for sandboxId
-            if (!sandboxId) throw new Error("Sandbox ID is null")
-            const sandbox = await getSandbox(sandboxId)
+            if (!currentSandboxId) throw new Error("Sandbox ID is null")
+            const sandbox = await getSandbox(currentSandboxId)
             if (!sandbox) throw new Error("Sandbox not found")
             const contents = []
             for (const file of params.files) {
@@ -143,14 +140,12 @@ async function codingAgentHandler({
       description: "Run the code in the sandbox",
       parameters: runCodeParamsSchema,
       handler: async (params, { step }) => {
-        // Ensure step is passed correctly if needed inside tool handlers
-        // Check if step exists and has the 'run' method before calling
+        const currentSandboxId = sandboxId
         if (step && typeof step.run === "function") {
           return await step.run("runCode", async () => {
             try {
-              // FIX: Add null check for sandboxId
-              if (!sandboxId) throw new Error("Sandbox ID is null")
-              const sandbox = await getSandbox(sandboxId) // Use non-null assertion or check
+              if (!currentSandboxId) throw new Error("Sandbox ID is null")
+              const sandbox = await getSandbox(currentSandboxId)
               if (!sandbox) throw new Error("Sandbox not found")
               const result = await sandbox.runCode(params.code)
               return result.logs.stdout.join("\n")
@@ -159,162 +154,238 @@ async function codingAgentHandler({
             }
           })
         } else {
-          // Fallback or error handling if step is not available
           console.error("Step context not available in toolRunCode handler")
-          // Attempt direct execution without step tracking (might lose some Inngest features)
-          try {
-            // FIX: Add null check for sandboxId
-            if (!sandboxId) throw new Error("Sandbox ID is null")
-            const sandbox = await getSandbox(sandboxId) // Use non-null assertion or check
-            if (!sandbox) throw new Error("Sandbox not found")
-            const result = await sandbox.runCode(params.code)
-            return result.logs.stdout.join("\n")
-          } catch (e) {
-            return "Error: " + e
-          }
+          return "Error: Step context is required to run code."
         }
       },
     })
 
-    // --- Define Agent Inline Again --- //
-    // console.log("[HANDLER] Defining agent...") // Removed redundant log
-    const agent = createAgent({
-      name: "Coding Agent",
-      description: "An expert coding agent for writing and modifying code.",
-      // Keep the improved system prompt
-      system: `You are an expert coding agent designed to help users with coding tasks. 
-          Your primary goal is to understand the user's request and use the available tools to fulfill it accurately.
+    const allTools = [
+      toolTerminal,
+      toolCreateOrUpdateFiles,
+      toolReadFiles,
+      toolRunCode,
+    ]
 
-          **Tool Usage Instructions:**
-          - Use the 'terminal' tool to run commands in a non-interactive sandbox.
-          - Use the 'readFiles' tool to read the content of existing files.
-          - **Crucially: When asked to write code, generate scripts, or create any file content, you MUST use the 'createOrUpdateFiles' tool to save the generated content into a file within the sandbox. Do not just output the code or file content as plain text in your response.** Confirm successful file creation/update based on the tool's output.
-          - Use the 'runCode' tool to execute generated code snippets if needed for testing or verification.
-
-          **Output Format:**
-          - Think step-by-step before acting.
-          - Clearly explain your plan and the tools you intend to use.
-          - After completing all steps, provide a summary of the actions taken and the final result within <task_summary></task_summary> tags.
-          `,
+    // --- Define Agents --- //
+    const testerAgent = createAgent({
+      name: "Tester Agent",
+      description: "Writes unit tests based on a task description.",
+      system: `You are a QA engineer agent. Your task is to write simple unit tests (e.g., using Node.js 'assert') for a given function description. 
+               Use the 'createOrUpdateFiles' tool to save the test code into a file named 'test.js'. 
+               Do not write the implementation code itself. Output the test code in the specified file.`,
       model: deepseek({
         apiKey: process.env.DEEPSEEK_API_KEY!,
         model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
       }),
-      tools: [
-        toolTerminal,
-        toolCreateOrUpdateFiles,
-        toolReadFiles,
-        toolRunCode,
-      ],
+      tools: allTools,
+      // Update state after test creation
       lifecycle: {
         onResponse: async ({ result, network }: any) => {
-          const lastAssistantMessageText =
-            lastAssistantTextMessageContent(result)
-          if (lastAssistantMessageText?.includes("<task_summary>")) {
-            const net = network || { state: { kv: new Map() } }
-            net.state.kv.set("task_summary", lastAssistantMessageText)
+          if (network?.state?.kv) {
+            const state = network.state.kv.get("network_state") || {}
+            // Revert to placeholder for now due to logging/hook issues
+            /* try {
+              const sandboxIdFromState = state.sandboxId;
+              if (!sandboxIdFromState) throw new Error("Sandbox ID not found in state for TesterAgent hook");
+              console.log(`[TesterAgent Lifecycle] Reading test.js from sandbox ${sandboxIdFromState}...`);
+              const fileContent = await step.run("read-test-code", async () => {
+                 const sandbox = await getSandbox(sandboxIdFromState);
+                 if (!sandbox) throw new Error("Sandbox not found for reading test code");
+                 return await sandbox.files.read('test.js');
+              });
+              state.test_code = fileContent;
+              console.log(`[TesterAgent Lifecycle] Stored test code content in state.`);
+            } catch (e) {
+              console.error(`[TesterAgent Lifecycle] Error reading test.js:`, e);
+              state.test_code = `Error reading test.js: ${e instanceof Error ? e.message : e}`;
+            } */
+            state.test_code = "test.js" // Reverted placeholder
+            state.status = "NEEDS_CODE"
+            network.state.kv.set("network_state", state)
+            // Simplified log message
+            console.log("[TesterAgent Lifecycle] State updated to NEEDS_CODE.")
           }
           return result
         },
       },
     })
-    // console.log("[HANDLER] Agent defined.") // Removed redundant log
 
-    // --- Create Network with Single Agent Inline Again --- //
-    // console.log("[HANDLER] Defining network...") // Removed redundant log
-    const network = createNetwork({
-      name: "coding-agent-network", // Revert name or keep DevOps?
-      agents: [agent],
-      defaultModel: deepseek({
-        // Router needs a model too
+    const codingAgent = createAgent({
+      name: "Coding Agent",
+      description: "Writes implementation code based on task and tests.",
+      system: `You are a software developer agent. Your task is to write the implementation code for a function based on the provided task description and unit tests. 
+               Read the tests from 'test.js' using the 'readFiles' tool. 
+               Write the implementation code and save it into 'implementation.js' using the 'createOrUpdateFiles' tool.`,
+      model: deepseek({
         apiKey: process.env.DEEPSEEK_API_KEY!,
         model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
       }),
-      maxIter: 15,
-      // Simple router for single agent
-      defaultRouter: async () => agent,
-    })
-    // console.log("[HANDLER] Network defined.") // Removed redundant log
-
-    // --- Execute Network --- //
-    console.log("[HANDLER] Starting network run...")
-    // FIX: Use optional chaining and provide default value for input
-    // FIX: Comment out { step } until the correct way to pass it is known
-    // FIX: Remove unused ts-expect-error
-    // FIX: Explicitly cast event.data type
-    const inputData = (event.data as { input?: string })?.input ?? ""
-    const networkResult = await network.run(inputData /* { step } */) // Pass step to network.run
-    console.log("[HANDLER] Network run finished.")
-    // console.log("[Coding Agent] Network run completed.") // Removed redundant log
-
-    // ADDED: Step to read the expected output file
-    const fileContentResult = await step.run("read-output-file", async () => {
-      console.log("[HANDLER STEP] Reading output file test-output.txt...")
-      if (!sandboxId) throw new Error("Sandbox ID is null for reading file")
-      const sandbox = await getSandbox(sandboxId)
-      if (!sandbox) throw new Error("Sandbox not found for reading file")
-
-      try {
-        // Use sandbox.files.read() as suggested by E2B docs/examples
-        const content = await sandbox.files.read("test-output.txt")
-        console.log("[HANDLER STEP] Successfully read test-output.txt.")
-        return { success: true, content: content }
-      } catch (error) {
-        console.error("[HANDLER STEP] Failed to read test-output.txt:", error)
-        const errorMessage =
-          error instanceof Error ? error.message : String(error)
-        // Basic check for file not found type errors
-        if (
-          errorMessage.includes("FileNotFoundError") ||
-          errorMessage.includes("NoSuchFile") ||
-          errorMessage.includes("404") ||
-          errorMessage.toLowerCase().includes("not found")
-        ) {
-          return {
-            success: false,
-            error: "File 'test-output.txt' not found in sandbox.",
+      tools: allTools,
+      // Update state after code creation
+      lifecycle: {
+        onResponse: async ({ result, network }: any) => {
+          if (network?.state?.kv) {
+            const state = network.state.kv.get("network_state") || {}
+            // Revert to placeholder
+            /* const implementationFilePath = 'implementation.js';
+            try {
+              const sandboxIdFromState = state.sandboxId;
+              if (!sandboxIdFromState) throw new Error("Sandbox ID not found in state for CodingAgent hook");
+              console.log(`[CodingAgent Lifecycle] Reading ${implementationFilePath} from sandbox ${sandboxIdFromState}...`);
+              const fileContent = await step.run("read-implementation-code", async () => {
+                 const sandbox = await getSandbox(sandboxIdFromState);
+                 if (!sandbox) throw new Error("Sandbox not found for reading implementation code");
+                 return await sandbox.files.read(implementationFilePath);
+              });
+              state.current_code = fileContent;
+              console.log(`[CodingAgent Lifecycle] Stored implementation code content in state.`);
+            } catch (e) {
+               console.error(`[CodingAgent Lifecycle] Error reading ${implementationFilePath}:`, e);
+               state.current_code = `Error reading ${implementationFilePath}: ${e instanceof Error ? e.message : e}`;
+            } */
+            state.current_code = "implementation.js" // Reverted placeholder
+            state.status = "NEEDS_CRITIQUE"
+            network.state.kv.set("network_state", state)
+            // Simplified log message
+            console.log(
+              "[CodingAgent Lifecycle] State updated to NEEDS_CRITIQUE."
+            )
           }
-        }
-        return { success: false, error: `Failed to read file: ${errorMessage}` }
-      }
+          return result
+        },
+      },
     })
 
-    // --- Extract Summary and Modify Return --- //
-    const summary = networkResult.state.kv.get("task_summary") || "(no summary)"
-    console.log(`[HANDLER END] Returning summary and file content result.`)
-    // Modify return value to include file reading result
-    return {
-      summary,
-      fileReadResult: fileContentResult, // Include success/error and content if success
+    const criticAgent = createAgent({
+      name: "Critic Agent",
+      description: "Reviews code and tests for correctness and style.",
+      system: `You are a code reviewer agent. Your task is to review the provided implementation code ('implementation.js') and test code ('test.js') based on the original task description. 
+               Use the 'readFiles' tool to read both files. 
+               Provide your feedback as a critique.`,
+      model: deepseek({
+        apiKey: process.env.DEEPSEEK_API_KEY!,
+        model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
+      }),
+      tools: allTools, // Critic might need to read files
+      // Update state after critique
+      lifecycle: {
+        onResponse: async ({ result, network }: any) => {
+          const lastAssistantMessageText =
+            lastAssistantTextMessageContent(result)
+          if (network?.state?.kv) {
+            const state = network.state.kv.get("network_state") || {}
+            // Log state BEFORE updating to COMPLETED
+            console.log(
+              "[CriticAgent Lifecycle] State BEFORE completion:",
+              state
+            )
+            state.status = "COMPLETED"
+            state.critique = lastAssistantMessageText || "No critique provided."
+            network.state.kv.set("network_state", state)
+            // Log state AFTER updating to COMPLETED
+            console.log(
+              "[CriticAgent Lifecycle] State AFTER completion:",
+              state
+            )
+            console.log("[CriticAgent Lifecycle] State updated to COMPLETED")
+          }
+          return result
+        },
+      },
+    })
+
+    // --- Create TDD Network --- //
+    const devOpsNetwork = createDevOpsNetwork(
+      testerAgent,
+      codingAgent,
+      criticAgent
+    )
+
+    // --- Initialize State and Run Network --- //
+    console.log("[HANDLER] Initializing TDD network state...")
+    const initialTask = (event.data as any)?.input ?? ""
+    if (!initialTask) {
+      throw new Error("Input task is missing in the event data.")
     }
+    const initialState = {
+      task: initialTask,
+      status: "NEEDS_TEST",
+      sandboxId: sandboxId,
+    }
+    devOpsNetwork.state.kv.set("network_state", initialState)
+    console.log("[HANDLER] Starting TDD network run...")
+    await devOpsNetwork.run(initialTask)
+    console.log("[HANDLER] TDD Network run finished.")
+
+    // --- Cleanup or Read Final State --- //
+    const finalState = devOpsNetwork.state.kv.get("network_state")
+    console.log("[HANDLER] Final Network State:", finalState)
+
+    // Cleanup using sandboxId from handler scope
+    // const currentSandboxId = sandboxId; // Remove unused variable
+    // FIX: Temporarily disable killing the sandbox to allow inspection
+    /*
+    if (currentSandboxId) {
+      console.log(`[HANDLER] Killing sandbox ${currentSandboxId}...`)
+      await step.run("kill-sandbox", async () => {
+        if (!currentSandboxId) {
+          console.warn("[HANDLER STEP] Sandbox ID became null before killing.")
+          return
+        }
+        const sandbox = await getSandbox(currentSandboxId)
+        if (sandbox) {
+          await sandbox.kill()
+          console.log(`[HANDLER STEP] Sandbox ${currentSandboxId} killed.`)
+        } else {
+          console.warn(
+            `[HANDLER STEP] Sandbox ${currentSandboxId} not found for killing.`
+          )
+        }
+      })
+    }
+    */
+    console.log("[HANDLER END] Event processing complete.")
+    return { event, finalState }
   } catch (error) {
-    // ADDED: Catch block for overall handler errors
     console.error("[HANDLER ERROR] An error occurred:", error)
-    // Optionally re-throw or return an error structure
-    return {
-      error: `Handler failed: ${error instanceof Error ? error.message : String(error)}`,
-    }
-  } finally {
-    // ADDED: Finally block to ensure sandbox cleanup
-    if (!sandboxId) {
-      console.log("[HANDLER FINALLY] No sandbox ID to close.")
-      return
-    }
-    console.log(`[HANDLER FINALLY] Closing sandbox: ${sandboxId}`)
-    const sandbox = await getSandbox(sandboxId)
-    if (sandbox) {
-      // FIX: Use correct method name (assuming it's close)
-      // If the method is different, this needs adjustment based on E2B SDK
-      // COMMENTED OUT DUE TO TS ERROR - E2B METHOD UNKNOWN
-      // await sandbox.close() // Keep existing method name for now, assuming it's correct despite linter error
+    // Cleanup on error using sandboxId from handler scope
+    // const errorSandboxId = sandboxId; // Remove unused variable
+    // FIX: Temporarily disable killing the sandbox on error
+    /*
+    if (errorSandboxId) {
       console.log(
-        `[HANDLER FINALLY] Sandbox close SKIPPED - Method unknown. Sandbox ID: ${sandboxId}`
+        `[HANDLER ERROR] Attempting to kill sandbox ${errorSandboxId} after error...`
       )
-    } else {
-      console.warn(
-        `[HANDLER FINALLY] Sandbox ${sandboxId} not found for closing.`
-      )
+      try {
+        await step.run("kill-sandbox-on-error", async () => {
+          if (!errorSandboxId) {
+            console.warn(
+              "[HANDLER STEP ERROR] Sandbox ID became null before killing on error."
+            )
+            return
+          }
+          const sandbox = await getSandbox(errorSandboxId)
+          if (sandbox) {
+            await sandbox.kill()
+            console.log(
+              `[HANDLER STEP] Sandbox ${errorSandboxId} killed after error.`
+            )
+          } else {
+            console.warn(
+              `[HANDLER STEP] Sandbox ${errorSandboxId} not found for killing after error.`
+            )
+          }
+        })
+      } catch (killError) {
+        console.error(
+          `[HANDLER ERROR] Failed to kill sandbox ${errorSandboxId} after initial error:`,
+          killError
+        )
+      }
     }
+    */
+    throw error
   }
 }
 
@@ -327,10 +398,7 @@ async function codingAgentHandler({
 // FIX: Ensure codingAgentHandler is defined before being used here.
 // Define the function before exporting it.
 const codingAgentFunction = inngest.createFunction(
-  {
-    id: "Coding Agent", // Keep original ID
-    retries: 0,
-  },
+  { id: "coding-agent-tdd-function", name: "TDD Coding Agent Function" }, // Updated ID and Name
   { event: "coding-agent/run" },
   codingAgentHandler // Use the handler function defined above
 )
@@ -351,13 +419,13 @@ app.use(
   serve({ client: inngest, functions: [codingAgentFunction] })
 )
 
-const PORT = process.env.PORT || 3000
+const APP_PORT = process.env.APP_PORT || 8484 // Changed default port to 8484
 
 // Only start the server if not in a test environment
 if (process.env.NODE_ENV !== "test") {
-  app.listen(PORT, () => {
+  app.listen(APP_PORT, () => {
     console.log(
-      `[NODE-APP] Inngest server listening on http://localhost:${PORT}/api/inngest`
+      `[NODE-APP] Inngest server listening on http://localhost:${APP_PORT}/api/inngest` // Use APP_PORT
     )
   })
 }

@@ -1,44 +1,50 @@
 import { createNetwork } from "@inngest/agent-kit";
-// @ts-ignore - Temporarily ignore module resolution error - REMOVED
 import { deepseek } from "@inngest/ai/models";
-// Define the Network
-export function createDevOpsNetwork(codingAgent, refactoringAgent) {
+import { z } from "zod";
+// Define the Network States for TDD flow
+const NetworkStatus = z.enum([
+    "NEEDS_TEST",
+    "NEEDS_CODE",
+    "NEEDS_CRITIQUE",
+    "COMPLETED",
+]);
+// FIX: Use Agent type for function parameters
+export function createDevOpsNetwork(testerAgent, // Renamed from codingAgent, acts first
+codingAgent, // New agent
+criticAgent // New agent
+) {
     const network = createNetwork({
-        name: "DevOps team",
-        agents: [codingAgent, refactoringAgent],
+        name: "TDD DevOps Team",
+        agents: [testerAgent, codingAgent, criticAgent], // Added new agents
         defaultModel: deepseek({
             // Model for the router itself
             apiKey: process.env.DEEPSEEK_API_KEY,
             model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
         }),
         maxIter: 15,
-        // Improved Router Logic
+        // TDD Router Logic based on state status
         defaultRouter: async ({ network }) => {
-            const net = network || { state: { _messages: [], kv: new Map() } }; // Assume _messages might exist
-            // If task is already summarized, stop routing
-            if (net.state.kv.has("task_summary"))
-                return;
-            // Attempt to get the initial user input from the message history
-            // Note: Accessing _messages is speculative based on potential internal structure
-            const initialPrompt = net.state._messages?.[0]?.content?.toLowerCase() || "";
-            console.log(`[Router] Initial prompt detected (lowercase): "${initialPrompt.substring(0, 100)}..."`); // Log for debugging
-            // Keywords for refactoring tasks
-            const refactoringKeywords = [
-                "refactor",
-                "improve",
-                "clean up",
-                "optimize",
-                "readability",
-            ];
-            // Check if the initial prompt contains any refactoring keywords
-            const isRefactoringTask = refactoringKeywords.some(keyword => initialPrompt.includes(keyword));
-            if (isRefactoringTask) {
-                console.log("[Router] Routing to Refactoring Agent based on keywords.");
-                return refactoringAgent;
-            }
-            else {
-                console.log("[Router] Defaulting to Coding Agent.");
-                return codingAgent;
+            // Ensure network and state exist
+            const state = (network?.state?.kv?.get("network_state") || {
+                status: "NEEDS_TEST", // Default if no state found (should be set by caller)
+            });
+            console.log(`[Router] Current state status: ${state.status}`);
+            switch (state.status) {
+                case "NEEDS_TEST":
+                    console.log("[Router] Routing to Tester Agent.");
+                    return testerAgent;
+                case "NEEDS_CODE":
+                    console.log("[Router] Routing to Coding Agent.");
+                    return codingAgent;
+                case "NEEDS_CRITIQUE":
+                    console.log("[Router] Routing to Critic Agent.");
+                    return criticAgent;
+                case "COMPLETED":
+                    console.log("[Router] Task completed. Stopping.");
+                    return;
+                default:
+                    console.error(`[Router] Unknown status: ${state.status}. Defaulting to Tester.`);
+                    return testerAgent; // Fallback, should not happen ideally
             }
         },
     });
