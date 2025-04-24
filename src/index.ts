@@ -37,7 +37,8 @@ async function codingAgentHandler({
 }) {
   sandboxId = null
   try {
-    console.log("[HANDLER START] TDD Event received.")
+    // Log event ID at the very beginning
+    console.log(`[HANDLER START] Event ID: ${event.id}. TDD Event received.`)
     console.log("[HANDLER] Getting sandbox ID...")
     // Assign the global sandboxId variable
     sandboxId = await step.run("get-sandbox-id", async () => {
@@ -170,41 +171,32 @@ async function codingAgentHandler({
     // --- Define Agents --- //
     const testerAgent = createAgent({
       name: "Tester Agent",
-      description: "Writes unit tests based on a task description.",
-      system: `You are a QA engineer agent. Your task is to write simple unit tests (e.g., using Node.js 'assert') for a given function description. 
-               Use the 'createOrUpdateFiles' tool to save the test code into a file named 'test.js'. 
-               Do not write the implementation code itself. Output the test code in the specified file.`,
+      description: "Writes or revises unit tests based on task and critique.",
+      system: `You are a QA engineer agent. 
+               Your task is to write simple unit tests (e.g., using Node.js 'assert') for a given function description.
+               **If critique on previous tests is provided (check state.test_critique), address the critique and revise the tests.**
+               Use the 'createOrUpdateFiles' tool to save the final test code into a file named 'test.js'.
+               Do not write the implementation code itself.`,
       model: deepseek({
         apiKey: process.env.DEEPSEEK_API_KEY!,
         model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
       }),
       tools: allTools,
-      // Update state after test creation
       lifecycle: {
         onResponse: async ({ result, network }: any) => {
           if (network?.state?.kv) {
             const state = network.state.kv.get("network_state") || {}
             // Revert to placeholder for now due to logging/hook issues
-            /* try {
-              const sandboxIdFromState = state.sandboxId;
-              if (!sandboxIdFromState) throw new Error("Sandbox ID not found in state for TesterAgent hook");
-              console.log(`[TesterAgent Lifecycle] Reading test.js from sandbox ${sandboxIdFromState}...`);
-              const fileContent = await step.run("read-test-code", async () => {
-                 const sandbox = await getSandbox(sandboxIdFromState);
-                 if (!sandbox) throw new Error("Sandbox not found for reading test code");
-                 return await sandbox.files.read('test.js');
-              });
-              state.test_code = fileContent;
-              console.log(`[TesterAgent Lifecycle] Stored test code content in state.`);
-            } catch (e) {
-              console.error(`[TesterAgent Lifecycle] Error reading test.js:`, e);
-              state.test_code = `Error reading test.js: ${e instanceof Error ? e.message : e}`;
-            } */
             state.test_code = "test.js" // Reverted placeholder
-            state.status = "NEEDS_CODE"
+            // Set status for Critic to review the tests
+            state.status = "NEEDS_TEST_CRITIQUE"
+            // Clear previous test critique if any
+            state.test_critique = undefined
             network.state.kv.set("network_state", state)
-            // Simplified log message
-            console.log("[TesterAgent Lifecycle] State updated to NEEDS_CODE.")
+            // Log the new status
+            console.log(
+              "[TesterAgent Lifecycle] State updated to NEEDS_TEST_CRITIQUE."
+            )
           }
           return result
         },
@@ -213,43 +205,32 @@ async function codingAgentHandler({
 
     const codingAgent = createAgent({
       name: "Coding Agent",
-      description: "Writes implementation code based on task and tests.",
-      system: `You are a software developer agent. Your task is to write the implementation code for a function based on the provided task description and unit tests. 
-               Read the tests from 'test.js' using the 'readFiles' tool. 
-               Write the implementation code and save it into 'implementation.js' using the 'createOrUpdateFiles' tool.`,
+      description:
+        "Writes or revises implementation code based on task, tests, and critique.",
+      system: `You are a software developer agent. 
+               Your task is to write the implementation code for a function based on the provided task description and unit tests ('test.js'). 
+               Use the 'readFiles' tool to read the tests.
+               **If critique on previous code is provided (check state.code_critique), address the critique and revise the code.**
+               Write the final implementation code and save it into 'implementation.js' using the 'createOrUpdateFiles' tool.`,
       model: deepseek({
         apiKey: process.env.DEEPSEEK_API_KEY!,
         model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
       }),
       tools: allTools,
-      // Update state after code creation
       lifecycle: {
         onResponse: async ({ result, network }: any) => {
           if (network?.state?.kv) {
             const state = network.state.kv.get("network_state") || {}
             // Revert to placeholder
-            /* const implementationFilePath = 'implementation.js';
-            try {
-              const sandboxIdFromState = state.sandboxId;
-              if (!sandboxIdFromState) throw new Error("Sandbox ID not found in state for CodingAgent hook");
-              console.log(`[CodingAgent Lifecycle] Reading ${implementationFilePath} from sandbox ${sandboxIdFromState}...`);
-              const fileContent = await step.run("read-implementation-code", async () => {
-                 const sandbox = await getSandbox(sandboxIdFromState);
-                 if (!sandbox) throw new Error("Sandbox not found for reading implementation code");
-                 return await sandbox.files.read(implementationFilePath);
-              });
-              state.current_code = fileContent;
-              console.log(`[CodingAgent Lifecycle] Stored implementation code content in state.`);
-            } catch (e) {
-               console.error(`[CodingAgent Lifecycle] Error reading ${implementationFilePath}:`, e);
-               state.current_code = `Error reading ${implementationFilePath}: ${e instanceof Error ? e.message : e}`;
-            } */
             state.current_code = "implementation.js" // Reverted placeholder
-            state.status = "NEEDS_CRITIQUE"
+            // Set status for Critic to review the code
+            state.status = "NEEDS_CODE_CRITIQUE"
+            // Clear previous code critique if any
+            state.code_critique = undefined
             network.state.kv.set("network_state", state)
-            // Simplified log message
+            // Log the new status
             console.log(
-              "[CodingAgent Lifecycle] State updated to NEEDS_CRITIQUE."
+              "[CodingAgent Lifecycle] State updated to NEEDS_CODE_CRITIQUE."
             )
           }
           return result
@@ -259,36 +240,120 @@ async function codingAgentHandler({
 
     const criticAgent = createAgent({
       name: "Critic Agent",
-      description: "Reviews code and tests for correctness and style.",
-      system: `You are a code reviewer agent. Your task is to review the provided implementation code ('implementation.js') and test code ('test.js') based on the original task description. 
-               Use the 'readFiles' tool to read both files. 
-               Provide your feedback as a critique.`,
+      description:
+        "Reviews code and/or tests for correctness and style, providing clear feedback.",
+      system: `You are a code reviewer agent. 
+               Your task is to review provided code and/or tests based on the original task description.
+               **Current Status:** You will be called in either 'NEEDS_TEST_CRITIQUE' or 'NEEDS_CODE_CRITIQUE' status.
+               - If status is 'NEEDS_TEST_CRITIQUE', review the tests in 'test.js'.
+               - If status is 'NEEDS_CODE_CRITIQUE', review the code in 'implementation.js' against the tests in 'test.js'.
+               Use the 'readFiles' tool to read the necessary file(s).
+               **Output Format:** Provide clear feedback. 
+               - If everything is good, state **'Tests OK'** or **'Code OK'** or **'Approved'** or **'LGTM'**.
+               - If revisions are needed, clearly state **'Revision needed'** and explain the issues/errors/problems found.
+               Your response will determine the next step in the workflow.`,
       model: deepseek({
         apiKey: process.env.DEEPSEEK_API_KEY!,
         model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
       }),
-      tools: allTools, // Critic might need to read files
-      // Update state after critique
+      tools: allTools,
       lifecycle: {
         onResponse: async ({ result, network }: any) => {
-          const lastAssistantMessageText =
-            lastAssistantTextMessageContent(result)
+          const critiqueText =
+            lastAssistantTextMessageContent(result) || "No critique provided."
           if (network?.state?.kv) {
             const state = network.state.kv.get("network_state") || {}
-            // Log state BEFORE updating to COMPLETED
+            let nextStatus: string = state.status // Default to current status if logic fails
+            const currentStatus = state.status
+
             console.log(
-              "[CriticAgent Lifecycle] State BEFORE completion:",
-              state
+              `[CriticAgent Lifecycle] Received critique. Current status: ${currentStatus}`
             )
-            state.status = "COMPLETED"
-            state.critique = lastAssistantMessageText || "No critique provided."
+            console.log(
+              `[CriticAgent Lifecycle] Critique Text: ${critiqueText.substring(0, 100)}...`
+            )
+
+            // Simple keyword-based decision logic
+            const critiqueLower = critiqueText.toLowerCase()
+            const needsRevision =
+              critiqueLower.includes("revision") ||
+              critiqueLower.includes("issue") ||
+              critiqueLower.includes("error") ||
+              critiqueLower.includes("fix") ||
+              critiqueLower.includes("problem")
+
+            const isApproved =
+              critiqueLower.includes("approved") ||
+              critiqueLower.includes("ok") ||
+              critiqueLower.includes("looks good") ||
+              critiqueLower.includes("lgTM") // Common abbreviation
+
+            if (currentStatus === "NEEDS_TEST_CRITIQUE") {
+              state.test_critique = critiqueText
+              if (needsRevision) {
+                nextStatus = "NEEDS_TEST_REVISION"
+                console.log(
+                  "[CriticAgent Lifecycle] Decision: Tests need revision."
+                )
+              } else if (isApproved) {
+                nextStatus = "NEEDS_CODE"
+                console.log("[CriticAgent Lifecycle] Decision: Tests approved.")
+              } else {
+                console.log(
+                  "[CriticAgent Lifecycle] Decision: Ambiguous critique on tests. Assuming OK."
+                )
+                nextStatus = "NEEDS_CODE" // Default to OK if unsure
+              }
+            } else if (currentStatus === "NEEDS_CODE_CRITIQUE") {
+              state.code_critique = critiqueText
+              if (needsRevision) {
+                nextStatus = "NEEDS_CODE_REVISION"
+                console.log(
+                  "[CriticAgent Lifecycle] Decision: Code needs revision."
+                )
+              } else if (isApproved) {
+                nextStatus = "COMPLETED"
+                console.log(
+                  "[CriticAgent Lifecycle] Decision: Code approved. Completing task."
+                )
+                const finalCompletedState = { ...state, status: nextStatus }
+                console.log(
+                  "[CriticAgent Lifecycle] FINAL STATE (COMPLETED):",
+                  finalCompletedState
+                )
+              } else {
+                console.log(
+                  "[CriticAgent Lifecycle] Decision: Ambiguous critique on code. Assuming OK."
+                )
+                nextStatus = "COMPLETED" // Default to OK if unsure
+                const finalCompletedState = { ...state, status: nextStatus }
+                console.log(
+                  "[CriticAgent Lifecycle] FINAL STATE (COMPLETED) - Ambiguous Critique:",
+                  finalCompletedState
+                )
+              }
+            } else {
+              console.warn(
+                `[CriticAgent Lifecycle] Critic called in unexpected state: ${currentStatus}.`
+              )
+              // Decide what to do in unexpected state, maybe mark as completed?
+              nextStatus = "COMPLETED"
+              if (nextStatus === "COMPLETED") {
+                const finalCompletedState = { ...state, status: nextStatus }
+                console.log(
+                  "[CriticAgent Lifecycle] FINAL STATE (COMPLETED) - Unexpected:",
+                  finalCompletedState
+                )
+              }
+            }
+
+            state.status = nextStatus
+            // Remove general critique field if specific ones are used
+            // state.critique = critiqueText; // We store in specific fields now
             network.state.kv.set("network_state", state)
-            // Log state AFTER updating to COMPLETED
             console.log(
-              "[CriticAgent Lifecycle] State AFTER completion:",
-              state
+              `[CriticAgent Lifecycle] State updated to ${nextStatus}.`
             )
-            console.log("[CriticAgent Lifecycle] State updated to COMPLETED")
           }
           return result
         },
@@ -316,9 +381,17 @@ async function codingAgentHandler({
     devOpsNetwork.state.kv.set("network_state", initialState)
     console.log("[HANDLER] Starting TDD network run...")
     await devOpsNetwork.run(initialTask)
+    // Log right after network run finishes
+    console.log(
+      `[HANDLER POST-RUN] Network run finished at: ${new Date().toISOString()}`
+    )
     console.log("[HANDLER] TDD Network run finished.")
 
     // --- Cleanup or Read Final State --- //
+    // Log right before reading final state
+    console.log(
+      `[HANDLER PRE-READ] Reading final state at: ${new Date().toISOString()}`
+    )
     const finalState = devOpsNetwork.state.kv.get("network_state")
     console.log("[HANDLER] Final Network State:", finalState)
 
@@ -346,7 +419,7 @@ async function codingAgentHandler({
     }
     */
     console.log("[HANDLER END] Event processing complete.")
-    return { event, finalState }
+    return { event }
   } catch (error) {
     console.error("[HANDLER ERROR] An error occurred:", error)
     // Cleanup on error using sandboxId from handler scope
@@ -425,7 +498,7 @@ const APP_PORT = process.env.APP_PORT || 8484 // Changed default port to 8484
 if (process.env.NODE_ENV !== "test") {
   app.listen(APP_PORT, () => {
     console.log(
-      `[NODE-APP] Inngest server listening on http://localhost:${APP_PORT}/api/inngest` // Use APP_PORT
+      `[NODE-APP] Inngest server listening on http://localhost:${APP_PORT}/api/inngest`
     )
   })
 }
