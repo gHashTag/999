@@ -5,56 +5,24 @@ import * as fs from "node:fs"
 import { z } from "zod"
 import { Inngest, EventPayload } from "inngest"
 
-// Uncomment agent-kit imports
-import { createAgent, createNetwork, createTool } from "@inngest/agent-kit"
+// AgentKit Core (No longer needed here)
+// import { createAgent, createNetwork, createTool } from "@inngest/agent-kit"
 
-import { deepseek } from "@inngest/ai/models"
+// Models (No longer needed here)
+// import { deepseek } from "@inngest/ai/models"
 
-import { getSandbox, lastAssistantTextMessageContent } from "./inngest/utils.js"
+import { getSandbox } from "./inngest/utils.js"
 import { Sandbox } from "@e2b/code-interpreter"
+import { createCodingTools } from "./tools/index.js" // Import tools factory
+import { createCodingAgent } from "./agents/codingAgent.js" // Import coding agent factory
+import { createRefactoringAgent } from "./agents/refactoringAgent.js" // Import the new agent
+import { createDevOpsNetwork } from "./network.js" // Import network factory
 
 const inngest = new Inngest({ id: "agentkit-coding-agent" })
 
-// Remove Dummy implementations
-/*
-const createTool = (config: any) => ({ ...config, isTool: true });
-const createAgent = (config: any) => ({ ...config, isAgent: true });
-const createNetwork = (config: any) => ({
-  ...config,
-  isNetwork: true,
-  run: async (input: any) => {
-    console.warn("WARN: createNetwork is mocked, actual network run skipped.");
-    const summary =
-      typeof input === "string" && input.includes("<task_summary>")
-        ? input
-        : null;
-    return { state: { kv: new Map().set("task_summary", summary) } };
-  },
-});
-*/
-
-// Define Zod schemas for tool parameters to infer types
-const terminalParamsSchema = z.object({
-  command: z.string(),
-})
-const createOrUpdateFilesParamsSchema = z.object({
-  files: z.array(
-    z.object({
-      path: z.string(),
-      content: z.string(),
-    })
-  ),
-})
-const readFilesParamsSchema = z.object({
-  files: z.array(z.string()),
-})
-const runCodeParamsSchema = z.object({
-  code: z.string(),
-})
-
 // Define the main event payload schema
 const codingAgentEventSchema = z.object({
-  input: z.string(), // Assuming input is a string, adjust if needed
+  input: z.string(),
 })
 
 type CodingAgentEvent = EventPayload<{
@@ -62,7 +30,10 @@ type CodingAgentEvent = EventPayload<{
   data: z.infer<typeof codingAgentEventSchema>
 }>
 
-// Define the handler function separately
+// Initialize Inngest Client
+// const inngest = new Inngest({ id: "agentkit-coding-agent" })
+
+// --- Main Handler --- //
 async function codingAgentHandler({
   event,
   step,
@@ -75,179 +46,53 @@ async function codingAgentHandler({
     return sandbox.sandboxId
   })
 
-  // --->>> Tool definitions start here (no change in placement yet) <<<---
-  const toolTerminal = createTool({
-    name: "terminal",
-    description: "Use the terminal to run commands",
-    parameters: terminalParamsSchema,
-    // @ts-ignore - Temporarily ignore type mismatch for handler opts
-    handler: async (
-      params: z.infer<typeof terminalParamsSchema>,
-      { step }: { step: any }
-    ) => {
-      return await step?.run("terminal", async () => {
-        const buffers = { stdout: "", stderr: "" }
-        try {
-          const sandbox = await getSandbox(sandboxId)
-          if (!sandbox) throw new Error("Sandbox not found")
-          const result = await sandbox.commands.run(params.command, {
-            onStdout: (data: string) => {
-              buffers.stdout += data
-            },
-            onStderr: (data: string) => {
-              buffers.stderr += data
-            },
-          })
-          return result.stdout
-        } catch (e) {
-          console.error(
-            `Command failed: ${e} \nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`
-          )
-          return `Command failed: ${e} \nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`
-        }
-      })
-    },
-  })
+  // Instantiate tools with the sandboxId for this run
+  const tools = createCodingTools(sandboxId)
 
-  const toolCreateOrUpdateFiles = createTool({
-    name: "createOrUpdateFiles",
-    description: "Create or update files in the sandbox",
-    parameters: createOrUpdateFilesParamsSchema,
-    // @ts-ignore - Temporarily ignore type mismatch for handler opts
-    handler: async (
-      params: z.infer<typeof createOrUpdateFilesParamsSchema>,
-      { step }: { step: any }
-    ) => {
-      return await step?.run("createOrUpdateFiles", async () => {
-        try {
-          const sandbox = await getSandbox(sandboxId)
-          if (!sandbox) throw new Error("Sandbox not found")
-          for (const file of params.files) {
-            await sandbox.files.write(file.path, file.content)
-          }
-          return `Files created or updated: ${params.files
-            .map((f: { path: string; content: string }) => f.path)
-            .join(", ")}`
-        } catch (e) {
-          return "Error: " + e
-        }
-      })
-    },
-  })
+  // Instantiate agents
+  const codingAgent = createCodingAgent(tools)
+  const refactoringAgent = createRefactoringAgent(tools) // Instantiate the new agent
 
-  const toolReadFiles = createTool({
-    name: "readFiles",
-    description: "Read files from the sandbox",
-    parameters: readFilesParamsSchema,
-    // @ts-ignore - Temporarily ignore type mismatch for handler opts
-    handler: async (
-      params: z.infer<typeof readFilesParamsSchema>,
-      { step }: { step: any }
-    ) => {
-      return await step?.run("readFiles", async () => {
-        try {
-          const sandbox = await getSandbox(sandboxId)
-          if (!sandbox) throw new Error("Sandbox not found")
-          const contents = []
-          for (const file of params.files) {
-            const content = await sandbox.files.read(file)
-            contents.push({ path: file, content })
-          }
-          return JSON.stringify(contents)
-        } catch (e) {
-          return "Error: " + e
-        }
-      })
-    },
-  })
+  // Instantiate the network with *both* agents
+  const network = createDevOpsNetwork(codingAgent, refactoringAgent)
 
-  const toolRunCode = createTool({
-    name: "runCode",
-    description: "Run the code in the sandbox",
-    parameters: runCodeParamsSchema,
-    // @ts-ignore - Temporarily ignore type mismatch for handler opts
-    handler: async (
-      params: z.infer<typeof runCodeParamsSchema>,
-      { step }: { step: any }
-    ) => {
-      return await step?.run("runCode", async () => {
-        try {
-          const sandbox = await getSandbox(sandboxId)
-          if (!sandbox) throw new Error("Sandbox not found")
-          const result = await sandbox.runCode(params.code)
-          return result.logs.stdout.join("\n")
-        } catch (e) {
-          return "Error: " + e
-        }
-      })
-    },
-  })
-  // --->>> Tool definitions end here <<<---
-
-  const agent = createAgent({
-    name: "Coding Agent",
-    description: "An expert coding agent",
-    system: `You are a coding agent help the user to achieve the described task.
-
-    When running commands, keep in mind that the terminal is non-interactive, remind to use the '-y' flag when running commands.
-
-    Once the task completed, you should return the following information:
-    <task_summary>
-    </task_summary>
-
-    Think step-by-step before you start the task.
-    `,
-    model: deepseek({
-      apiKey: process.env.DEEPSEEK_API_KEY!,
-      model: process.env.DEEPSEEK_MODEL || "deepseek-coder", // Removed 'as any'
-    }),
-    tools: [toolTerminal, toolCreateOrUpdateFiles, toolReadFiles, toolRunCode],
-    lifecycle: {
-      onResponse: async ({ result, network }: any) => {
-        const lastAssistantMessageText = lastAssistantTextMessageContent(result)
-        if (lastAssistantMessageText?.includes("<task_summary>")) {
-          const net = network || { state: { kv: new Map() } }
-          net.state.kv.set("task_summary", lastAssistantMessageText)
-        }
-        return result
-      },
-    },
-  })
-
-  const network = createNetwork({
-    name: "coding-agent-network",
-    agents: [agent],
-    maxIter: 15,
-    defaultRouter: async ({ network }: any) => {
-      const net = network || { state: { kv: new Map() } }
-      if (net.state.kv.has("task_summary")) return
-      return agent
-    },
-  })
-
+  // Validate event data
   if (!event.data) {
     throw new Error("Event data is missing!")
   }
+
+  // Run the network
   // @ts-ignore - Temporarily ignore type error for event.data.input access
   await network.run(event.data.input)
 
+  // Download artifact
   await step.run("download-artifact", async () => {
     console.log("------------------------------------")
     console.log("Downloading artifact...")
     const sandbox = await getSandbox(sandboxId)
     if (!sandbox) throw new Error("Sandbox not found")
+    // Ensure the artifact name is consistent
+    const sandboxArtifactName = "artifact.tar.gz"
+    // Create the archive inside the sandbox
     await sandbox.commands.run(
-      "touch artifact.tar.gz && tar --exclude=artifact.tar.gz --exclude=node_modules --exclude=.npm --exclude=.env --exclude=.bashrc --exclude=.profile  --exclude=.bash_logout --exclude=.env* -zcvf artifact.tar.gz ."
+      `tar --exclude=${sandboxArtifactName} --exclude=node_modules --exclude=.npm --exclude=.env --exclude=.bashrc --exclude=.profile  --exclude=.bash_logout --exclude=.env* -zcvf ${sandboxArtifactName} .`
     )
-    const artifact = await sandbox.files.read("artifact.tar.gz", {
+    // Read the artifact blob
+    const artifact = await sandbox.files.read(sandboxArtifactName, {
       format: "blob",
     })
-    const localFileName = `artifact-${new Date().toISOString()}.tar.gz`
+    // Define local path and filename
+    const localDirectory = "artifacts" // Save inside artifacts/ directory
+    const localFileName = `${localDirectory}/artifact-${new Date().toISOString()}.tar.gz`
+    // Ensure the local directory exists (it should, we created it)
+    // fs.mkdirSync(localDirectory, { recursive: true }); // Keep commented unless issues arise
+    // Write the artifact file locally
     const arrayBuffer = await artifact.arrayBuffer()
-    fs.writeFileSync(localFileName, Buffer.from(arrayBuffer)) // Ensure correct fs usage
+    fs.writeFileSync(localFileName, Buffer.from(arrayBuffer))
     console.log(`Artifact downloaded in ${localFileName}`)
+    // Update extraction command hint
     console.log(
-      `Extract artifact by running: \`mkdir artifact && tar -xvzf ${localFileName} -C artifact\``
+      `Extract artifact by running: \`mkdir -p ${localFileName}-extracted && tar -xvzf ${localFileName} -C ${localFileName}-extracted\``
     )
     console.log("------------------------------------")
     await sandbox.kill()
@@ -257,33 +102,38 @@ async function codingAgentHandler({
   return finalNet?.state?.kv?.get("task_summary")
 }
 
-// Create the Inngest function using the handler
+// --- Inngest Function Definition --- //
 const agentFunction = inngest.createFunction(
   {
-    id: "Coding Agent",
+    id: "Coding Agent", // This ID might need renaming if it represents the network now
     retries: 0,
   },
   { event: "coding-agent/run" },
   codingAgentHandler
 )
 
-// Export the handler for testing, and the Inngest function object
-export { inngest, agentFunction, codingAgentHandler }
+// --- Export for Server --- //
+// No longer exporting individual agents/handlers directly
+// Export the Inngest client and the function(s) for the server
+export { inngest, agentFunction }
 
-// --- Add HTTP Server ---
+// --- HTTP Server (Entry Point) --- //
 import { serve } from "inngest/express" // Import the serve adapter
 import express from "express"
 
 const app = express()
 app.use(express.json()) // Middleware to parse JSON bodies
 
-// Serve Inngest functions at /api/inngest
-// Pass the inngest instance and the array of functions
+// Serve the Inngest function(s)
 app.use("/api/inngest", serve({ client: inngest, functions: [agentFunction] }))
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
-  console.log(
-    `[NODE-APP] Inngest server listening on http://localhost:${PORT}/api/inngest`
-  )
-})
+
+// Only start the server if not in a test environment
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(
+      `[NODE-APP] Inngest server listening on http://localhost:${PORT}/api/inngest`
+    )
+  })
+}
