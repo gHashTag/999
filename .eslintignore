@@ -1,0 +1,18 @@
+# ESLint Ignore
+
+# Build output
+dist/
+
+# Node modules
+node_modules/
+
+# Logs
+logs/
+
+# Coverage reports
+coverage/
+html/
+
+# Artifacts and potentially generated JS files in root
+artifacts/
+db.js 

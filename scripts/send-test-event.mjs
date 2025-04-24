@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 import http from "http"
 
 // --- Configuration ---
@@ -26,7 +27,7 @@ if (process.argv[2]) {
     const argData = JSON.parse(process.argv[2])
     eventPayload.data = argData
     console.log("Using event data from command line argument (parsed as JSON).")
-  } catch (e) {
+  } catch /* (e) */ {
     // Fallback to treating as a simple string input
     eventPayload.data.input = process.argv[2]
     console.log("Using event input string from command line argument.")

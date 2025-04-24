@@ -1,6 +1,6 @@
-import { createNetwork } from "@inngest/agent-kit"
-// @ts-ignore - Temporarily ignore module resolution error - REMOVED
+import { createNetwork, AgentRunOpts } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
+// FIX: Remove unused directive
 // Define the Network
 export function createDevOpsNetwork(codingAgent: any, refactoringAgent: any) {
   const network = createNetwork({
@@ -13,7 +13,7 @@ export function createDevOpsNetwork(codingAgent: any, refactoringAgent: any) {
     }),
     maxIter: 15,
     // Improved Router Logic
-    defaultRouter: async ({ network }: any) => {
+    defaultRouter: async ({ network }: AgentRunOpts) => {
       const net = network || { state: { _messages: [], kv: new Map() } } // Assume _messages might exist
 
       // If task is already summarized, stop routing

@@ -15,7 +15,7 @@
     "dev:test-report": "npx vite preview --outDir html",
     "dev:build-watch": "tsc --watch",
     "test": "vitest run",
-    "test:watch": "vitest",
+    "test:watch": "vitest --watch --ui --coverage.enabled=true",
     "test:ui": "vitest --ui",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
@@ -23,7 +23,8 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "start": "node dist/index.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "start:tutorial": "tsx src/tutorial.ts"
   },
   "dependencies": {
     "@e2b/code-interpreter": "^1.1.1",
@@ -46,6 +47,7 @@
     "eslint": "^9.25.1",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.2.6",
+    "globals": "^16.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.1",
     "msw": "^2.7.5",
@@ -63,5 +65,7 @@
       "eslint --fix",
       "prettier --write"
     ]
-  }
+  },
+  "keywords": [],
+  "author": ""
 }
