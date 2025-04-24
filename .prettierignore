@@ -1,0 +1,26 @@
+# .prettierignore
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Test reports
+html
+coverage
+
+# Environment variables
+.env
+
+# Lockfiles
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# Git hooks
+.husky
+
+# IDE/Editor config
+.cursor
+.vscode 

@@ -69,7 +69,7 @@ This section documents common issues encountered during testing and development,
   // import { someFunction } from "./myModule";
 
   // Correct:
-  import { someFunction } from "./myModule.js";
+  import { someFunction } from "./myModule.js"
   ```
 
 ### 2. Vitest: Errors Accessing `mock.calls` with `vi.spyOn`
@@ -95,4 +95,5 @@ This section documents common issues encountered during testing and development,
   expect(mockStepRun.mock.calls[0][0]).toBe(...); // Works!
   ```
   This approach ensures the mock function instance you are asserting against is the same one that was called.
+
 # 999

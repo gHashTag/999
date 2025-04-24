@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    /* Base Options from Node.js 18 */
+    "lib": ["es2023"],
+    "module": "node16",
+    "target": "es2022",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node16",
+    "allowSyntheticDefaultImports": true,
+
+    /* Source Map and Declaration Files */
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    /* Type Checking */
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+
+    /* Experimental Options */
+    // "experimentalDecorators": true,
+    // "emitDecoratorMetadata": true,
+
+    /* Advanced Options */
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+}

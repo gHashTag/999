@@ -1,0 +1,58 @@
+{
+  "name": "999",
+  "version": "0.1.0",
+  "description": "Standalone NeuroCoder agent using Inngest Agent Kit",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "start": "node dist/index.js",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@e2b/code-interpreter": "^1.1.1",
+    "@inngest/agent-kit": "latest",
+    "@inngest/ai": "latest",
+    "@inngest/middleware-encryption": "latest",
+    "dotenv": "^16.4.5",
+    "inngest": "latest",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.11",
+    "@typescript-eslint/eslint-plugin": "^8.31.0",
+    "@typescript-eslint/parser": "^8.31.0",
+    "@vitest/coverage-v8": "^3.1.2",
+    "@vitest/ui": "^3.1.2",
+    "eslint": "^9.25.1",
+    "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-prettier": "^5.2.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "msw": "^2.7.5",
+    "prettier": "^3.5.3",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.31.0",
+    "vitest": "^3.1.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
