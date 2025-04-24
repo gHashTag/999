@@ -11,7 +11,10 @@ This project contains a standalone NeuroCoder agent powered by the Inngest Agent
 ## Available Scripts
 
 - `pnpm run build`: Compile TypeScript code to `dist/`.
-- `pnpm run dev`: Compile TypeScript in watch mode.
+- `pnpm run dev`: **The primary command for development.** Runs `kill-ports.sh` and then starts both the Inngest dev server (`dev:serve`) and the Vite preview server for test reports (`dev:test-report`) concurrently with colored logs.
+- `pnpm run dev:build-watch`: Compile TypeScript in watch mode (the old `dev` behavior).
+- `pnpm run dev:serve`: Start only the Inngest dev server.
+- `pnpm run dev:test-report`: Start only the Vite preview server for test reports.
 - `pnpm run start`: Run the compiled code from `dist/`.
 - `pnpm run test`: Run all tests once using Vitest.
 - `pnpm run test:watch`: Run tests in watch mode.
@@ -43,8 +46,14 @@ A pre-commit hook is configured using Husky and lint-staged. Before each commit,
 
 1.  **Install dependencies:** `pnpm install`
 2.  **Set up environment variables:** Create a `.env` file based on `.env.example` (if it exists) and fill in your API keys (`DEEPSEEK_API_KEY`, `E2B_API_KEY`).
-3.  **Build the code:** `pnpm run build`
-4.  **Run the Inngest dev server:** `npx inngest-cli dev -f ./dist/index.js`
+3.  **Start the development environment:**
+    ```bash
+    pnpm run dev
+    ```
+    This will automatically:
+    - Stop processes on required ports (8288, 8289, 4173).
+    - Start the Inngest Dev Server (API at `http://localhost:8288`).
+    - Start the Vite preview server for the HTML test report (usually at `http://localhost:4173`).
 
 ## Running Tests
 
