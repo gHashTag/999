@@ -11,7 +11,7 @@
     "dev": "tsc --watch",
     "dev:serve": "npx inngest-cli dev",
     "dev:test-report": "npx vite preview --outDir html",
-    "dev:all": "concurrently \"pnpm run dev:serve\" \"pnpm run dev:test-report\"",
+    "dev:all": "concurrently --prefix-colors auto,blue,magenta \"pnpm:dev:serve\" \"pnpm:dev:test-report\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -48,6 +48,7 @@
     "prettier": "^3.5.3",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.31.0",
+    "vite": "^6.3.3",
     "vitest": "^3.1.2"
   },
   "engines": {
