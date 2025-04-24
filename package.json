@@ -8,10 +8,10 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
+    "dev": "bash scripts/kill-ports.sh && concurrently --prefix-colors auto,blue,magenta \"pnpm:dev:serve\" \"pnpm:dev:test-report\"",
+    "dev:build-watch": "tsc --watch",
     "dev:serve": "npx inngest-cli dev",
     "dev:test-report": "npx vite preview --outDir html",
-    "dev:all": "concurrently --prefix-colors auto,blue,magenta \"pnpm:dev:serve\" \"pnpm:dev:test-report\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
