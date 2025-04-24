@@ -9,6 +9,7 @@ import { Sandbox } from "@e2b/code-interpreter";
 //   TextPart,
 // } from "@inngest/agent-kit";
 export function lastAssistantTextMessageContent(result) {
+    // Используем any
     const output = result?.output; // Безопасный доступ
     if (!Array.isArray(output))
         return undefined;
@@ -21,10 +22,13 @@ export function lastAssistantTextMessageContent(result) {
     return content
         ? typeof content === "string"
             ? content
-            : Array.isArray(content) ? content.map((c) => c?.text).join("") : undefined // any + проверка
+            : Array.isArray(content)
+                ? content.map((c) => c?.text).join("")
+                : undefined // any + проверка
         : undefined;
 }
 export async function getSandbox(sandboxId) {
+    // Возвращаем null если ошибка
     try {
         const sandbox = await Sandbox.connect(sandboxId);
         await sandbox.setTimeout(5 * 60_000);

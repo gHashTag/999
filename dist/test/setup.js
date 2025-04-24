@@ -1,6 +1,6 @@
 import { beforeAll, afterEach, afterAll } from "vitest";
 import { setupServer } from "msw/node";
-import { handlers } from "../mocks/handlers.js"; // Import your handlers - Added .js extension
+import { handlers } from "../mocks/handlers.js";
 // Setup requests interception using the given handlers.
 const server = setupServer(...handlers);
 // Start server before all tests

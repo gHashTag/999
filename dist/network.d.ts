@@ -1,0 +1,2 @@
+export declare function createDevOpsNetwork(codingAgent: any, refactoringAgent: any): import("@inngest/agent-kit").Network<import("@inngest/agent-kit").StateData>;
+//# sourceMappingURL=network.d.ts.map
