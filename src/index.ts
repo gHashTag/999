@@ -3,7 +3,7 @@ import "dotenv/config"
 
 import * as fs from "node:fs"
 import { z } from "zod"
-import { Inngest } from "inngest"
+import { Inngest, EventPayload } from "inngest"
 
 // Uncomment agent-kit imports
 import { createAgent, createNetwork, createTool } from "@inngest/agent-kit"
@@ -33,8 +33,43 @@ const createNetwork = (config: any) => ({
 });
 */
 
+// Define Zod schemas for tool parameters to infer types
+const terminalParamsSchema = z.object({
+  command: z.string(),
+})
+const createOrUpdateFilesParamsSchema = z.object({
+  files: z.array(
+    z.object({
+      path: z.string(),
+      content: z.string(),
+    })
+  ),
+})
+const readFilesParamsSchema = z.object({
+  files: z.array(z.string()),
+})
+const runCodeParamsSchema = z.object({
+  code: z.string(),
+})
+
+// Define the main event payload schema
+const codingAgentEventSchema = z.object({
+  input: z.string(), // Assuming input is a string, adjust if needed
+})
+
+type CodingAgentEvent = EventPayload<{
+  name: "coding-agent/run"
+  data: z.infer<typeof codingAgentEventSchema>
+}>
+
 // Define the handler function separately
-async function codingAgentHandler({ event, step }: any) {
+async function codingAgentHandler({
+  event,
+  step,
+}: {
+  event: CodingAgentEvent
+  step: any
+}) {
   const sandboxId = await step.run("get-sandbox-id", async () => {
     const sandbox = await Sandbox.create() // Ensure Sandbox is imported
     return sandbox.sandboxId
@@ -44,16 +79,18 @@ async function codingAgentHandler({ event, step }: any) {
   const toolTerminal = createTool({
     name: "terminal",
     description: "Use the terminal to run commands",
-    parameters: z.object({
-      command: z.string(),
-    }),
-    handler: async ({ command }: any, { step }: any) => {
+    parameters: terminalParamsSchema,
+    // @ts-ignore - Temporarily ignore type mismatch for handler opts
+    handler: async (
+      params: z.infer<typeof terminalParamsSchema>,
+      { step }: { step: any }
+    ) => {
       return await step?.run("terminal", async () => {
         const buffers = { stdout: "", stderr: "" }
         try {
           const sandbox = await getSandbox(sandboxId)
           if (!sandbox) throw new Error("Sandbox not found")
-          const result = await sandbox.commands.run(command, {
+          const result = await sandbox.commands.run(params.command, {
             onStdout: (data: string) => {
               buffers.stdout += data
             },
@@ -75,24 +112,21 @@ async function codingAgentHandler({ event, step }: any) {
   const toolCreateOrUpdateFiles = createTool({
     name: "createOrUpdateFiles",
     description: "Create or update files in the sandbox",
-    parameters: z.object({
-      files: z.array(
-        z.object({
-          path: z.string(),
-          content: z.string(),
-        })
-      ),
-    }),
-    handler: async ({ files }: any, { step }: any) => {
+    parameters: createOrUpdateFilesParamsSchema,
+    // @ts-ignore - Temporarily ignore type mismatch for handler opts
+    handler: async (
+      params: z.infer<typeof createOrUpdateFilesParamsSchema>,
+      { step }: { step: any }
+    ) => {
       return await step?.run("createOrUpdateFiles", async () => {
         try {
           const sandbox = await getSandbox(sandboxId)
           if (!sandbox) throw new Error("Sandbox not found")
-          for (const file of files) {
+          for (const file of params.files) {
             await sandbox.files.write(file.path, file.content)
           }
-          return `Files created or updated: ${files
-            .map((f: any) => f.path)
+          return `Files created or updated: ${params.files
+            .map((f: { path: string; content: string }) => f.path)
             .join(", ")}`
         } catch (e) {
           return "Error: " + e
@@ -104,16 +138,18 @@ async function codingAgentHandler({ event, step }: any) {
   const toolReadFiles = createTool({
     name: "readFiles",
     description: "Read files from the sandbox",
-    parameters: z.object({
-      files: z.array(z.string()),
-    }),
-    handler: async ({ files }: any, { step }: any) => {
+    parameters: readFilesParamsSchema,
+    // @ts-ignore - Temporarily ignore type mismatch for handler opts
+    handler: async (
+      params: z.infer<typeof readFilesParamsSchema>,
+      { step }: { step: any }
+    ) => {
       return await step?.run("readFiles", async () => {
         try {
           const sandbox = await getSandbox(sandboxId)
           if (!sandbox) throw new Error("Sandbox not found")
           const contents = []
-          for (const file of files) {
+          for (const file of params.files) {
             const content = await sandbox.files.read(file)
             contents.push({ path: file, content })
           }
@@ -128,15 +164,17 @@ async function codingAgentHandler({ event, step }: any) {
   const toolRunCode = createTool({
     name: "runCode",
     description: "Run the code in the sandbox",
-    parameters: z.object({
-      code: z.string(),
-    }),
-    handler: async ({ code }: any, { step }: any) => {
+    parameters: runCodeParamsSchema,
+    // @ts-ignore - Temporarily ignore type mismatch for handler opts
+    handler: async (
+      params: z.infer<typeof runCodeParamsSchema>,
+      { step }: { step: any }
+    ) => {
       return await step?.run("runCode", async () => {
         try {
           const sandbox = await getSandbox(sandboxId)
           if (!sandbox) throw new Error("Sandbox not found")
-          const result = await sandbox.runCode(code)
+          const result = await sandbox.runCode(params.code)
           return result.logs.stdout.join("\n")
         } catch (e) {
           return "Error: " + e
@@ -159,8 +197,8 @@ async function codingAgentHandler({ event, step }: any) {
     Think step-by-step before you start the task.
     `,
     model: deepseek({
-      apiKey: process.env.DEEPSEEK_API_KEY,
-      model: (process.env.DEEPSEEK_MODEL || "deepseek-coder") as any,
+      apiKey: process.env.DEEPSEEK_API_KEY!,
+      model: process.env.DEEPSEEK_MODEL || "deepseek-coder", // Removed 'as any'
     }),
     tools: [toolTerminal, toolCreateOrUpdateFiles, toolReadFiles, toolRunCode],
     lifecycle: {
@@ -186,6 +224,10 @@ async function codingAgentHandler({ event, step }: any) {
     },
   })
 
+  if (!event.data) {
+    throw new Error("Event data is missing!")
+  }
+  // @ts-ignore - Temporarily ignore type error for event.data.input access
   await network.run(event.data.input)
 
   await step.run("download-artifact", async () => {
@@ -210,8 +252,8 @@ async function codingAgentHandler({ event, step }: any) {
     await sandbox.kill()
   })
 
-  const finalNet = network || { state: { kv: new Map() } }
-  return finalNet.state.kv.get("task_summary")
+  const finalNet = network
+  return finalNet?.state?.kv?.get("task_summary")
 }
 
 // Create the Inngest function using the handler
@@ -221,7 +263,7 @@ const agentFunction = inngest.createFunction(
     retries: 0,
   },
   { event: "coding-agent/run" },
-  codingAgentHandler // Pass the handler function here
+  codingAgentHandler
 )
 
 // Export the handler for testing, and the Inngest function object
