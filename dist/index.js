@@ -4,26 +4,19 @@ import { Inngest } from "inngest";
 import { getSandbox } from "./inngest/utils.js";
 import { Sandbox } from "@e2b/code-interpreter";
 import { createDevOpsNetwork } from "./network.js";
+import { NetworkStatus } from "./types.js";
 import { getAllTools } from "./toolDefinitions.js";
 import { createTesterAgent, createCodingAgent, createCriticAgent, } from "./agentDefinitions.js";
+import { log } from "./utils/logger.js";
 // Initialize Inngest Client
 const inngest = new Inngest({ id: "agentkit-tdd-agent" });
-// Helper for structured logging
-const log = (level, stepName, message, data = {}) => {
-    console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        level,
-        step: stepName,
-        sandboxId: sandboxId, // Include current sandboxId if available
-        message,
-        ...data,
-    }));
-};
 // --- Main Handler --- //
-let sandboxId = null;
+// FIX: Make sandboxId local to the handler, pass it explicitly where needed (e.g., to logger or tools)
+// let sandboxId: string | null = null
 async function codingAgentHandler({ event, step, // Use any type
  }) {
-    sandboxId = null;
+    // FIX: Make sandboxId local to the handler, pass it explicitly where needed (e.g., to logger or tools)
+    // sandboxId = null
     try {
         // Log event ID at the very beginning
         const eventId = event.id;
@@ -40,7 +33,7 @@ async function codingAgentHandler({ event, step, // Use any type
             return await getSandbox(id);
         };
         // Assign the global sandboxId variable
-        sandboxId = await step.run("get-sandbox-id", async () => {
+        const sandboxId = await step.run("get-sandbox-id", async () => {
             log("info", "CREATE_SANDBOX_STEP_START", "Creating sandbox...", {
                 eventId,
             });
@@ -68,6 +61,7 @@ async function codingAgentHandler({ event, step, // Use any type
             sandboxId,
             apiKey: process.env.DEEPSEEK_API_KEY,
             modelName: process.env.DEEPSEEK_MODEL || "deepseek-coder",
+            getSandbox: getSandboxForTools,
         };
         const testerAgent = createTesterAgent(agentDeps);
         const codingAgent = createCodingAgent(agentDeps);
@@ -90,39 +84,213 @@ async function codingAgentHandler({ event, step, // Use any type
         devOpsNetwork.state.kv.set("network_state", initialState);
         log("info", "NETWORK_RUN_START", "Starting TDD network run...", { eventId });
         await devOpsNetwork.run(initialTask);
-        log("info", "NETWORK_RUN_END", "TDD Network run finished.", { eventId });
-        // --- Cleanup or Read Final State --- //
-        log("info", "READ_FINAL_STATE_START", "Reading final state...", { eventId });
-        const finalState = devOpsNetwork.state.kv.get("network_state");
-        log("info", "READ_FINAL_STATE_END", "Final Network State retrieved.", {
+        log("info", "NETWORK_RUN_END", "TDD Network run finished (agents loop).", {
             eventId,
-            finalState,
         });
-        // Cleanup using sandboxId from handler scope
-        // const currentSandboxId = sandboxId; // Remove unused variable
+        // --- Wait for Network Completion Signal & Run Final Tests --- //
+        log("info", "WAIT_FOR_COMPLETION_START", "Waiting for network completion signal...", { eventId });
+        const completionEvent = await step.waitForEvent("wait-for-network-completion", {
+            event: "tdd/network.ready-for-test", // Event sent by CriticAgent on approval
+            timeout: "5m", // Adjust timeout as needed
+        });
+        if (!completionEvent) {
+            log("warn", "NETWORK_TIMEOUT", "Network did not reach READY_FOR_FINAL_TEST within timeout.", { eventId });
+            // Optionally update state to reflect timeout
+            const timeoutState = devOpsNetwork.state.kv.get("network_state") || {};
+            const finalTimeoutState = {
+                ...timeoutState,
+                task: timeoutState.task || "",
+                status: NetworkStatus.Enum.COMPLETED, // Or a specific TIMEOUT status
+                sandboxId: timeoutState.sandboxId ?? null,
+                error: "Network completion timeout.",
+            };
+            devOpsNetwork.state.kv.set("network_state", finalTimeoutState);
+            log("info", "FINAL_STATE_LOG", "Logging final network state after timeout.", { eventId, finalState: finalTimeoutState });
+            return { message: "Network timeout" };
+        }
+        log("info", "NETWORK_COMPLETED_EVENT", "Received network completion signal.", { eventId /*, completionEventData: completionEvent.data */ });
+        // Fetch the state *after* receiving the completion signal
+        const stateAfterNetwork = devOpsNetwork.state.kv.get("network_state");
+        // Double-check status just in case
+        if (stateAfterNetwork?.status === NetworkStatus.Enum.READY_FOR_FINAL_TEST) {
+            log("info", "FINAL_TEST_RUN_START", "State confirmed READY_FOR_FINAL_TEST. Running final tests...", {
+                eventId,
+                sandboxId: stateAfterNetwork.sandboxId,
+            });
+            // Run final tests within a step
+            await step.run("run-final-tests", async () => {
+                const testStepName = "STEP_run-final-tests";
+                // Use state fetched AFTER network completion
+                const currentState = stateAfterNetwork;
+                const testCode = currentState.test_code;
+                const implCode = currentState.implementation_code;
+                const currentSandboxId = currentState.sandboxId;
+                if (!currentSandboxId) {
+                    log("error", testStepName, "Sandbox ID missing before final tests.", {
+                        eventId,
+                    });
+                    // Update state to FAILED immediately
+                    const errorState = {
+                        ...currentState,
+                        task: currentState.task || "",
+                        status: NetworkStatus.Enum.COMPLETED_TESTS_FAILED,
+                        sandboxId: null,
+                        error: "Final test run failed: Sandbox ID missing.",
+                    };
+                    devOpsNetwork.state.kv.set("network_state", errorState);
+                    throw new Error("Cannot run final tests: Sandbox ID missing in state.");
+                }
+                if (!testCode || !implCode) {
+                    log("error", testStepName, "Code or tests missing for final run.", {
+                        eventId,
+                        sandboxId: currentSandboxId,
+                        hasTestCode: !!testCode,
+                        hasImplCode: !!implCode,
+                    });
+                    // Update state to FAILED
+                    const errorState = {
+                        ...currentState,
+                        task: currentState.task || "",
+                        status: NetworkStatus.Enum.COMPLETED_TESTS_FAILED,
+                        sandboxId: currentSandboxId,
+                        error: "Final test run failed: Code or tests missing.",
+                    };
+                    devOpsNetwork.state.kv.set("network_state", errorState);
+                    throw new Error("Code or tests missing for final run.");
+                }
+                // FIX: Get sandbox directly instead of finding tools
+                const sandbox = await getSandboxForTools(currentSandboxId);
+                if (!sandbox) {
+                    throw new Error(`Sandbox not found for ID: ${currentSandboxId}`);
+                }
+                let terminalResult = null;
+                try {
+                    log("info", `${testStepName}_WriteFiles`, "Writing test/impl files...", { eventId, sandboxId: currentSandboxId });
+                    // FIX: Use sandbox directly to write files
+                    await sandbox.files.write("implementation.js", implCode);
+                    await sandbox.files.write("test.js", testCode);
+                    log("info", `${testStepName}_RunTests`, "Running node test.js...", {
+                        eventId,
+                        sandboxId: currentSandboxId,
+                    });
+                    // FIX: Use sandbox directly to run command
+                    terminalResult = await sandbox.commands.run("node test.js");
+                }
+                catch (toolError) {
+                    log("error", testStepName, "Error during direct sandbox operation in final test run.", {
+                        eventId,
+                        sandboxId: currentSandboxId,
+                        error: toolError.message,
+                        stack: toolError.stack,
+                    });
+                    // Update state to FAILED
+                    const errorState = {
+                        ...currentState, // Use state fetched at start of step
+                        task: currentState.task || "",
+                        status: NetworkStatus.Enum.COMPLETED_TESTS_FAILED,
+                        sandboxId: currentSandboxId,
+                        error: `Final test run failed during tool execution: ${toolError.message}`,
+                    };
+                    devOpsNetwork.state.kv.set("network_state", errorState);
+                    throw toolError; // Rethrow to fail the step
+                }
+                // Analyze terminal result (similar logic to previous onFinish)
+                let finalTestStatus = NetworkStatus.Enum.COMPLETED_TESTS_FAILED;
+                let testOutput = "Error: Terminal result not available or invalid.";
+                let errorMessage = "Test Runner failed: Terminal result missing or invalid.";
+                if (terminalResult &&
+                    typeof terminalResult === "object" &&
+                    terminalResult !== null &&
+                    "exitCode" in terminalResult) {
+                    const termOutput = terminalResult;
+                    testOutput = `Exit Code: ${termOutput.exitCode}\nStdout:\n${termOutput.stdout || ""}\nStderr:\n${termOutput.stderr || ""}`;
+                    log("info", testStepName, "Analyzed terminal result.", {
+                        eventId,
+                        sandboxId: currentSandboxId,
+                        exitCode: termOutput.exitCode,
+                    });
+                    if (termOutput.error) {
+                        errorMessage = `Final test run failed via tool error: ${termOutput.error}`;
+                    }
+                    else if (termOutput.exitCode === 0) {
+                        if (termOutput.stderr && termOutput.stderr.trim() !== "") {
+                            errorMessage =
+                                "Final tests failed (stderr output detected despite exit code 0).";
+                        }
+                        else {
+                            finalTestStatus = NetworkStatus.Enum.COMPLETED_TESTS_PASSED;
+                            errorMessage = undefined;
+                            log("info", testStepName, "Final tests PASSED.", {
+                                eventId,
+                                sandboxId: currentSandboxId,
+                            });
+                        }
+                    }
+                    else {
+                        errorMessage = `Final tests failed (Exit Code: ${termOutput.exitCode}).`;
+                    }
+                }
+                else {
+                    log("error", testStepName, "Invalid terminal result received.", {
+                        eventId,
+                        sandboxId: currentSandboxId,
+                        terminalResult,
+                    });
+                }
+                // Update state with final test result
+                // Re-fetch state again before final update
+                const stateBeforeFinalUpdate = devOpsNetwork.state.kv.get("network_state") || {};
+                const finalStateUpdate = {
+                    ...stateBeforeFinalUpdate,
+                    task: stateBeforeFinalUpdate.task || "",
+                    status: finalTestStatus,
+                    sandboxId: currentSandboxId ?? null,
+                    error: errorMessage,
+                    test_run_output: testOutput,
+                    test_critique: undefined,
+                    code_critique: undefined,
+                };
+                devOpsNetwork.state.kv.set("network_state", finalStateUpdate);
+                log("info", testStepName, `Final state updated after tests. Status: ${finalTestStatus}.`, { eventId, sandboxId: currentSandboxId });
+            }); // End step.run("run-final-tests")
+            // Log the final state after the test step
+            const stateAfterTests = devOpsNetwork.state.kv.get("network_state");
+            log("info", "FINAL_STATE_LOG", "Logging final network state after tests.", { eventId, finalState: stateAfterTests });
+        }
+        else {
+            // This case should ideally not happen if waitForEvent worked correctly
+            // But log it just in case state changed unexpectedly or event was wrong
+            log("warn", "POST_NETWORK_CHECK_UNEXPECTED_STATUS", `Received completion signal, but status is ${stateAfterNetwork?.status}. Skipping final tests.`, { eventId });
+            log("info", "FINAL_STATE_LOG", "Logging final network state (skipped tests).", { eventId, finalState: stateAfterNetwork });
+        }
+        // Cleanup using sandboxId from the state
         // FIX: Temporarily disable killing the sandbox to allow inspection
         /*
-        if (currentSandboxId) {
-          console.log(`[HANDLER] Killing sandbox ${currentSandboxId}...`)
+        // Extract the sandbox ID *before* the potential kill step
+        const finalSandboxId = (
+          devOpsNetwork.state.kv.get("network_state") as TddNetworkState | undefined
+        )?.sandboxId
+        if (finalSandboxId) {
+          console.log(`[HANDLER] Killing sandbox ${finalSandboxId}...`)
           await step.run("kill-sandbox", async () => {
-            if (!currentSandboxId) {
+            if (!finalSandboxId) {
               console.warn("[HANDLER STEP] Sandbox ID became null before killing.")
               return
             }
-            const sandbox = await getSandbox(currentSandboxId)
+            const sandbox = await getSandbox(finalSandboxId) // Assuming getSandbox is available
             if (sandbox) {
               await sandbox.kill()
-              console.log(`[HANDLER STEP] Sandbox ${currentSandboxId} killed.`)
+              console.log(`[HANDLER STEP] Sandbox ${finalSandboxId} killed.`)
             } else {
               console.warn(
-                `[HANDLER STEP] Sandbox ${currentSandboxId} not found for killing.`
+                `[HANDLER STEP] Sandbox ${finalSandboxId} not found for killing.`
               )
             }
           })
         }
         */
         log("info", "HANDLER_END", "Event processing complete.", { eventId });
-        return { event };
+        return { finalState: devOpsNetwork.state.kv.get("network_state") };
     }
     catch (error) {
         log("error", "HANDLER_ERROR", "An error occurred in the main handler.", {
@@ -185,6 +353,9 @@ import { serve } from "inngest/express"; // Import the serve adapter
 import express from "express";
 const app = express();
 app.use(express.json()); // Middleware to parse JSON bodies
+// FIX: Import testRunnerAgent correctly if needed here or ensure it's defined
+// Assuming testRunnerAgent function definition is needed for the handler below
+// import { testRunnerAgent } from "./testRunnerAgent.js" // Re-add import if needed
 // Serve the Inngest function(s)
 // FIX: Use the correctly defined function variable
 app.use("/api/inngest", serve({ client: inngest, functions: [codingAgentFunction] }));
@@ -192,6 +363,7 @@ const APP_PORT = process.env.APP_PORT || 8484; // Changed default port to 8484
 // Only start the server if not in a test environment
 if (process.env.NODE_ENV !== "test") {
     app.listen(APP_PORT, () => {
+        // FIX: Use the imported log function
         log("info", "SERVER_START", `Inngest server listening on http://localhost:${APP_PORT}/api/inngest`, { port: APP_PORT });
     });
 }

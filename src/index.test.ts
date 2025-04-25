@@ -1,49 +1,64 @@
-import { describe, it, expect /*, vi*/ } from "vitest" // Commented out vi
-// Comment out direct import of handler as it's no longer exported
-// import { agentFunction, codingAgentHandler } from "./index";
-import { agentFunction } from "./index.js" // Import only agentFunction
-// Removed unused import: import { Inngest } from "inngest"
-// Remove unused import causing error
-// import { TEventPayloadSchemas } from "./inngest/types";
+import { describe, it, expect, vi, beforeEach } from "vitest"
+// FIX: Remove unused import
+// import { Inngest } from "inngest"
+// FIX: Import codingAgent (exported as codingAgent from index.ts)
+import { inngest, codingAgent } from "./index.js"
 
-// Mock Inngest if necessary for more complex tests
-// const mockInngest = new Inngest</* TEventPayloadSchemas - removed */>({ id: "test-app" });
+// Define mock data for the event
+const testEventData = { input: "Write a function to add two numbers." }
 
-// Mocks for Inngest execution context
-// Removed unused mock: const mockStepRunResult = "mock-sandbox-id"
-// Keep the mock object, but we will spy on its method
-// Removed unused mock:
-// const mockStepObject = {
-//   run: async (name: string, _fn: any) => { // Mark fn as unused
-//     console.log(`mockStepObject.run called for: ${name}`) // Add logging
-//     if (name === "get-sandbox-id") {
-//       return "mock-sandbox-id";
-//     } else if (name === "download-artifact") {
-//       return Promise.resolve()
-//     } else {
-//       console.warn(`WARN: Unmocked step.run called for: ${name}`)
-//       return Promise.resolve(`mock result for ${name}`)
-//     }
-//   },
-// }
-// Removed unused mock: const mockEvent = {
-//   data: { input: "Test task description" },
-// }
+// Mock the dependencies that the agent function might use
+vi.mock("@e2b/code-interpreter", () => ({
+  Sandbox: {
+    create: vi.fn().mockResolvedValue({
+      sandboxId: "mock-sandbox-id",
+      // Add other methods/properties if needed by the code under test
+      kill: vi.fn().mockResolvedValue(undefined),
+      // Mock other necessary sandbox methods if called
+    }),
+  },
+}))
+
+// FIX: Correct describe block structure
+describe("Inngest Function Triggering", () => {
+  // Mock getSandbox - adjust if its implementation changes
+  // vi.mock("./inngest/utils.js", () => ({
+  //   getSandbox: vi.fn().mockResolvedValue(null), // Assume sandbox doesn't exist initially
+  // }));
+
+  beforeEach(() => {
+    // Reset mocks before each test if necessary
+    vi.clearAllMocks()
+  })
+
+  it("should process a coding task event", async () => {
+    // FIX: Use the imported agent (codingAgent)
+    const result = await inngest.send({
+      name: "coding-agent/run",
+      data: testEventData,
+    })
+
+    // Example assertions (adjust based on expected outcome)
+    expect(result).toBeDefined()
+    // TODO: Add more specific assertions based on what codingAgentHandler should do
+    // For example, check if certain steps were called using step.invoke mocks if needed
+  })
+})
 
 // --- Entire describe block for "agentFunction logic" is removed --- //
 
-// Basic test suite for agentFunction configuration object
+// Basic test suite for agentFunction configuration
 describe("agentFunction configuration", () => {
   it("should be defined and be an object", () => {
     // Expect the configuration object to exist
-    expect(agentFunction).toBeDefined()
-    expect(agentFunction).not.toBeNull()
+    expect(codingAgent).toBeDefined()
+    expect(codingAgent).not.toBeNull()
 
     // Check if it's an object (which is what createFunction returns)
-    expect(typeof agentFunction).toBe("object")
+    expect(typeof codingAgent).toBe("object")
 
     // Optionally, check for specific properties if needed later
-    // expect(agentFunction.id).toBe("Coding Agent");
+    // expect(codingAgent.id).toBe("Coding Agent");
 
     // Later, we will add tests for the actual function logic,
     // likely by mocking the Inngest execution environment or step functions.
@@ -52,10 +67,10 @@ describe("agentFunction configuration", () => {
   // New test for the function ID
   it("should have the correct ID", () => {
     // Remove console.log
-    // console.log("agentFunction object structure:", agentFunction);
+    // console.log("codingAgent object structure:", codingAgent);
 
     // Check the ID within the options object
-    expect(agentFunction.opts.id).toBe("Coding Agent")
+    expect(codingAgent.opts.id).toBe("Coding Agent")
   })
 
   // Add more tests here as functionality grows

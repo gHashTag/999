@@ -106,3 +106,153 @@ This section documents common issues encountered during testing and development,
   This approach ensures the mock function instance you are asserting against is the same one that was called.
 
 # 999
+
+# NeuroCoder TDD Orchestration Example
+
+This project demonstrates a standalone NeuroCoder agent using the Inngest Agent Kit, focusing on a Test-Driven Development (TDD) orchestration pattern with multiple agents (Tester, Coder, Critic).
+
+## Overview
+
+The goal is to create a system where a task is passed through a network of agents:
+
+1.  **Tester:** Writes tests for the task.
+2.  **Coder:** Writes implementation code based on the tests.
+3.  **Critic:** Reviews both tests and code, providing feedback or approving the result.
+
+This cycle utilizes E2B sandboxes for code execution and Inngest for managing the agent workflows and state.
+
+## Project Structure
+
+```
+.
+├── src/                # Source code
+│   ├── agents/         # Agent definitions (prompts, tools, logic) (placeholder)
+│   ├── tools/          # Tool definitions for agents (placeholder)
+│   ├── index.ts        # Main Inngest function definition and Express server setup
+│   ├── network.ts      # Definition of the TDD agent network and router
+│   ├── agentDefinitions.ts # Functions to create agent instances
+│   ├── toolDefinitions.ts  # Functions to create tool instances
+│   ├── types.ts        # TypeScript types and interfaces
+│   └── inngest/        # Inngest specific utilities (e.g., sandbox management)
+├── scripts/            # Utility shell scripts
+├── dist/               # Compiled JavaScript output (from TypeScript)
+├── artifacts/          # Directory for downloaded E2B artifacts (.gitignore-d)
+├── html/               # Directory for Vitest HTML report output (.gitignore-d)
+├── .env.example        # Example environment variables
+├── package.json        # Project dependencies and scripts
+├── tsconfig.json       # TypeScript configuration
+├── vitest.config.ts    # Vitest configuration
+├── README.md           # This file
+└── ROADMAP.md          # Detailed plan and progress tracking
+```
+
+## Setup
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd <repository-directory>
+    ```
+2.  **Install dependencies:** Requires Node.js and pnpm.
+    ```bash
+    pnpm install
+    ```
+3.  **Configure Environment Variables:**
+    - Copy `.env.example` to `.env`.
+    - Fill in your `E2B_API_KEY` and `DEEPSEEK_API_KEY`. You might need to adjust `DEEPSEEK_MODEL` if you prefer a different DeepSeek model.
+    ```bash
+    cp .env.example .env
+    # Edit .env with your keys
+    ```
+4.  **Setup Git Hooks (Optional but Recommended):**
+    ```bash
+    pnpm prepare
+    # or directly: npx husky install
+    ```
+
+## Development Environment
+
+The primary command for local development is:
+
+```bash
+pnpm run dev
+```
+
+This command performs several actions using `concurrently`:
+
+1.  **Cleans Ports:** Runs `scripts/kill-ports.sh` to free up potentially conflicting ports (8288, 8289, 4173, 3000, 5000, 8484).
+2.  **Build Watch:** Runs `tsc --watch` to continuously compile TypeScript files into the `dist/` directory.
+3.  **Inngest Dev Server:** Runs `npx inngest-cli dev -u http://localhost:8484/api/inngest`. This is the core Inngest development server that listens for events and triggers function runs. It connects to the application server running on port 8484.
+4.  **Test Report Server:** Runs `npx vite preview --outDir html` to serve the Vitest HTML coverage report (usually accessible at `http://localhost:4173`).
+
+**Important Notes:**
+
+- The `dev` script **does not** run `node dist/index.js` directly anymore. The `inngest-cli dev` server handles the execution of Inngest functions defined in `dist/index.js`.
+- The `--raw` flag is passed to `concurrently` to preserve color output from the individual processes.
+
+**Troubleshooting:**
+
+- **Port Conflicts (`EADDRINUSE`):** If `pnpm run dev` fails due to port conflicts even after the `kill-ports.sh` script, some processes might not have terminated correctly. You can manually kill them using `pkill`. Open a separate terminal and run:
+  ```bash
+  # Stop all related dev processes forcefully
+  pkill -f 'pnpm run dev' && pkill -f 'inngest-cli dev' && pkill -f 'vite preview' && pkill -f 'tsc --watch' && pkill -f 'nodemon'
+  # Run this command a couple of times if needed, then try 'pnpm run dev' again.
+  ```
+- **Stale Commands/Behavior:** If `pnpm run dev` seems to be running an old version of the script (e.g., still trying to launch `nodemon`), try cleaning the pnpm cache:
+  ```bash
+  pnpm store prune
+  ```
+  If that doesn't work, try a full reinstall:
+  ```bash
+  rm -rf node_modules
+  pnpm install
+  ```
+  Then, use the `pkill` command above before running `pnpm run dev` again.
+
+## Sending Test Events
+
+To trigger the `coding-agent/run` function during development, use the provided script:
+
+```bash
+# Ensure 'pnpm run dev' is running in another terminal
+
+# Send event with default task
+node scripts/send-test-event.mjs
+
+# Send event with a custom task string
+node scripts/send-test-event.mjs "Implement a function that calculates Fibonacci sequence"
+
+# Send event with custom JSON data (pass as a single string argument)
+node scripts/send-test-event.mjs '{"input": "Refactor this code to use async/await", "context": "some existing code..."}'
+```
+
+## Running Tests
+
+- **Run all tests once:** `pnpm test`
+- **Run tests in watch mode with UI and coverage:** `pnpm run test:watch` (Access UI typically at `http://localhost:51204/__vitest__/`)
+- **Generate coverage report:** `pnpm run coverage` (HTML report available in `html/` directory, view with `pnpm run dev:test-report`)
+
+## Linting and Formatting
+
+- **Check formatting:** `pnpm run format:check`
+- **Apply formatting:** `pnpm run format`
+- **Check linting:** `pnpm run lint`
+- **Apply linting fixes:** `pnpm run lint:fix`
+
+These checks are also run automatically on staged files before committing if you've set up Husky hooks (`pnpm prepare`).
+
+## Building for Production
+
+```bash
+pnpm run build
+```
+
+This compiles TypeScript code to the `dist/` directory.
+
+## Starting in Production Mode
+
+```bash
+node dist/index.js
+```
+
+This starts the Express server which serves the Inngest functions. Ensure necessary environment variables are set.

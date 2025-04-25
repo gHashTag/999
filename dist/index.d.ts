@@ -8,7 +8,11 @@ declare function codingAgentHandler({ event, step, }: {
     event: CodingAgentEvent;
     step: any;
 }): Promise<{
-    event: CodingAgentEvent;
+    message: string;
+    finalState?: undefined;
+} | {
+    finalState: any;
+    message?: undefined;
 }>;
 declare const codingAgentFunction: import("inngest").InngestFunction<Omit<import("inngest").InngestFunction.Options<Inngest<{
     id: string;

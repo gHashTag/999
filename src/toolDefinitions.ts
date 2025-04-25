@@ -17,13 +17,13 @@ type LoggerFunc = (
 type GetSandboxFunc = (sandboxId: string) => Promise<Sandbox | null>
 
 // --- Tool Schema Definitions --- //
-const terminalParamsSchema = z.object({ command: z.string() })
-const createOrUpdateFilesParamsSchema = z.object({
+export const terminalParamsSchema = z.object({ command: z.string() })
+export const createOrUpdateFilesParamsSchema = z.object({
   files: z.array(z.object({ path: z.string(), content: z.string() })),
 })
-const readFilesParamsSchema = z.object({ files: z.array(z.string()) })
-const runCodeParamsSchema = z.object({ code: z.string() })
-const processArtifactParamsSchema = z.object({
+export const readFilesParamsSchema = z.object({ files: z.array(z.string()) })
+export const runCodeParamsSchema = z.object({ code: z.string() })
+export const processArtifactParamsSchema = z.object({
   artifactPath: z.string().describe("Local path to the .tar.gz artifact file"),
   fileToRead: z
     .string()
@@ -79,7 +79,11 @@ export function createTerminalTool(
             stdoutLen: result.stdout.length,
             stderrLen: result.stderr.length,
           })
-          return result.stdout
+          return {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode,
+          }
         } catch (e: any) {
           log("error", `${toolStepName}_ERROR`, "Terminal command failed.", {
             eventId,
@@ -90,7 +94,12 @@ export function createTerminalTool(
             stdout: buffers.stdout,
             stderr: buffers.stderr,
           })
-          return `Command failed: ${e.message} \nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`
+          return {
+            stdout: buffers.stdout,
+            stderr: buffers.stderr,
+            exitCode: -1,
+            error: `Command failed: ${e.message}`,
+          }
         }
       })
     },
@@ -112,12 +121,11 @@ export function createCreateOrUpdateFilesTool(
       const currentSandboxId = sandboxId
       const toolStepName = "TOOL_createOrUpdateFiles"
       const filePaths = params.files.map(f => f.path)
-      log(
-        "info",
-        `${toolStepName}_START`,
-        "Creating/updating files and artifact.",
-        { eventId, currentSandboxId, files: filePaths }
-      )
+      log("info", `${toolStepName}_START`, "Creating/updating files.", {
+        eventId,
+        currentSandboxId,
+        files: filePaths,
+      })
       return await step?.run(toolStepName, async () => {
         try {
           if (!currentSandboxId)
@@ -126,24 +134,7 @@ export function createCreateOrUpdateFilesTool(
           if (!sandbox)
             throw new Error(`Sandbox not found for ID: ${currentSandboxId}`)
 
-          const writtenFilePaths: string[] = []
-          log(
-            "info",
-            `${toolStepName}_WRITE_START`,
-            "Writing files to sandbox.",
-            { eventId, currentSandboxId, files: filePaths }
-          )
-          for (const file of params.files) {
-            await sandbox.files.write(file.path, file.content)
-            writtenFilePaths.push(file.path)
-          }
-          log("info", `${toolStepName}_WRITE_END`, "Files written.", {
-            eventId,
-            currentSandboxId,
-            writtenFiles: writtenFilePaths,
-          })
-
-          if (writtenFilePaths.length === 0) {
+          if (params.files.length === 0) {
             log(
               "warn",
               `${toolStepName}_NO_FILES`,
@@ -152,134 +143,80 @@ export function createCreateOrUpdateFilesTool(
             )
             return {
               message: "No files specified to write.",
-              artifactPath: null,
+              files: [],
             }
           }
 
+          const writtenFilesData: Array<{ path: string; content: string }> = []
           log(
             "info",
-            `${toolStepName}_ARCHIVE_START`,
-            "Creating artifact for written files...",
-            { eventId, currentSandboxId, filesToArchive: writtenFilePaths }
+            `${toolStepName}_WRITE_START`,
+            "Writing files to sandbox.",
+            { eventId, currentSandboxId, files: filePaths }
           )
-          const archiveCommand = `
-                      TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%S.%NZ')
-                      ARTIFACT_FILENAME="artifact-$TIMESTAMP.tar.gz"
-                      REMOTE_ARCHIVE_PATH="/home/user/$ARTIFACT_FILENAME"
-                      tar -czvf "$REMOTE_ARCHIVE_PATH" ${writtenFilePaths.map(p => `"${p}"`).join(" ")} || echo "Error archiving"
-                      echo "$REMOTE_ARCHIVE_PATH"
-                    `
-          log(
-            "info",
-            `${toolStepName}_ARCHIVE_CMD_RUN`,
-            "Running archive command...",
-            { eventId, currentSandboxId }
-          )
-          const execResult = await sandbox.commands.run(archiveCommand)
-
-          const stdoutLines = execResult.stdout.trim().split("\n")
-          const remoteArchivePath = stdoutLines.find(
-            line =>
-              line.startsWith("/home/user/artifact-") &&
-              line.endsWith(".tar.gz")
-          )
-
-          if (!remoteArchivePath || execResult.stderr) {
+          for (const file of params.files) {
+            await sandbox.files.write(file.path, file.content)
             log(
-              "error",
-              `${toolStepName}_ARCHIVE_CMD_ERROR`,
-              "Archive creation failed or path not found.",
-              {
-                eventId,
-                currentSandboxId,
-                stdout: execResult.stdout,
-                stderr: execResult.stderr,
-              }
+              "info",
+              `${toolStepName}_READ_BACK_START`,
+              "Reading file content back.",
+              { eventId, currentSandboxId, filePath: file.path }
             )
-            throw new Error(
-              `Failed to create archive or find path: ${execResult.stderr || "stdout did not contain expected path"}`
-            )
+            try {
+              const content = await sandbox.files.read(file.path)
+              writtenFilesData.push({ path: file.path, content })
+              log(
+                "info",
+                `${toolStepName}_READ_BACK_SUCCESS`,
+                "Successfully read file content back.",
+                {
+                  eventId,
+                  currentSandboxId,
+                  filePath: file.path,
+                  length: content.length,
+                }
+              )
+            } catch (readError: any) {
+              log(
+                "error",
+                `${toolStepName}_READ_BACK_ERROR`,
+                "Failed to read file content back after writing.",
+                {
+                  eventId,
+                  currentSandboxId,
+                  filePath: file.path,
+                  error: readError.message,
+                }
+              )
+              throw new Error(
+                `Failed to read back file ${file.path}: ${readError.message}`
+              )
+            }
           }
           log(
             "info",
-            `${toolStepName}_ARCHIVE_CMD_SUCCESS`,
-            "Remote archive created.",
-            { eventId, currentSandboxId, remoteArchivePath }
+            `${toolStepName}_WRITE_END`,
+            "Files written and read back.",
+            {
+              eventId,
+              currentSandboxId,
+              writtenFiles: writtenFilesData.map(f => f.path),
+            }
           )
-
-          log(
-            "info",
-            `${toolStepName}_READ_ARTIFACT_START`,
-            "Reading artifact content...",
-            { eventId, currentSandboxId, remoteArchivePath }
-          )
-          const archiveBuffer = await sandbox.files.read(remoteArchivePath)
-          log(
-            "info",
-            `${toolStepName}_READ_ARTIFACT_END`,
-            "Artifact content read.",
-            { eventId, currentSandboxId, bytes: archiveBuffer.length }
-          )
-
-          const localArtifactDir = "artifacts"
-          const localPath = path.join(
-            localArtifactDir,
-            path.basename(remoteArchivePath)
-          )
-          log(
-            "info",
-            `${toolStepName}_SAVE_ARTIFACT_START`,
-            "Saving artifact locally...",
-            { eventId, localPath }
-          )
-          await fs.promises.mkdir(localArtifactDir, { recursive: true })
-          await fs.promises.writeFile(localPath, archiveBuffer)
-          log(
-            "info",
-            `${toolStepName}_SAVE_ARTIFACT_END`,
-            "Artifact saved locally.",
-            { eventId, localPath }
-          )
-
-          log(
-            "info",
-            `${toolStepName}_CLEANUP_START`,
-            "Cleaning up remote archive.",
-            { eventId, currentSandboxId, remoteArchivePath }
-          )
-          sandbox.commands
-            .run(`rm -f ${remoteArchivePath}`)
-            .then(() =>
-              log(
-                "info",
-                `${toolStepName}_CLEANUP_SUCCESS`,
-                "Remote archive cleaned up.",
-                { eventId, currentSandboxId }
-              )
-            )
-            .catch(e =>
-              log(
-                "warn",
-                `${toolStepName}_CLEANUP_ERROR`,
-                "Cleanup archive failed.",
-                { eventId, currentSandboxId, error: e.message }
-              )
-            )
 
           log(
             "info",
             `${toolStepName}_SUCCESS`,
-            "Tool finished successfully.",
+            "Tool finished successfully, returning file contents.",
             {
               eventId,
               currentSandboxId,
-              localArtifactPath: localPath,
-              message: `Files created/updated: ${writtenFilePaths.join(", ")}`,
+              returnedFiles: writtenFilesData.map(f => f.path),
             }
           )
           return {
-            message: `Files created/updated: ${writtenFilePaths.join(", ")}`,
-            artifactPath: localPath,
+            message: `Files created/updated: ${writtenFilesData.map(f => f.path).join(", ")}`,
+            files: writtenFilesData,
           }
         } catch (e: any) {
           log(
@@ -289,8 +226,8 @@ export function createCreateOrUpdateFilesTool(
             { eventId, currentSandboxId, error: e.message, stack: e.stack }
           )
           return {
-            message: `Error creating/updating files or artifact: ${e.message}`,
-            artifactPath: null,
+            message: `Error creating/updating files: ${e.message}`,
+            files: [],
             error: true,
           }
         }
