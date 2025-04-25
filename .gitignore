@@ -8,3 +8,5 @@ logs/
 
 # Artifacts
 artifacts/
+
+dist/

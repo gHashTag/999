@@ -233,7 +233,7 @@ fastify.register(fastifyPlugin, {
 })
 
 // Базовый обработчик для GET /, чтобы waitForUrl мог проверить доступность
-fastify.get("/", async (request, reply) => {
+fastify.get("/", async (_request, reply) => {
   return reply.send("OK")
 })
 
