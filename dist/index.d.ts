@@ -1,17 +1,6 @@
 import "dotenv/config";
-import { z } from "zod";
-import { Inngest, EventPayload } from "inngest";
-declare const codingAgentEventSchema: z.ZodObject<{
-    input: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    input: string;
-}, {
-    input: string;
-}>;
-type CodingAgentEvent = EventPayload<{
-    name: "coding-agent/run";
-    data: z.infer<typeof codingAgentEventSchema>;
-}>;
+import { Inngest } from "inngest";
+import { CodingAgentEvent } from "./types.js";
 declare const inngest: Inngest<{
     id: string;
 }>;
@@ -20,7 +9,6 @@ declare function codingAgentHandler({ event, step, }: {
     step: any;
 }): Promise<{
     event: CodingAgentEvent;
-    finalState: any;
 }>;
 declare const codingAgentFunction: import("inngest").InngestFunction<Omit<import("inngest").InngestFunction.Options<Inngest<{
     id: string;
@@ -30,14 +18,14 @@ declare const codingAgentFunction: import("inngest").InngestFunction<Omit<import
     id: string;
 }>, string, {
     logger: import("inngest/middleware/logger").Logger;
-    event: import("inngest").FailureEventPayload<EventPayload<any>>;
     error: Error;
+    event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
 }>>, "triggers">, typeof codingAgentHandler, import("inngest").Handler<Inngest<{
     id: string;
 }>, string, {
     logger: import("inngest/middleware/logger").Logger;
-    event: import("inngest").FailureEventPayload<EventPayload<any>>;
     error: Error;
+    event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
 }>, Inngest<{
     id: string;
 }>, import("inngest").InngestMiddleware.Stack, [{
