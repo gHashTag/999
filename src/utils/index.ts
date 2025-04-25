@@ -1,1 +1,1 @@
-export * from "./logic/logger"
+export * from "./logic/logger.js"

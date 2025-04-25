@@ -2,19 +2,19 @@
 import "dotenv/config"
 
 import { Inngest } from "inngest"
-import { getSandbox } from "@/inngest"
+import { getSandbox } from "./inngest/index.js"
 import { Sandbox } from "@e2b/code-interpreter"
-import { createDevOpsNetwork, type NetworkRun } from "@/network/network"
-import { TddNetworkState, NetworkStatus } from "@/types/network"
-import { CodingAgentEvent, codingAgentEventSchema } from "@/types/events"
-import { AgentDependencies } from "@/types/agents"
-import { getAllTools } from "@/tools/toolDefinitions"
+import { createDevOpsNetwork, type NetworkRun } from "./network/network.js"
+import { TddNetworkState, NetworkStatus } from "./types/network.js"
+import { CodingAgentEvent, codingAgentEventSchema } from "./types/events.js"
+import { AgentDependencies } from "./types/agents.js"
+import { getAllTools } from "./tools/toolDefinitions.js"
 import {
   createTesterAgent,
   createCodingAgent,
   createCriticAgent,
-} from "@/agents"
-import { log } from "@/utils"
+} from "./agents/index.js"
+import { log } from "./utils/index.js"
 
 // Initialize Inngest Client
 const inngest = new Inngest({ id: "agentkit-tdd-agent" })
@@ -252,7 +252,7 @@ async function codingAgentHandler({
     if (stateAfterNetwork?.status === NetworkStatus.Enum.READY_FOR_FINAL_TEST) {
         await step.run("run-final-tests", async () => {
             // ... existing test logic using stateAfterNetwork ...
-        })
+      })
     }
     */
 

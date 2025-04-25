@@ -256,3 +256,41 @@ node dist/index.js
 ```
 
 This starts the Express server which serves the Inngest functions. Ensure necessary environment variables are set.
+
+## Development Notes
+
+### Node.js ES Modules and File Extensions
+
+This project uses native ES Modules (ESM) configured via `"type": "module"` in `package.json` and compiled with TypeScript (`tsc`).
+
+**Problem:** Node.js, when running ESM code, requires **explicit file extensions** for relative imports (e.g., `.js`). It does not automatically resolve extensions like `.ts` or look for `index.js` within directories as CommonJS did.
+
+**Symptom:** Running the compiled code (e.g., `node dist/index.js`) results in `ERR_MODULE_NOT_FOUND` or `ERR_UNSUPPORTED_DIR_IMPORT` errors for relative paths.
+
+**Solution:** You **MUST** include the `.js` extension in all relative import/export paths within the TypeScript source code (`.ts` files).
+
+```typescript
+// Incorrect (causes runtime error in Node.js ESM)
+import { something } from "./my-module"
+import { helper } from "../utils/helpers"
+export * from "./logic/service"
+
+// Correct (works after tsc compilation)
+import { something } from "./my-module.js"
+import { helper } from "../utils/helpers.js"
+export * from "./logic/service.js"
+```
+
+**Why?**
+
+- `tsc` (with current settings like `moduleResolution: "bundler"` or even `"NodeNext"`) does not automatically append `.js` extensions to relative paths in the compiled JavaScript output.
+- Node.js strictly follows the ESM specification, which mandates explicit extensions for relative paths to avoid ambiguity and align with browser behavior.
+
+**Alternatives (Not Recommended):**
+
+- Using `--experimental-specifier-resolution=node`: Relies on an experimental Node.js flag.
+- Using Bundlers (Vite, esbuild): Adds complexity but can handle resolution automatically (potential future improvement).
+
+**Current Practice:** Manually add `.js` to all relative imports/exports in `.ts` files.
+
+### Common Testing Issues & Solutions

@@ -105,21 +105,12 @@ describe.skip("DevOps Network configuration", () => {
     //   toolReadFiles: { name: "mockRead" },
     //   toolRunCode: { name: "mockRunCode" },
     // } as any
-
     // --- Mock agent creation directly in the test since files are deleted ---
-    const _mockCodingAgent = {
-      name: "Coding Agent",
-      // ... other necessary mock properties ...
-    }
-    const _mockRefactoringAgent = {
-      name: "Refactoring Agent",
-      // ... other necessary mock properties ...
-    }
+    // const _mockCodingAgent = { name: "Coding Agent" } // REMOVED
+    // const _mockRefactoringAgent = { name: "Refactoring Agent" } // REMOVED
     // -----------------------------------------------------------------------
-
     // Create the network with the mock agents - Removed as network import commented
     // const network = createDevOpsNetwork(mockCodingAgent as any, mockRefactoringAgent as any) // Use 'as any' for mock
-
     // expect(network).toBeDefined()
     // expect(network.name).toBe("DevOps team")
     // expect(network.agents).toBeDefined()
@@ -141,12 +132,11 @@ describe.skip("DevOps Network configuration", () => {
   it.skip("should route coding tasks to Coding Agent", async () => {
     // Mark as skipped
     // --- Mock agent creation directly in the test ---
-    const _mockCodingAgent = { name: "Coding Agent" }
-    const _mockRefactoringAgent = { name: "Refactoring Agent" }
+    // const _mockCodingAgent = { name: "Coding Agent" } // REMOVED
+    // const _mockRefactoringAgent = { name: "Refactoring Agent" } // REMOVED
     // ---------------------------------------------
     // const network = createDevOpsNetwork(mockCodingAgent as any, mockRefactoringAgent as any)
     // const router = network.router
-
     // // Simulate router input with a non-refactoring prompt
     // const codingTaskInput = "write a nodejs script"
     // const routerInput = {
@@ -157,7 +147,6 @@ describe.skip("DevOps Network configuration", () => {
     //     },
     //   },
     // }
-
     // const chosenAgent = await router(routerInput)
     // expect(chosenAgent.name).toBe("Coding Agent")
   })
@@ -165,12 +154,11 @@ describe.skip("DevOps Network configuration", () => {
   it.skip("should route refactoring tasks to Refactoring Agent", async () => {
     // Mark as skipped
     // --- Mock agent creation directly in the test ---
-    const _mockCodingAgent = { name: "Coding Agent" }
-    const _mockRefactoringAgent = { name: "Refactoring Agent" }
+    // const _mockCodingAgent = { name: "Coding Agent" } // REMOVED
+    // const _mockRefactoringAgent = { name: "Refactoring Agent" } // REMOVED
     // ---------------------------------------------
     // const network = createDevOpsNetwork(mockCodingAgent as any, mockRefactoringAgent as any)
     // const router = network.router
-
     // // Simulate router input with a refactoring prompt
     // const refactoringTaskInput = "Could you refactor this code for clarity?"
     // const routerInput = {
@@ -181,7 +169,6 @@ describe.skip("DevOps Network configuration", () => {
     //     },
     //   },
     // }
-
     // const chosenAgent = await router(routerInput)
     // // Expect Refactoring Agent now!
     // expect(chosenAgent.name).toBe("Refactoring Agent")

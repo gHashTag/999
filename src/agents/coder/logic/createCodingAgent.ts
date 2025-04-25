@@ -1,6 +1,6 @@
 import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies } from "../../../types/agents"
+import type { AgentDependencies } from "../../../types/agents.js"
 
 export function createCodingAgent({
   allTools,

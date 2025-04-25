@@ -1,1 +1,1 @@
-export * from "./logic/createTesterAgent"
+export * from "./logic/createTesterAgent.js"

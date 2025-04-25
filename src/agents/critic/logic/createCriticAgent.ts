@@ -1,7 +1,7 @@
 import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies, AnyTool } from "../../../types/agents"
-import { NetworkStatus, TddNetworkState } from "../../../types/network"
+import type { AgentDependencies, AnyTool } from "../../../types/agents.js"
+import { NetworkStatus, TddNetworkState } from "../../../types/network.js"
 
 export function createCriticAgent({
   allTools,
