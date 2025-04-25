@@ -1,39 +1,26 @@
 import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import { lastAssistantTextMessageContent } from "./inngest/utils.js" // Assuming this utility is needed
-import type { TddNetworkState } from "./types.js"
-import { NetworkStatus } from "./types.js" // Import the enum itself for usage
-import { Tool } from "@inngest/agent-kit"
-// import { Sandbox } from "@e2b/code-interpreter" // Removed unused import
+// Updated import paths
+import { TddNetworkState, NetworkStatus } from "./types/network.js"
+import type { AgentDependencies, AnyTool } from "./types/agents.js"
+// --- End updated import paths
+// import { Sandbox } from "@e2b/code-interpreter" // Removed unused
 
 // Define types for dependencies (could be imported from a central types file eventually)
-type LoggerFunc = (
-  level: "info" | "warn" | "error",
-  stepName: string,
-  message: string,
-  data?: object
-) => void
 // Assuming AgentTool type is exported or available from @inngest/agent-kit implicitly
-type AnyTool = Tool<any>
 
-interface AgentDependencies {
-  allTools: AnyTool[]
-  log: LoggerFunc
-  eventId: string
-  sandboxId: string | null
-  apiKey: string
-  modelName: string
-  // getSandbox: (id: string) => Promise<Sandbox | null> // Removed, no longer needed directly by agents
-}
+// UPDATED: Reflect that args passed to onFinish likely comes from Inngest's Result<StateData>
+// and might contain step context implicitly or explicitly.
+// interface InngestOnFinishArgs { ... } // Removed unused interface
+
+// Result type for onFinish hooks that download content
+// interface FileDownloadResult { ... } // Removed as onFinish hooks are removed
 
 export function createTesterAgent({
   allTools,
-  log,
-  eventId,
-  sandboxId,
   apiKey,
   modelName,
-}: Omit<AgentDependencies, "getSandbox">) {
+}: AgentDependencies) {
   return createAgent({
     name: "Tester Agent",
     description: "Writes or revises unit tests based on task and critique.",
@@ -56,131 +43,20 @@ export function createTesterAgent({
                  **CRITICAL INSTRUCTION: Ensure the file is named exactly 'test.js'.**
                  **If critique on previous tests is provided (check state.test_critique), address the critique and revise the tests before saving using 'createOrUpdateFiles'.**
                  Your final action MUST be a call to 'createOrUpdateFiles' with the content for 'test.js'.
-                 **If the task description or critique is unclear, use the 'askHumanForInput' tool to ask for clarification before writing tests.**`,
+                 **If the task description or critique is unclear, use the 'askHumanForInput' tool to ask for clarification before writing tests.**`, // System prompt needs access to state eventually
     model: deepseek({
       apiKey: apiKey,
       model: modelName,
     }),
     tools: allTools,
-    lifecycle: {
-      onFinish: async ({ result, network }: any) => {
-        const hookStepName = "TesterAgent_onFinish"
-        log("info", hookStepName, "Hook started.", { eventId })
-        if (!network?.state?.kv || !sandboxId) {
-          log("warn", hookStepName, "KV or sandboxId missing.", { eventId })
-          return result
-        }
-        const state: Partial<TddNetworkState> =
-          network.state.kv.get("network_state") || {}
-        log("info", hookStepName, "Retrieved state.", { eventId })
-
-        let testFileContent: string | undefined = undefined
-
-        // Find the result of the createOrUpdateFiles tool call
-        const createOrUpdateCall = result?.toolCalls?.find(
-          (call: any) => call.toolName === "createOrUpdateFiles"
-        )
-        const toolResult = createOrUpdateCall?.result
-
-        // Check if the tool call was successful and returned the new 'files' array
-        if (toolResult?.files && !toolResult?.error) {
-          const returnedFiles = toolResult.files
-          log("info", hookStepName, "Found files in tool result.", {
-            eventId,
-            fileCount: returnedFiles.length,
-            filePaths: returnedFiles.map((f: any) => f.path),
-          })
-
-          // Find the specific file we need ('test.js')
-          const testFile = returnedFiles.find((f: any) => f.path === "test.js")
-
-          if (testFile) {
-            testFileContent = testFile.content
-            log(
-              "info",
-              hookStepName,
-              "Successfully extracted test.js content.",
-              {
-                eventId,
-                contentLength: testFileContent?.length,
-              }
-            )
-          } else {
-            log(
-              "warn",
-              hookStepName,
-              "'test.js' not found in tool result files. Found files: " +
-                returnedFiles.map((f: any) => f.path).join(", "),
-              { eventId }
-            )
-          }
-        } else {
-          log(
-            "warn",
-            hookStepName,
-            "Could not find 'files' array in tool result, or tool returned error.",
-            { eventId, toolResult: toolResult }
-          )
-        }
-
-        // Update state based on whether content was successfully extracted
-        if (testFileContent !== undefined) {
-          const newState: TddNetworkState = {
-            ...state,
-            task: state.task || "",
-            status: NetworkStatus.Enum.NEEDS_CODE_CRITIQUE,
-            sandboxId: state.sandboxId || sandboxId,
-            test_artifact_path: undefined,
-            test_code: testFileContent,
-            test_critique: undefined,
-            implementation_code: undefined,
-            code_critique: undefined,
-            error: undefined,
-          }
-          log("info", hookStepName, "Updating state with test code content.", {
-            eventId,
-          })
-          network.state.kv.set("network_state", newState)
-          log(
-            "info",
-            hookStepName,
-            "State updated. Status: NEEDS_CODE_CRITIQUE.",
-            { eventId }
-          )
-        } else {
-          log(
-            "error",
-            hookStepName,
-            "Test file content for 'test.js' not found. Setting state to COMPLETED with error.",
-            { eventId }
-          )
-          const errorState: TddNetworkState = {
-            ...state,
-            task: state.task || "",
-            status: NetworkStatus.Enum.COMPLETED,
-            sandboxId: state.sandboxId || sandboxId,
-            error: `Tester failed to create or extract 'test.js' from tool result.`,
-          }
-          log("info", hookStepName, "Updating state with error.", {
-            eventId,
-            errorState,
-          })
-          network.state.kv.set("network_state", errorState)
-        }
-        return result
-      },
-    },
   })
 }
 
 export function createCodingAgent({
   allTools,
-  log,
-  eventId,
-  sandboxId,
   apiKey,
   modelName,
-}: Omit<AgentDependencies, "getSandbox">) {
+}: AgentDependencies) {
   return createAgent({
     name: "Coding Agent",
     description:
@@ -195,145 +71,30 @@ export function createCodingAgent({
                  4. **Save Code:** Save the final implementation code into 'implementation.js' using the 'createOrUpdateFiles' tool.
                  
                  Focus on writing only the implementation code in 'implementation.js'. Do NOT re-read test files using tools.
-                 **If the tests or critique are unclear, or if you are unsure how to proceed, use the 'askHumanForInput' tool to ask for guidance.**`,
+                 **If the tests or critique are unclear, or if you are unsure how to proceed, use the 'askHumanForInput' tool to ask for guidance.**`, // Needs state access
     model: deepseek({
       apiKey: apiKey,
       model: modelName,
     }),
     tools: allTools,
-    lifecycle: {
-      onFinish: async ({ result, network }: any) => {
-        const hookStepName = "CodingAgent_onFinish"
-        log("info", hookStepName, "Hook started.", { eventId })
-        if (!network?.state?.kv || !sandboxId) {
-          log("warn", hookStepName, "KV or sandboxId missing.", { eventId })
-          return result
-        }
-        const state: Partial<TddNetworkState> =
-          network.state.kv.get("network_state") || {}
-        log("info", hookStepName, "Retrieved state.", { eventId })
-
-        let implFileContent: string | undefined = undefined
-
-        // Find the result of the createOrUpdateFiles tool call
-        const createOrUpdateCall = result?.toolCalls?.find(
-          (call: any) => call.toolName === "createOrUpdateFiles"
-        )
-
-        // Check if the tool call was successful and returned the new 'files' array
-        if (
-          createOrUpdateCall?.result?.files &&
-          !createOrUpdateCall?.result?.error
-        ) {
-          const returnedFiles = createOrUpdateCall.result.files
-          log("info", hookStepName, "Found files in tool result.", {
-            eventId,
-            fileCount: returnedFiles.length,
-            filePaths: returnedFiles.map((f: any) => f.path),
-          })
-
-          // Find the specific file we need ('implementation.js')
-          const implFile = returnedFiles.find(
-            (f: any) => f.path === "implementation.js"
-          )
-
-          if (implFile) {
-            implFileContent = implFile.content
-            log(
-              "info",
-              hookStepName,
-              "Successfully extracted implementation.js content.",
-              {
-                eventId,
-                contentLength: implFileContent?.length,
-              }
-            )
-          } else {
-            log(
-              "warn",
-              hookStepName,
-              "'implementation.js' not found in tool result files.",
-              { eventId }
-            )
-          }
-        } else {
-          log(
-            "warn",
-            hookStepName,
-            "Could not find 'files' array in tool result, or tool returned error.",
-            { eventId, toolResult: createOrUpdateCall?.result }
-          )
-        }
-
-        // Update state based on whether content was successfully extracted
-        if (implFileContent !== undefined) {
-          const newState: TddNetworkState = {
-            ...state,
-            task: state.task || "",
-            status: NetworkStatus.Enum.NEEDS_CODE_CRITIQUE,
-            sandboxId: state.sandboxId || sandboxId,
-            test_artifact_path: undefined,
-            test_code: state.test_code,
-            implementation_code: implFileContent,
-            code_critique: undefined,
-            error: undefined,
-          }
-          log(
-            "info",
-            hookStepName,
-            "Updating state with implementation code content.",
-            { eventId }
-          )
-          network.state.kv.set("network_state", newState)
-          log(
-            "info",
-            hookStepName,
-            "State updated. Status: NEEDS_CODE_CRITIQUE.",
-            { eventId }
-          )
-        } else {
-          log(
-            "error",
-            hookStepName,
-            "Implementation file content not found. Setting state to COMPLETED with error.",
-            { eventId }
-          )
-          const errorState: TddNetworkState = {
-            ...state,
-            task: state.task || "",
-            status: NetworkStatus.Enum.COMPLETED,
-            sandboxId: state.sandboxId || sandboxId,
-            error: `Coder failed to create or extract 'implementation.js'`,
-          }
-          log("info", hookStepName, "Updating state with error.", {
-            eventId,
-            errorState,
-          })
-          network.state.kv.set("network_state", errorState)
-        }
-        return result
-      },
-    },
   })
 }
 
 export function createCriticAgent({
   allTools,
-  log,
-  eventId,
-  sandboxId,
   apiKey,
   modelName,
-}: Omit<AgentDependencies, "getSandbox">) {
+}: AgentDependencies) {
   return createAgent({
     name: "Critic Agent",
     description:
       "Reviews code and/or tests for correctness and style, providing clear feedback.",
     system: async ({ network }: any) => {
+      // System prompt needs network access
       const state: Partial<TddNetworkState> =
-        network?.state?.kv?.get("network_state") || {}
+        network?.get("network_state") || {}
       const status = state.status
-      let basePrompt = `You are a code reviewer agent. Your task is to review provided code and/or tests based on the original task description: "${state.task}".`
+      let basePrompt = `You are a code reviewer agent. Your task is to review provided code and/or tests based on the original task description: "${state.task || "Unknown task"}".`
       let contentToReview = ""
 
       if (status === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
@@ -359,172 +120,17 @@ export function createCriticAgent({
       apiKey: apiKey,
       model: modelName,
     }),
-    tools: allTools.filter(tool => tool.name !== "processArtifact"),
-    lifecycle: {
-      onResponse: async ({ result, network }: any) => {
-        const hookStepName = "CriticAgent_onResponse"
-        const critiqueText =
-          lastAssistantTextMessageContent(result) || "No critique provided."
-        log("info", hookStepName, "Hook started.", {
-          eventId,
-          critiqueTextLen: critiqueText.length,
-        })
-        if (network?.state?.kv) {
-          const state: Partial<TddNetworkState> =
-            network.state.kv.get("network_state") || {}
-          let nextStatus: NetworkStatus =
-            state.status || NetworkStatus.Enum.COMPLETED // Default to completed if status missing
-          const currentStatus = state.status
-          const step = network.step // Assuming step context is available via network object? Check agent-kit docs.
-          log("info", hookStepName, "Received critique.", {
-            eventId,
-            currentStatus: currentStatus ?? "undefined",
-          })
-          log("info", hookStepName, "Critique Text Snippet.", {
-            eventId,
-            critiqueSnippet: critiqueText.substring(0, 100),
-          })
-          const critiqueLower = critiqueText.toLowerCase()
-          const needsRevision =
-            critiqueLower.includes("revision") ||
-            critiqueLower.includes("issue") ||
-            critiqueLower.includes("error") ||
-            critiqueLower.includes("fix") ||
-            critiqueLower.includes("problem")
-          const isApproved =
-            critiqueLower.includes("approved") ||
-            critiqueLower.includes("ok") ||
-            critiqueLower.includes("looks good") ||
-            critiqueLower.includes("lgtm")
-
-          if (state.status === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
-            state.test_critique = critiqueText
-            if (needsRevision) {
-              nextStatus = NetworkStatus.Enum.NEEDS_TEST_REVISION
-              log("info", hookStepName, "Decision: Tests need revision.", {
-                eventId,
-              })
-            } else if (isApproved) {
-              nextStatus = NetworkStatus.Enum.NEEDS_CODE
-              log("info", hookStepName, "Decision: Tests approved.", {
-                eventId,
-              })
-            } else {
-              log(
-                "info",
-                hookStepName,
-                "Decision: Ambiguous critique on tests. Assuming OK.",
-                { eventId }
-              )
-              nextStatus = NetworkStatus.Enum.NEEDS_CODE
-            }
-          } else if (state.status === NetworkStatus.Enum.NEEDS_CODE_CRITIQUE) {
-            state.code_critique = critiqueText
-            if (needsRevision) {
-              nextStatus = NetworkStatus.Enum.NEEDS_CODE_REVISION
-              log("info", hookStepName, "Decision: Code needs revision.", {
-                eventId,
-              })
-            } else if (isApproved) {
-              nextStatus = NetworkStatus.Enum.READY_FOR_FINAL_TEST
-              log(
-                "info",
-                hookStepName,
-                "Decision: Code approved. Ready for final tests.",
-                { eventId }
-              )
-              const readyState: TddNetworkState = {
-                ...state,
-                task: state.task || "",
-                status: nextStatus,
-                sandboxId: state.sandboxId || sandboxId,
-                code_critique: critiqueText,
-                error: undefined,
-              }
-              if (step) {
-                await step.sendEvent("send-completion-event", {
-                  name: "tdd/network.ready-for-test",
-                  data: { finalState: readyState },
-                })
-                log(
-                  "info",
-                  hookStepName,
-                  "Sent tdd/network.ready-for-test event.",
-                  { eventId }
-                )
-              } else {
-                log(
-                  "warn",
-                  hookStepName,
-                  "Step context not available in onResponse, cannot send event.",
-                  { eventId }
-                )
-              }
-              log("info", hookStepName, "Updating state for final tests.", {
-                eventId,
-                readyState,
-              })
-              network.state.kv.set("network_state", readyState)
-            } else {
-              // Handle ambiguous critique: Set status to require human input
-              log(
-                "warn",
-                hookStepName,
-                "Decision: Ambiguous critique on code. Setting status to NEEDS_HUMAN_INPUT.",
-                { eventId, critiqueText }
-              )
-              nextStatus = NetworkStatus.Enum.NEEDS_HUMAN_INPUT
-              // Update state in KV with the new status and the critique
-              const needsHumanState: TddNetworkState = {
-                ...state,
-                task: state.task || "",
-                status: nextStatus,
-                sandboxId: state.sandboxId || sandboxId,
-                code_critique: critiqueText,
-                error: "Ambiguous critique requires human review.",
-              }
-              log(
-                "info",
-                hookStepName,
-                "Updating state to require human input.",
-                {
-                  eventId,
-                  needsHumanState,
-                }
-              )
-              network.state.kv.set("network_state", needsHumanState)
-            }
-          } else {
-            log("warn", hookStepName, "Critic called in unexpected state.", {
-              eventId,
-              currentStatus: currentStatus ?? "undefined",
-            })
-            nextStatus = "COMPLETED"
-            const finalCompletedState: TddNetworkState = {
-              ...state,
-              task: state.task || "",
-              status: nextStatus,
-              sandboxId: state.sandboxId || sandboxId,
-              error: `Critic called in unexpected state: ${currentStatus ?? "undefined"}`,
-            }
-            log(
-              "warn",
-              hookStepName,
-              "FINAL STATE (COMPLETED - Unexpected). Setting state.",
-              { eventId, finalCompletedState }
-            )
-            network.state.kv.set("network_state", finalCompletedState)
-          }
-        } else {
-          log(
-            "warn",
-            hookStepName,
-            "Could not update state: network.state.kv missing.",
-            { eventId }
-          )
-        }
-        return result
-      },
-    },
+    tools: allTools.filter(
+      (tool: AnyTool) =>
+        tool.name !== "createOrUpdateFiles" && tool.name !== "terminal"
+    ),
   })
 }
+
+// --- REMOVED onFinish Hook Functions --- //
+// export async function TesterAgent_onFinish(...) { ... }
+// export async function CodingAgent_onFinish(...) { ... }
+// export async function CriticAgent_onFinish(...) { ... }
+
+// --- REMOVED Helper Function for Critic Agent --- //
+// function extractCritiqueData(...) { ... } // Moved to src/agents/critic/extractCritiqueData.ts

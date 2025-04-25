@@ -3,7 +3,6 @@ description:
 globs: 
 alwaysApply: true
 ---
-
 # Code Style Rules 🎨
 
 ## Language Rules 🌐
@@ -22,7 +21,13 @@ alwaysApply: true
 3. File Structure 📂
    - Use English for file and directory names
    - Follow kebab-case for file names
+   - **Exception:** The primary test directory MUST be named `__tests__`.
    - Group related files in descriptive directories
+   - **Strict Directory Structure:**
+     - Each directory (e.g., `src/feature`) MUST contain an `index.ts` file for exporting public APIs and a `README.md` for documentation.
+     - All other source files (`.ts`, `.tsx`, etc.) MUST reside within logical subdirectories (e.g., `src/feature/logic`, `src/feature/utils`, `src/feature/components`).
+     - No loose source files should exist directly within a feature directory alongside `index.ts`.
+     - **Exception:** Directories acting as logical groupings of related files (e.g., `src/types` containing `agents.ts`, `events.ts`, `network.ts`) are permitted, provided they maintain internal consistency and don't mix implementation logic with type definitions directly.
 
 ## Comment Style 💭
 
@@ -88,3 +93,8 @@ alwaysApply: true
      // ... additional context
    })
    ```
+
+## Review and Update 🔄
+
+- **Continuous Review:** These code style rules are living guidelines. As new patterns emerge or the project evolves, these rules should be reviewed and updated.
+- **Proposing Changes:** If you identify a need for a new rule or modification of an existing one, please discuss it and propose changes (e.g., via PR to this file).

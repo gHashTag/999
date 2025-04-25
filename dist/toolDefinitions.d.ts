@@ -156,6 +156,35 @@ export declare function getAllTools(log: LoggerFunc, getSandbox: GetSandboxFunc,
 }, {
     artifactPath: string;
     fileToRead: string;
+}>> | import("@inngest/agent-kit").Tool<z.ZodObject<{
+    question: z.ZodString;
+    context: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    question: string;
+    context?: string | undefined;
+}, {
+    question: string;
+    context?: string | undefined;
 }>>)[];
+export declare const askHumanForInputParamsSchema: z.ZodObject<{
+    question: z.ZodString;
+    context: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    question: string;
+    context?: string | undefined;
+}, {
+    question: string;
+    context?: string | undefined;
+}>;
+export declare function createAskHumanForInputTool(log: LoggerFunc, eventId: string): import("@inngest/agent-kit").Tool<z.ZodObject<{
+    question: z.ZodString;
+    context: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    question: string;
+    context?: string | undefined;
+}, {
+    question: string;
+    context?: string | undefined;
+}>>;
 export {};
 //# sourceMappingURL=toolDefinitions.d.ts.map

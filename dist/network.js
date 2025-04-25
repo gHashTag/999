@@ -1,6 +1,6 @@
 import { createNetwork } from "@inngest/agent-kit";
 import { deepseek } from "@inngest/ai/models";
-import { NetworkStatus } from "./types.js";
+import { NetworkStatus } from "./types/network.js";
 // Define the Network States for TDD flow with Critique Loop
 /*
 const NetworkStatus = z.enum([

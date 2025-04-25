@@ -356,6 +356,67 @@ export function getAllTools(log, getSandbox, eventId, sandboxId) {
         createReadFilesTool(log, getSandbox, eventId, sandboxId),
         createRunCodeTool(log, getSandbox, eventId, sandboxId),
         createProcessArtifactTool(log, getSandbox, eventId, sandboxId),
+        createAskHumanForInputTool(log, eventId),
     ];
+}
+// +++ ADDED: Human in the Loop Tool +++
+export const askHumanForInputParamsSchema = z.object({
+    question: z.string().describe("The specific question to ask the human."),
+    context: z
+        .string()
+        .optional()
+        .describe("Optional additional context for the human."),
+});
+export function createAskHumanForInputTool(log, eventId // sandboxId and getSandbox might not be needed here
+) {
+    return createTool({
+        name: "askHumanForInput",
+        description: "Asks a human user for input or clarification and waits for their response.",
+        parameters: askHumanForInputParamsSchema,
+        handler: async (params, { step }) => {
+            const toolStepName = "TOOL_askHumanForInput";
+            log("info", `${toolStepName}_START`, "Requesting human input.", {
+                eventId,
+                question: params.question,
+                context: params.context,
+            });
+            if (!step) {
+                log("error", `${toolStepName}_ERROR`, "Step context is required for waitForEvent.", { eventId });
+                return { error: "Step context is required for this tool." };
+            }
+            // Log what we are waiting for
+            log("info", `${toolStepName}_WAITING`, "Waiting for human/input.received event.", {
+                eventId,
+                timeout: "1h",
+                match: { "data.responseToEventId": eventId }, // Match based on the original event ID
+            });
+            // Wait for the human response event
+            const humanResponseEvent = await step.waitForEvent("wait-for-human-input", {
+                event: "human/input.received", // The event name we expect
+                timeout: "1h", // Let's wait for 1 hour
+                match: "data.responseToEventId", // Match the event's data field 'responseToEventId' with our current eventId
+            });
+            if (!humanResponseEvent) {
+                log("warn", `${toolStepName}_TIMEOUT`, "No human response received within the timeout period.", { eventId });
+                return { error: "Human did not respond within the 1-hour timeout." };
+            }
+            // Extract the response from the event data
+            // Assuming the event data has a field like 'humanInput'
+            const humanInput = humanResponseEvent.data?.humanInput;
+            log("info", `${toolStepName}_RECEIVED`, "Human response received.", {
+                eventId,
+                humanInput: humanInput ?? "(empty response)", // Log the input (or indicator if empty)
+            });
+            if (humanInput === undefined || humanInput === null) {
+                log("warn", `${toolStepName}_EMPTY_RESPONSE`, "Human response event received, but input field was missing or null.", { eventId, eventData: humanResponseEvent.data });
+                return {
+                    error: "Human response event received, but the input was missing.",
+                };
+            }
+            return {
+                humanResponse: humanInput,
+            };
+        },
+    });
 }
 //# sourceMappingURL=toolDefinitions.js.map

@@ -1,6 +1,6 @@
-import { createNetwork, Agent } from "@inngest/agent-kit"
+import { createNetwork, Agent, type NetworkRun } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import { TddNetworkState, NetworkStatus } from "./types.js"
+import { TddNetworkState, NetworkStatus } from "./types/network.js"
 
 // Define the Network States for TDD flow with Critique Loop
 /*
@@ -101,3 +101,5 @@ export function createDevOpsNetwork(
   })
   return network
 }
+
+export { type NetworkRun } // Re-export NetworkRun type

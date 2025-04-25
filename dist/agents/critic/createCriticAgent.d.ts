@@ -1,0 +1,3 @@
+import type { AgentDependencies } from "../../types/agents.js";
+export declare function createCriticAgent({ allTools, apiKey, modelName, log, }: AgentDependencies): import("@inngest/agent-kit").Agent<import("@inngest/agent-kit").StateData>;
+//# sourceMappingURL=createCriticAgent.d.ts.map

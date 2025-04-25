@@ -2,17 +2,19 @@
 import "dotenv/config"
 
 import { Inngest } from "inngest"
-import { getSandbox } from "./inngest/utils.js"
+import { getSandbox } from "./inngest/index.js"
 import { Sandbox } from "@e2b/code-interpreter"
-import { createDevOpsNetwork } from "./network.js"
-import { TddNetworkState, CodingAgentEvent, NetworkStatus } from "./types.js"
+import { createDevOpsNetwork, type NetworkRun } from "./network.js"
+import { TddNetworkState, NetworkStatus } from "./types/network.js"
+import { CodingAgentEvent, codingAgentEventSchema } from "./types/events.js"
+import { AgentDependencies } from "./types/agents.js"
 import { getAllTools } from "./toolDefinitions.js"
 import {
   createTesterAgent,
   createCodingAgent,
   createCriticAgent,
-} from "./agentDefinitions.js"
-import { log } from "./utils/logger.js"
+} from "./agents/index.js"
+import { log } from "./utils/index.js"
 
 // Initialize Inngest Client
 const inngest = new Inngest({ id: "agentkit-tdd-agent" })
@@ -36,9 +38,22 @@ async function codingAgentHandler({
     if (!eventId) {
       throw new Error("Event ID is missing.")
     }
+
+    // Validate event data using the schema
+    const validatedData = codingAgentEventSchema.safeParse(event.data)
+    if (!validatedData.success) {
+      log("error", "HANDLER_START", "Invalid event data.", {
+        eventId,
+        errors: validatedData.error.issues,
+      })
+      throw new Error(`Invalid event data: ${validatedData.error.message}`)
+    }
+    const taskInput = validatedData.data.input // Access validated input
+
     log("info", "HANDLER_START", "TDD Event received.", {
       eventId,
-      eventData: event.data,
+      eventData: event.data, // Log original data
+      taskInput, // Log extracted task
     })
     log("info", "GET_SANDBOX_ID_START", "Getting sandbox ID...", { eventId })
 
@@ -71,14 +86,11 @@ async function codingAgentHandler({
 
     // ADDED: Create agents using imported functions
     log("info", "CREATE_AGENTS_START", "Creating agents...", { eventId })
-    const agentDeps = {
+    const agentDeps: AgentDependencies = {
       allTools,
       log,
-      eventId,
-      sandboxId,
       apiKey: process.env.DEEPSEEK_API_KEY!,
       modelName: process.env.DEEPSEEK_MODEL || "deepseek-coder",
-      getSandbox: getSandboxForTools,
     }
     const testerAgent = createTesterAgent(agentDeps)
     const codingAgent = createCodingAgent(agentDeps)
@@ -92,353 +104,170 @@ async function codingAgentHandler({
       criticAgent
     )
 
-    // --- Initialize State and Run Network --- //
-    log("info", "INIT_STATE", "Initializing TDD network state.", { eventId })
-    const initialTask = (event.data as any)?.input ?? ""
-    if (!initialTask) {
-      throw new Error("Input task is missing in the event data.")
-    }
-    // FIX: Use the defined type for initial state
-    const initialState: TddNetworkState = {
-      task: initialTask,
-      status: "NEEDS_TEST",
-      sandboxId: sandboxId,
-    }
-    devOpsNetwork.state.kv.set("network_state", initialState)
-    log("info", "NETWORK_RUN_START", "Starting TDD network run...", { eventId })
-    await devOpsNetwork.run(initialTask)
-    log("info", "NETWORK_RUN_END", "TDD Network run finished (agents loop).", {
+    // --- Initialize Network State --- //
+    log("info", "INIT_STATE_START", "Initializing network state...", {
       eventId,
     })
+    const initialState: TddNetworkState = {
+      task: taskInput, // Use validated taskInput
+      status: NetworkStatus.Enum.NEEDS_TEST, // Start with needing tests
+      sandboxId: sandboxId,
+    }
+    // Use step context for KV access
+    await step.state.kv.set("network_state", initialState)
+    log("info", "INIT_STATE_END", "Network state initialized.", {
+      eventId,
+      initialState,
+    })
 
-    // --- Wait for Network Completion Signal & Run Final Tests --- //
+    // --- Run the Network --- //
+    log("info", "NETWORK_RUN_START", "Running DevOps network...", { eventId })
+    // Pass an empty string as the first argument, as run() expects input/overrides
+    const networkResult: NetworkRun<TddNetworkState> =
+      await devOpsNetwork.run("")
+    log("info", "NETWORK_RUN_END", "DevOps network finished.", {
+      eventId,
+      // Access state and output correctly from NetworkRun type
+      finalStatus: networkResult.state.kv.get("status"), // Assuming status is in KV
+      // Output is top-level on NetworkRun result - Error TS2339 - Commenting out for now
+      // output: networkResult.output,
+    })
+
+    // --- Persist Final State from Network Run --- //
+    // networkResult.state is the State object. Get TddNetworkState from its KV.
+    const finalStateFromNetwork = networkResult.state.kv.get(
+      "network_state"
+    ) as TddNetworkState | undefined
+
+    if (finalStateFromNetwork) {
+      log(
+        "info",
+        "PERSIST_FINAL_STATE_START",
+        "Persisting final state from network run...",
+        { eventId, status: finalStateFromNetwork.status } // Direct access is ok now
+      )
+      await step.state.kv.set("network_state", finalStateFromNetwork)
+      log("info", "PERSIST_FINAL_STATE_END", "Final state persisted.", {
+        eventId,
+      })
+    } else {
+      // This branch might be less likely now since networkResult.state should exist
+      log(
+        "error",
+        "NETWORK_RESULT_STATE_MISSING",
+        "Final state missing from network result (unexpected).",
+        { eventId }
+      )
+      // Potentially throw an error or handle this case depending on expected behavior
+      throw new Error("Network run did not produce a final state.")
+    }
+
+    // TODO: MAJOR REFACTOR NEEDED HERE
+    // The following logic assumed onFinish hooks updated the state and sent events.
+    // Now, this logic needs to be implemented here, using networkResult and the final state.
+    // This includes:
+    // 1. Determining the final status (COMPLETED, FAILED_TESTS, etc.)
+    // 2. Extracting critique if the last step was Critic.
+    // 3. Downloading files (test.js, implementation.js) using sandboxId from state.
+    // 4. Updating state with downloaded files.
+    // 5. Running final tests.
+    // 6. Updating final state based on test results.
+    // 7. Sending final events.
+
+    // --- Placeholder for post-network logic --- //
     log(
-      "info",
-      "WAIT_FOR_COMPLETION_START",
-      "Waiting for network completion signal...",
+      "warn",
+      "POST_NETWORK_REFACTOR",
+      "Logic after network run needs refactoring - state/event updates moved here.",
       { eventId }
     )
 
-    const completionEvent = await step.waitForEvent(
-      "wait-for-network-completion",
-      {
-        event: "tdd/network.ready-for-test", // Event sent by CriticAgent on approval
-        timeout: "5m", // Adjust timeout as needed
-      }
-    )
+    // Fetch final state after network run (NOW reads the state persisted above)
+    const finalStateFromKV = (await step.state.kv.get("network_state")) as
+      | TddNetworkState
+      | undefined
 
-    if (!completionEvent) {
+    if (!finalStateFromKV) {
       log(
-        "warn",
-        "NETWORK_TIMEOUT",
-        "Network did not reach READY_FOR_FINAL_TEST within timeout.",
+        "error",
+        "FINAL_STATE_ERROR",
+        "Could not retrieve final state from KV store.",
         { eventId }
       )
-      // Optionally update state to reflect timeout
-      const timeoutState: Partial<TddNetworkState> =
-        devOpsNetwork.state.kv.get("network_state") || {}
-      const finalTimeoutState: TddNetworkState = {
-        ...timeoutState,
-        task: timeoutState.task || "",
-        status: NetworkStatus.Enum.COMPLETED, // Or a specific TIMEOUT status
-        sandboxId: timeoutState.sandboxId ?? null,
-        error: "Network completion timeout.",
-      }
-      devOpsNetwork.state.kv.set("network_state", finalTimeoutState)
-      log(
-        "info",
-        "FINAL_STATE_LOG",
-        "Logging final network state after timeout.",
-        { eventId, finalState: finalTimeoutState }
-      )
-      return { message: "Network timeout" }
+      throw new Error("Final state missing after network run.")
     }
 
     log(
       "info",
-      "NETWORK_COMPLETED_EVENT",
-      "Received network completion signal.",
-      { eventId /*, completionEventData: completionEvent.data */ }
+      "FINAL_STATE_LOG",
+      "Logging final network state after network run (before tests/cleanup).",
+      {
+        eventId,
+        finalState: finalStateFromKV,
+      }
     )
 
-    // Fetch the state *after* receiving the completion signal
-    const stateAfterNetwork: TddNetworkState | undefined =
-      devOpsNetwork.state.kv.get("network_state")
-
-    // Double-check status just in case
-    if (stateAfterNetwork?.status === NetworkStatus.Enum.READY_FOR_FINAL_TEST) {
+    // --- Simplified Logic: Assume network reaches some terminal state --- //
+    // THIS IS A TEMPORARY SIMPLIFICATION - Needs proper implementation
+    if (
+      finalStateFromKV.status === NetworkStatus.Enum.READY_FOR_FINAL_TEST ||
+      finalStateFromKV.status === NetworkStatus.Enum.COMPLETED ||
+      finalStateFromKV.status === NetworkStatus.Enum.COMPLETED_TESTS_FAILED ||
+      finalStateFromKV.status === NetworkStatus.Enum.COMPLETED_TESTS_PASSED
+    ) {
       log(
         "info",
-        "FINAL_TEST_RUN_START",
-        "State confirmed READY_FOR_FINAL_TEST. Running final tests...",
-        {
-          eventId,
-          sandboxId: stateAfterNetwork.sandboxId,
-        }
+        "POST_NETWORK_SIMPLIFIED",
+        "Network reached a terminal state. Proceeding with placeholder cleanup.",
+        { eventId, status: finalStateFromKV.status }
       )
-
-      // Run final tests within a step
-      await step.run("run-final-tests", async () => {
-        const testStepName = "STEP_run-final-tests"
-        // Use state fetched AFTER network completion
-        const currentState = stateAfterNetwork
-        const testCode = currentState.test_code
-        const implCode = currentState.implementation_code
-        const currentSandboxId = currentState.sandboxId
-
-        if (!currentSandboxId) {
-          log("error", testStepName, "Sandbox ID missing before final tests.", {
-            eventId,
-          })
-          // Update state to FAILED immediately
-          const errorState: TddNetworkState = {
-            ...currentState,
-            task: currentState.task || "",
-            status: NetworkStatus.Enum.COMPLETED_TESTS_FAILED,
-            sandboxId: null,
-            error: "Final test run failed: Sandbox ID missing.",
-          }
-          devOpsNetwork.state.kv.set("network_state", errorState)
-          throw new Error(
-            "Cannot run final tests: Sandbox ID missing in state."
-          )
-        }
-        if (!testCode || !implCode) {
-          log("error", testStepName, "Code or tests missing for final run.", {
-            eventId,
-            sandboxId: currentSandboxId,
-            hasTestCode: !!testCode,
-            hasImplCode: !!implCode,
-          })
-          // Update state to FAILED
-          const errorState: TddNetworkState = {
-            ...currentState,
-            task: currentState.task || "",
-            status: NetworkStatus.Enum.COMPLETED_TESTS_FAILED,
-            sandboxId: currentSandboxId,
-            error: "Final test run failed: Code or tests missing.",
-          }
-          devOpsNetwork.state.kv.set("network_state", errorState)
-          throw new Error("Code or tests missing for final run.")
-        }
-
-        // FIX: Get sandbox directly instead of finding tools
-        const sandbox = await getSandboxForTools(currentSandboxId)
-        if (!sandbox) {
-          throw new Error(`Sandbox not found for ID: ${currentSandboxId}`)
-        }
-
-        let terminalResult: any = null
-        try {
-          log(
-            "info",
-            `${testStepName}_WriteFiles`,
-            "Writing test/impl files...",
-            { eventId, sandboxId: currentSandboxId }
-          )
-          // FIX: Use sandbox directly to write files
-          await sandbox.files.write("implementation.js", implCode)
-          await sandbox.files.write("test.js", testCode)
-
-          log("info", `${testStepName}_RunTests`, "Running node test.js...", {
-            eventId,
-            sandboxId: currentSandboxId,
-          })
-          // FIX: Use sandbox directly to run command
-          terminalResult = await sandbox.commands.run("node test.js")
-        } catch (toolError: any) {
-          log(
-            "error",
-            testStepName,
-            "Error during direct sandbox operation in final test run.",
-            {
-              eventId,
-              sandboxId: currentSandboxId,
-              error: toolError.message,
-              stack: toolError.stack,
-            }
-          )
-          // Update state to FAILED
-          const errorState: TddNetworkState = {
-            ...currentState, // Use state fetched at start of step
-            task: currentState.task || "",
-            status: NetworkStatus.Enum.COMPLETED_TESTS_FAILED,
-            sandboxId: currentSandboxId,
-            error: `Final test run failed during tool execution: ${toolError.message}`,
-          }
-          devOpsNetwork.state.kv.set("network_state", errorState)
-          throw toolError // Rethrow to fail the step
-        }
-
-        // Analyze terminal result (similar logic to previous onFinish)
-        let finalTestStatus: NetworkStatus =
-          NetworkStatus.Enum.COMPLETED_TESTS_FAILED
-        let testOutput = "Error: Terminal result not available or invalid."
-        let errorMessage: string | undefined =
-          "Test Runner failed: Terminal result missing or invalid."
-
-        if (
-          terminalResult &&
-          typeof terminalResult === "object" &&
-          terminalResult !== null &&
-          "exitCode" in terminalResult
-        ) {
-          const termOutput = terminalResult as {
-            exitCode: number
-            stdout?: string
-            stderr?: string
-            error?: string
-          }
-          testOutput = `Exit Code: ${termOutput.exitCode}\nStdout:\n${termOutput.stdout || ""}\nStderr:\n${termOutput.stderr || ""}`
-          log("info", testStepName, "Analyzed terminal result.", {
-            eventId,
-            sandboxId: currentSandboxId,
-            exitCode: termOutput.exitCode,
-          })
-
-          if (termOutput.error) {
-            errorMessage = `Final test run failed via tool error: ${termOutput.error}`
-          } else if (termOutput.exitCode === 0) {
-            if (termOutput.stderr && termOutput.stderr.trim() !== "") {
-              errorMessage =
-                "Final tests failed (stderr output detected despite exit code 0)."
-            } else {
-              finalTestStatus = NetworkStatus.Enum.COMPLETED_TESTS_PASSED
-              errorMessage = undefined
-              log("info", testStepName, "Final tests PASSED.", {
-                eventId,
-                sandboxId: currentSandboxId,
-              })
-            }
-          } else {
-            errorMessage = `Final tests failed (Exit Code: ${termOutput.exitCode}).`
-          }
-        } else {
-          log("error", testStepName, "Invalid terminal result received.", {
-            eventId,
-            sandboxId: currentSandboxId,
-            terminalResult,
-          })
-        }
-
-        // Update state with final test result
-        // Re-fetch state again before final update
-        const stateBeforeFinalUpdate: Partial<TddNetworkState> =
-          devOpsNetwork.state.kv.get("network_state") || {}
-        const finalStateUpdate: TddNetworkState = {
-          ...stateBeforeFinalUpdate,
-          task: stateBeforeFinalUpdate.task || "",
-          status: finalTestStatus,
-          sandboxId: currentSandboxId ?? null,
-          error: errorMessage,
-          test_run_output: testOutput,
-          test_critique: undefined,
-          code_critique: undefined,
-        }
-        devOpsNetwork.state.kv.set("network_state", finalStateUpdate)
-        log(
-          "info",
-          testStepName,
-          `Final state updated after tests. Status: ${finalTestStatus}.`,
-          { eventId, sandboxId: currentSandboxId }
-        )
-      }) // End step.run("run-final-tests")
-
-      // Log the final state after the test step
-      const stateAfterTests = devOpsNetwork.state.kv.get("network_state")
-      log(
-        "info",
-        "FINAL_STATE_LOG",
-        "Logging final network state after tests.",
-        { eventId, finalState: stateAfterTests }
-      )
+      // Placeholder: Just log final state and return
     } else {
-      // This case should ideally not happen if waitForEvent worked correctly
-      // But log it just in case state changed unexpectedly or event was wrong
       log(
         "warn",
-        "POST_NETWORK_CHECK_UNEXPECTED_STATUS",
-        `Received completion signal, but status is ${stateAfterNetwork?.status}. Skipping final tests.`,
-        { eventId }
+        "POST_NETWORK_UNEXPECTED",
+        "Network finished with non-terminal status. Needs handling.",
+        { eventId, status: finalStateFromKV.status }
       )
+      // Placeholder: Update state to completed error?
+      const errorState: TddNetworkState = {
+        ...finalStateFromKV,
+        status: NetworkStatus.Enum.COMPLETED,
+        error: `Network finished unexpectedly with status: ${finalStateFromKV.status}`,
+      }
+      await step.state.kv.set("network_state", errorState)
       log(
         "info",
         "FINAL_STATE_LOG",
-        "Logging final network state (skipped tests).",
-        { eventId, finalState: stateAfterNetwork }
+        "Logging final network state after unexpected finish.",
+        { eventId, finalState: errorState }
       )
     }
 
-    // Cleanup using sandboxId from the state
-    // FIX: Temporarily disable killing the sandbox to allow inspection
+    // --- Original Final Test Logic (Needs Integration with New Flow) --- //
     /*
-    // Extract the sandbox ID *before* the potential kill step
-    const finalSandboxId = (
-      devOpsNetwork.state.kv.get("network_state") as TddNetworkState | undefined
-    )?.sandboxId
-    if (finalSandboxId) {
-      console.log(`[HANDLER] Killing sandbox ${finalSandboxId}...`)
-      await step.run("kill-sandbox", async () => {
-        if (!finalSandboxId) {
-          console.warn("[HANDLER STEP] Sandbox ID became null before killing.")
-          return
-        }
-        const sandbox = await getSandbox(finalSandboxId) // Assuming getSandbox is available
-        if (sandbox) {
-          await sandbox.kill()
-          console.log(`[HANDLER STEP] Sandbox ${finalSandboxId} killed.`)
-        } else {
-          console.warn(
-            `[HANDLER STEP] Sandbox ${finalSandboxId} not found for killing.`
-          )
-        }
-      })
+    const completionEvent = await step.waitForEvent(...)
+    if (!completionEvent) { ... }
+    const stateAfterNetwork = await step.state.kv.get("network_state")
+    if (stateAfterNetwork?.status === NetworkStatus.Enum.READY_FOR_FINAL_TEST) {
+        await step.run("run-final-tests", async () => {
+            // ... existing test logic using stateAfterNetwork ...
+        })
     }
     */
-    log("info", "HANDLER_END", "Event processing complete.", { eventId })
-    return { finalState: devOpsNetwork.state.kv.get("network_state") }
+
+    // Cleanup (Temporarily disabled)
+    log("info", "HANDLER_END", "Event processing complete (placeholder).", {
+      eventId,
+    })
+    return { finalState: await step.state.kv.get("network_state") } // Return final state
   } catch (error: any) {
     log("error", "HANDLER_ERROR", "An error occurred in the main handler.", {
       eventId: event.id,
       error: error.message,
       stack: error.stack,
     })
-    // Cleanup on error using sandboxId from handler scope
-    // const errorSandboxId = sandboxId; // Remove unused variable
-    // FIX: Temporarily disable killing the sandbox on error
-    /*
-    if (errorSandboxId) {
-      console.log(
-        `[HANDLER ERROR] Attempting to kill sandbox ${errorSandboxId} after error...`
-      )
-      try {
-        await step.run("kill-sandbox-on-error", async () => {
-          if (!errorSandboxId) {
-            console.warn(
-              "[HANDLER STEP ERROR] Sandbox ID became null before killing on error."
-            )
-            return
-          }
-          const sandbox = await getSandbox(errorSandboxId)
-          if (sandbox) {
-            await sandbox.kill()
-            console.log(
-              `[HANDLER STEP] Sandbox ${errorSandboxId} killed after error.`
-            )
-          } else {
-            console.warn(
-              `[HANDLER STEP] Sandbox ${errorSandboxId} not found for killing after error.`
-            )
-          }
-        })
-      } catch (killError) {
-        console.error(
-          `[HANDLER ERROR] Failed to kill sandbox ${errorSandboxId} after initial error:`,
-          killError
-        )
-      }
-    }
-    */
+    // Cleanup on error (Temporarily disabled)
     throw error
   }
 }
