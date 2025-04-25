@@ -3,10 +3,10 @@ import "dotenv/config";
 import { Inngest } from "inngest";
 import { getSandbox } from "./inngest/index.js";
 import { Sandbox } from "@e2b/code-interpreter";
-import { createDevOpsNetwork } from "./network.js";
+import { createDevOpsNetwork } from "./network/network.js";
 import { NetworkStatus } from "./types/network.js";
 import { codingAgentEventSchema } from "./types/events.js";
-import { getAllTools } from "./toolDefinitions.js";
+import { getAllTools } from "./tools/toolDefinitions.js";
 import { createTesterAgent, createCodingAgent, createCriticAgent, } from "./agents/index.js";
 import { log } from "./utils/index.js";
 // Initialize Inngest Client

@@ -1,13 +1,5 @@
 /* eslint-disable */
 import { Sandbox } from "@e2b/code-interpreter";
-// Убираем импорты типов из agent-kit, так как они не находятся
-// import {
-//   InferenceResult,
-//   NetworkRun,
-//   TextMessage,
-//   Message,
-//   TextPart,
-// } from "@inngest/agent-kit";
 export function lastAssistantTextMessageContent(result) {
     // Используем any
     const output = result?.output; // Безопасный доступ

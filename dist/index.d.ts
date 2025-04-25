@@ -17,14 +17,14 @@ declare const codingAgentFunction: import("inngest").InngestFunction<Omit<import
 }], import("inngest").Handler<Inngest<{
     id: string;
 }>, string, {
-    error: Error;
     logger: import("inngest/middleware/logger").Logger;
+    error: Error;
     event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
 }>>, "triggers">, typeof codingAgentHandler, import("inngest").Handler<Inngest<{
     id: string;
 }>, string, {
-    error: Error;
     logger: import("inngest/middleware/logger").Logger;
+    error: Error;
     event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
 }>, Inngest<{
     id: string;

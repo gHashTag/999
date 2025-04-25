@@ -1,18 +1,16 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const agent_kit_1 = require("@inngest/agent-kit");
-const server_1 = require("@inngest/agent-kit/server");
+import { createAgent, createNetwork, anthropic } from "@inngest/agent-kit";
+import { createServer } from "@inngest/agent-kit/server";
 // Check for API key (optional, but good practice)
 if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("ANTHROPIC_API_KEY environment variable not set. Tutorial agents may not work.");
 }
 // Agent 1: Database Administrator
-const dbaAgent = (0, agent_kit_1.createAgent)({
+const dbaAgent = createAgent({
     name: "Database administrator",
     description: "Provides expert support for managing PostgreSQL databases",
     system: "You are a PostgreSQL expert database administrator. " +
         "You only provide answers to questions linked to Postgres database schema, indexes, extensions.",
-    model: (0, agent_kit_1.anthropic)({
+    model: anthropic({
         // Use the model specified in the tutorial
         model: "claude-3-5-haiku-20240307", // Using specific Haiku version if 'latest' causes issues, fallback to tutorial's likely intent
         apiKey: process.env.ANTHROPIC_API_KEY, // Pass the API key
@@ -22,12 +20,12 @@ const dbaAgent = (0, agent_kit_1.createAgent)({
     }),
 });
 // Agent 2: Database Security Expert
-const securityAgent = (0, agent_kit_1.createAgent)({
+const securityAgent = createAgent({
     name: "Database Security Expert",
     description: "Provides expert guidance on PostgreSQL security, access control, audit logging, and compliance best practices",
     system: "You are a PostgreSQL security expert. " +
         "You only provide answers to questions linked to PostgreSQL security topics such as encryption, access control, audit logging, and compliance best practices.",
-    model: (0, agent_kit_1.anthropic)({
+    model: anthropic({
         // Use the model specified in the tutorial
         model: "claude-3-5-haiku-20240307", // Using specific Haiku version
         apiKey: process.env.ANTHROPIC_API_KEY, // Pass the API key
@@ -37,10 +35,10 @@ const securityAgent = (0, agent_kit_1.createAgent)({
     }),
 });
 // Network: DevOps Team
-const devOpsNetwork = (0, agent_kit_1.createNetwork)({
+const devOpsNetwork = createNetwork({
     name: "DevOps team",
     agents: [dbaAgent, securityAgent],
-    defaultModel: (0, agent_kit_1.anthropic)({
+    defaultModel: anthropic({
         // Use the model specified in the tutorial for the router
         model: "claude-3-5-haiku-20240307", // Using specific Haiku version
         apiKey: process.env.ANTHROPIC_API_KEY, // Pass the API key
@@ -52,7 +50,7 @@ const devOpsNetwork = (0, agent_kit_1.createNetwork)({
 });
 // Server Setup using createServer
 console.log("Starting AgentKit server for tutorial...");
-const server = (0, server_1.createServer)({
+const server = createServer({
     agents: [dbaAgent, securityAgent], // Serve individual agents
     networks: [devOpsNetwork], // Serve the network
     // No specific client needed here as createServer handles it

@@ -1,69 +1,26 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.askHumanForInputParamsSchema = exports.processArtifactParamsSchema = exports.runCodeParamsSchema = exports.readFilesParamsSchema = exports.createOrUpdateFilesParamsSchema = exports.terminalParamsSchema = void 0;
-exports.createTerminalTool = createTerminalTool;
-exports.createCreateOrUpdateFilesTool = createCreateOrUpdateFilesTool;
-exports.createReadFilesTool = createReadFilesTool;
-exports.createRunCodeTool = createRunCodeTool;
-exports.createProcessArtifactTool = createProcessArtifactTool;
-exports.getAllTools = getAllTools;
-exports.createAskHumanForInputTool = createAskHumanForInputTool;
-const zod_1 = require("zod");
-const agent_kit_1 = require("@inngest/agent-kit");
-const fs = __importStar(require("node:fs"));
-const path = __importStar(require("node:path"));
+import { z } from "zod";
+import { createTool } from "@inngest/agent-kit";
+import * as fs from "node:fs";
+import * as path from "node:path";
 // --- Tool Schema Definitions --- //
-exports.terminalParamsSchema = zod_1.z.object({ command: zod_1.z.string() });
-exports.createOrUpdateFilesParamsSchema = zod_1.z.object({
-    files: zod_1.z.array(zod_1.z.object({ path: zod_1.z.string(), content: zod_1.z.string() })),
+export const terminalParamsSchema = z.object({ command: z.string() });
+export const createOrUpdateFilesParamsSchema = z.object({
+    files: z.array(z.object({ path: z.string(), content: z.string() })),
 });
-exports.readFilesParamsSchema = zod_1.z.object({ files: zod_1.z.array(zod_1.z.string()) });
-exports.runCodeParamsSchema = zod_1.z.object({ code: zod_1.z.string() });
-exports.processArtifactParamsSchema = zod_1.z.object({
-    artifactPath: zod_1.z.string().describe("Local path to the .tar.gz artifact file"),
-    fileToRead: zod_1.z
+export const readFilesParamsSchema = z.object({ files: z.array(z.string()) });
+export const runCodeParamsSchema = z.object({ code: z.string() });
+export const processArtifactParamsSchema = z.object({
+    artifactPath: z.string().describe("Local path to the .tar.gz artifact file"),
+    fileToRead: z
         .string()
         .describe("Path to the file to read inside the archive (e.g., 'test.js')"),
 });
 // --- Tool Creation Functions --- //
-function createTerminalTool(log, getSandbox, eventId, sandboxId) {
-    return (0, agent_kit_1.createTool)({
+export function createTerminalTool(log, getSandbox, eventId, sandboxId) {
+    return createTool({
         name: "terminal",
         description: "Use the terminal to run commands",
-        parameters: exports.terminalParamsSchema,
+        parameters: terminalParamsSchema,
         handler: async (params, { step }) => {
             const currentSandboxId = sandboxId;
             const toolStepName = "TOOL_terminal";
@@ -123,11 +80,11 @@ function createTerminalTool(log, getSandbox, eventId, sandboxId) {
         },
     });
 }
-function createCreateOrUpdateFilesTool(log, getSandbox, eventId, sandboxId) {
-    return (0, agent_kit_1.createTool)({
+export function createCreateOrUpdateFilesTool(log, getSandbox, eventId, sandboxId) {
+    return createTool({
         name: "createOrUpdateFiles",
         description: "Create or update files in the sandbox and return an artifact path.",
-        parameters: exports.createOrUpdateFilesParamsSchema,
+        parameters: createOrUpdateFilesParamsSchema,
         handler: async (params, { step }) => {
             const currentSandboxId = sandboxId;
             const toolStepName = "TOOL_createOrUpdateFiles";
@@ -203,11 +160,11 @@ function createCreateOrUpdateFilesTool(log, getSandbox, eventId, sandboxId) {
         },
     });
 }
-function createReadFilesTool(log, getSandbox, eventId, sandboxId) {
-    return (0, agent_kit_1.createTool)({
+export function createReadFilesTool(log, getSandbox, eventId, sandboxId) {
+    return createTool({
         name: "readFiles",
         description: "Read files from the sandbox",
-        parameters: exports.readFilesParamsSchema,
+        parameters: readFilesParamsSchema,
         handler: async (params, { step }) => {
             const currentSandboxId = sandboxId;
             const toolStepName = "TOOL_readFiles";
@@ -252,11 +209,11 @@ function createReadFilesTool(log, getSandbox, eventId, sandboxId) {
         },
     });
 }
-function createRunCodeTool(log, getSandbox, eventId, sandboxId) {
-    return (0, agent_kit_1.createTool)({
+export function createRunCodeTool(log, getSandbox, eventId, sandboxId) {
+    return createTool({
         name: "runCode",
         description: "Run the code in the sandbox",
-        parameters: exports.runCodeParamsSchema,
+        parameters: runCodeParamsSchema,
         handler: async (params, { step }) => {
             const currentSandboxId = sandboxId;
             const toolStepName = "TOOL_runCode";
@@ -305,11 +262,11 @@ function createRunCodeTool(log, getSandbox, eventId, sandboxId) {
         },
     });
 }
-function createProcessArtifactTool(log, getSandbox, eventId, sandboxId) {
-    return (0, agent_kit_1.createTool)({
+export function createProcessArtifactTool(log, getSandbox, eventId, sandboxId) {
+    return createTool({
         name: "processArtifact",
         description: "Uploads a local .tar.gz artifact to the sandbox, extracts it, and reads a specified file from within.",
-        parameters: exports.processArtifactParamsSchema,
+        parameters: processArtifactParamsSchema,
         handler: async (params, { step }) => {
             const currentSandboxId = sandboxId;
             const toolStepName = "TOOL_processArtifact";
@@ -370,7 +327,7 @@ function createProcessArtifactTool(log, getSandbox, eventId, sandboxId) {
                     sandbox.commands
                         .run(`rm -rf ${remoteArchivePath} ${remoteExtractDir}`)
                         .then(() => log("info", `${toolStepName}_CLEANUP_SUCCESS`, "Remote files cleaned up.", { eventId, currentSandboxId }))
-                        .catch(e => log("warn", `${toolStepName}_CLEANUP_ERROR`, "Cleanup failed.", {
+                        .catch((e) => log("warn", `${toolStepName}_CLEANUP_ERROR`, "Cleanup failed.", {
                         eventId,
                         currentSandboxId,
                         error: e.message,
@@ -392,7 +349,7 @@ function createProcessArtifactTool(log, getSandbox, eventId, sandboxId) {
     });
 }
 // Function to assemble all tools, accepting dependencies
-function getAllTools(log, getSandbox, eventId, sandboxId) {
+export function getAllTools(log, getSandbox, eventId, sandboxId) {
     return [
         createTerminalTool(log, getSandbox, eventId, sandboxId),
         createCreateOrUpdateFilesTool(log, getSandbox, eventId, sandboxId),
@@ -403,19 +360,19 @@ function getAllTools(log, getSandbox, eventId, sandboxId) {
     ];
 }
 // +++ ADDED: Human in the Loop Tool +++
-exports.askHumanForInputParamsSchema = zod_1.z.object({
-    question: zod_1.z.string().describe("The specific question to ask the human."),
-    context: zod_1.z
+export const askHumanForInputParamsSchema = z.object({
+    question: z.string().describe("The specific question to ask the human."),
+    context: z
         .string()
         .optional()
         .describe("Optional additional context for the human."),
 });
-function createAskHumanForInputTool(log, eventId // sandboxId and getSandbox might not be needed here
+export function createAskHumanForInputTool(log, eventId // sandboxId and getSandbox might not be needed here
 ) {
-    return (0, agent_kit_1.createTool)({
+    return createTool({
         name: "askHumanForInput",
         description: "Asks a human user for input or clarification and waits for their response.",
-        parameters: exports.askHumanForInputParamsSchema,
+        parameters: askHumanForInputParamsSchema,
         handler: async (params, { step }) => {
             const toolStepName = "TOOL_askHumanForInput";
             log("info", `${toolStepName}_START`, "Requesting human input.", {

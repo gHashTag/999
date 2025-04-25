@@ -9,6 +9,12 @@ import { Sandbox } from "@e2b/code-interpreter"
 //   TextPart,
 // } from "@inngest/agent-kit";
 
+// Cache for sandboxes - Not currently used
+// const sandboxCache = new Map<string, Sandbox>()
+
+// Function to retrieve a sandbox, potentially from cache
+export type GetSandboxFunc = (sandboxId: string) => Promise<Sandbox | null>
+
 export function lastAssistantTextMessageContent(
   result: any
 ): string | undefined {

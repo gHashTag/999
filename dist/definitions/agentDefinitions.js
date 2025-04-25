@@ -1,12 +1,7 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createTesterAgent = createTesterAgent;
-exports.createCodingAgent = createCodingAgent;
-exports.createCriticAgent = createCriticAgent;
-const agent_kit_1 = require("@inngest/agent-kit");
-const models_1 = require("@inngest/ai/models");
+import { createAgent } from "@inngest/agent-kit";
+import { deepseek } from "@inngest/ai/models";
 // Updated import paths
-const network_js_1 = require("./types/network.js");
+import { NetworkStatus } from "../types/network.js";
 // --- End updated import paths
 // import { Sandbox } from "@e2b/code-interpreter" // Removed unused
 // Define types for dependencies (could be imported from a central types file eventually)
@@ -16,8 +11,8 @@ const network_js_1 = require("./types/network.js");
 // interface InngestOnFinishArgs { ... } // Removed unused interface
 // Result type for onFinish hooks that download content
 // interface FileDownloadResult { ... } // Removed as onFinish hooks are removed
-function createTesterAgent({ allTools, apiKey, modelName, }) {
-    return (0, agent_kit_1.createAgent)({
+export function createTesterAgent({ allTools, apiKey, modelName, }) {
+    return createAgent({
         name: "Tester Agent",
         description: "Writes or revises unit tests based on task and critique.",
         system: `You are a QA engineer agent. 
@@ -40,15 +35,15 @@ function createTesterAgent({ allTools, apiKey, modelName, }) {
                  **If critique on previous tests is provided (check state.test_critique), address the critique and revise the tests before saving using 'createOrUpdateFiles'.**
                  Your final action MUST be a call to 'createOrUpdateFiles' with the content for 'test.js'.
                  **If the task description or critique is unclear, use the 'askHumanForInput' tool to ask for clarification before writing tests.**`, // System prompt needs access to state eventually
-        model: (0, models_1.deepseek)({
+        model: deepseek({
             apiKey: apiKey,
             model: modelName,
         }),
         tools: allTools,
     });
 }
-function createCodingAgent({ allTools, apiKey, modelName, }) {
-    return (0, agent_kit_1.createAgent)({
+export function createCodingAgent({ allTools, apiKey, modelName, }) {
+    return createAgent({
         name: "Coding Agent",
         description: "Writes or revises implementation code based on task, tests, and critique.",
         system: `You are a software developer agent. 
@@ -62,15 +57,15 @@ function createCodingAgent({ allTools, apiKey, modelName, }) {
                  
                  Focus on writing only the implementation code in 'implementation.js'. Do NOT re-read test files using tools.
                  **If the tests or critique are unclear, or if you are unsure how to proceed, use the 'askHumanForInput' tool to ask for guidance.**`, // Needs state access
-        model: (0, models_1.deepseek)({
+        model: deepseek({
             apiKey: apiKey,
             model: modelName,
         }),
         tools: allTools,
     });
 }
-function createCriticAgent({ allTools, apiKey, modelName, }) {
-    return (0, agent_kit_1.createAgent)({
+export function createCriticAgent({ allTools, apiKey, modelName, }) {
+    return createAgent({
         name: "Critic Agent",
         description: "Reviews code and/or tests for correctness and style, providing clear feedback.",
         system: async ({ network }) => {
@@ -79,12 +74,12 @@ function createCriticAgent({ allTools, apiKey, modelName, }) {
             const status = state.status;
             let basePrompt = `You are a code reviewer agent. Your task is to review provided code and/or tests based on the original task description: "${state.task || "Unknown task"}".`;
             let contentToReview = "";
-            if (status === network_js_1.NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
+            if (status === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
                 basePrompt += `\nReview the following unit tests ('test.js'):`;
                 contentToReview =
                     state.test_code || "Error: Test code not found in state.";
             }
-            else if (status === network_js_1.NetworkStatus.Enum.NEEDS_CODE_CRITIQUE) {
+            else if (status === NetworkStatus.Enum.NEEDS_CODE_CRITIQUE) {
                 basePrompt += `\nReview the following implementation code ('implementation.js') against the provided tests ('test.js'):`;
                 const implCode = state.implementation_code ||
                     "Error: Implementation code not found in state.";
@@ -97,7 +92,7 @@ function createCriticAgent({ allTools, apiKey, modelName, }) {
             const finalPrompt = `${basePrompt}\n\n${contentToReview}\n\n**Review Output Format:** Provide clear feedback. \n- If everything is good, state **'Tests OK'** or **'Code OK'** or **'Approved'** or **'LGTM'**. Use clear approval terms.\n- If revisions are needed, clearly state **'Revision needed'** and explain the issues/errors/problems found.\n- **If you are unsure about the correctness or the review result is ambiguous, use the 'askHumanForInput' tool to request clarification before approving or requesting revision.**\nYour response will determine the next step in the workflow.`;
             return finalPrompt;
         },
-        model: (0, models_1.deepseek)({
+        model: deepseek({
             apiKey: apiKey,
             model: modelName,
         }),

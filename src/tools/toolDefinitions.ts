@@ -2,19 +2,8 @@ import { z } from "zod"
 import { createTool } from "@inngest/agent-kit"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { Sandbox } from "@e2b/code-interpreter"
-
-// Type for the logger function (assuming it's passed)
-// Consider defining this more centrally if used elsewhere
-type LoggerFunc = (
-  level: "info" | "warn" | "error",
-  stepName: string,
-  message: string,
-  data?: object
-) => void
-
-// Type for the getSandbox function (assuming it's passed)
-type GetSandboxFunc = (sandboxId: string) => Promise<Sandbox | null>
+import type { LoggerFunc } from "../types/agents.js"
+import type { GetSandboxFunc } from "../inngest/index.js"
 
 // --- Tool Schema Definitions --- //
 export const terminalParamsSchema = z.object({ command: z.string() })
@@ -468,7 +457,7 @@ export function createProcessArtifactTool(
                 { eventId, currentSandboxId }
               )
             )
-            .catch(e =>
+            .catch((e: any) =>
               log("warn", `${toolStepName}_CLEANUP_ERROR`, "Cleanup failed.", {
                 eventId,
                 currentSandboxId,

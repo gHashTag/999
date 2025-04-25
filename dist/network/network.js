@@ -1,9 +1,6 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createDevOpsNetwork = createDevOpsNetwork;
-const agent_kit_1 = require("@inngest/agent-kit");
-const models_1 = require("@inngest/ai/models");
-const network_js_1 = require("./types/network.js");
+import { createNetwork } from "@inngest/agent-kit";
+import { deepseek } from "@inngest/ai/models";
+import { NetworkStatus } from "../types/network.js";
 // Define the Network States for TDD flow with Critique Loop
 /*
 const NetworkStatus = z.enum([
@@ -31,15 +28,15 @@ interface NetworkState {
 }
 */
 // FIX: Use Agent type for function parameters
-function createDevOpsNetwork(testerAgent, codingAgent, criticAgent
+export function createDevOpsNetwork(testerAgent, codingAgent, criticAgent
 // FIX: Remove testRunnerAgent parameter
 // testRunnerAgent: Agent<any>
 ) {
-    const network = (0, agent_kit_1.createNetwork)({
+    const network = createNetwork({
         name: "TDD DevOps Team with Critique",
         // FIX: Remove testRunnerAgent from the agents list
         agents: [testerAgent, codingAgent, criticAgent],
-        defaultModel: (0, models_1.deepseek)({
+        defaultModel: deepseek({
             apiKey: process.env.DEEPSEEK_API_KEY,
             model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
         }),
@@ -52,11 +49,11 @@ function createDevOpsNetwork(testerAgent, codingAgent, criticAgent
             });
             console.log(`[Router] Current state status: ${state.status}`);
             switch (state.status) {
-                case network_js_1.NetworkStatus.Enum.NEEDS_TEST:
-                case network_js_1.NetworkStatus.Enum.NEEDS_TEST_REVISION: // Tester works in both cases
+                case NetworkStatus.Enum.NEEDS_TEST:
+                case NetworkStatus.Enum.NEEDS_TEST_REVISION: // Tester works in both cases
                     console.log("[Router] Routing to Tester Agent.");
                     return testerAgent;
-                case network_js_1.NetworkStatus.Enum.NEEDS_CODE:
+                case NetworkStatus.Enum.NEEDS_CODE:
                 case "NEEDS_CODE":
                 case "NEEDS_CODE_REVISION": // Coder works in both cases
                     console.log("[Router] Routing to Coding Agent.");
@@ -66,7 +63,7 @@ function createDevOpsNetwork(testerAgent, codingAgent, criticAgent
                     console.log("[Router] Routing to Critic Agent.");
                     return criticAgent;
                 // FIX: Stop network loop when ready for final tests
-                case network_js_1.NetworkStatus.Enum.READY_FOR_FINAL_TEST:
+                case NetworkStatus.Enum.READY_FOR_FINAL_TEST:
                     console.log("[Router] State is READY_FOR_FINAL_TEST. Stopping agent network loop.");
                     return; // Stop the agent loop
                 case "COMPLETED":
