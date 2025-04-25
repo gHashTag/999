@@ -66,15 +66,24 @@ alwaysApply: true
 1. Import Order
    - Node.js built-in modules
    - External dependencies
-   - Internal modules (@/ imports)
+   - Internal modules using path aliases (@/ imports)
    - Relative imports (./ imports)
 
-2. Function Order
+2. Path Aliases
+   - **Use path aliases (`@/...`)** for importing modules from within the `src` directory instead of relative paths (`../`, `./`).
+   - Aliases are configured in `tsconfig.json` under `compilerOptions.paths`.
+
+3. Import File Extensions
+   - **Do NOT include `.js` extensions** in internal module imports (both alias and relative paths).
+   - Example: `import { MyComponent } from '@/components/MyComponent'` instead of `import { MyComponent } from '@/components/MyComponent.js'`
+   - *Note: This requires specific `moduleResolution` settings in `tsconfig.json`. If compiler errors (like TS2835) occur, revisit this rule or the `tsconfig.json` settings.*
+
+4. Function Order
    - Public methods first
    - Private methods last
    - Group related functions together
 
-3. Type Definitions
+5. Type Definitions
    - Place types/interfaces at the top of file
    - Group related types together
 

@@ -1,5 +1,5 @@
 import type { AgentResult, Message } from "@inngest/agent-kit"
-import type { CritiqueData, LoggerFunc } from "../../../types/agents.js"
+import type { CritiqueData, LoggerFunc } from "../../../types/agents"
 
 // Define a more specific type for the expected structure of the last message
 // This helps TypeScript understand the possible properties

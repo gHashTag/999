@@ -1,4 +1,4 @@
-export * from "./tester/index.js";
-export * from "./coder/index.js";
-export * from "./critic/index.js";
+export * from "./tester";
+export * from "./coder";
+export * from "./critic";
 //# sourceMappingURL=index.d.ts.map

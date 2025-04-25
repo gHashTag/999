@@ -1,2 +1,2 @@
-export * from "./logic/createCriticAgent.js";
+export * from "./logic/createCriticAgent";
 //# sourceMappingURL=index.d.ts.map

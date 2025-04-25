@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { LoggerFunc } from "../types/agents.js";
-import type { GetSandboxFunc } from "../inngest/index.js";
+import type { LoggerFunc } from "@/types/agents";
+import type { GetSandboxFunc } from "@/inngest";
 export declare const terminalParamsSchema: z.ZodObject<{
     command: z.ZodString;
 }, "strip", z.ZodTypeAny, {

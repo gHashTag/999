@@ -1,6 +1,6 @@
 import { createAgent } from "@inngest/agent-kit";
 import { deepseek } from "@inngest/ai/models";
-import { NetworkStatus } from "../../../types/network.js";
+import { NetworkStatus } from "../../../types/network";
 export function createCriticAgent({ allTools, apiKey, modelName, }) {
     return createAgent({
         name: "Critic Agent",

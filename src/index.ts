@@ -2,19 +2,19 @@
 import "dotenv/config"
 
 import { Inngest } from "inngest"
-import { getSandbox } from "./inngest/index.js"
+import { getSandbox } from "@/inngest"
 import { Sandbox } from "@e2b/code-interpreter"
-import { createDevOpsNetwork, type NetworkRun } from "./network/network.js"
-import { TddNetworkState, NetworkStatus } from "./types/network.js"
-import { CodingAgentEvent, codingAgentEventSchema } from "./types/events.js"
-import { AgentDependencies } from "./types/agents.js"
-import { getAllTools } from "./tools/toolDefinitions.js"
+import { createDevOpsNetwork, type NetworkRun } from "@/network/network"
+import { TddNetworkState, NetworkStatus } from "@/types/network"
+import { CodingAgentEvent, codingAgentEventSchema } from "@/types/events"
+import { AgentDependencies } from "@/types/agents"
+import { getAllTools } from "@/tools/toolDefinitions"
 import {
   createTesterAgent,
   createCodingAgent,
   createCriticAgent,
-} from "./agents/index.js"
-import { log } from "./utils/index.js"
+} from "@/agents"
+import { log } from "@/utils"
 
 // Initialize Inngest Client
 const inngest = new Inngest({ id: "agentkit-tdd-agent" })

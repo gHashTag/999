@@ -1,5 +1,5 @@
 import type { AgentResult } from "@inngest/agent-kit";
-import type { CritiqueData, LoggerFunc } from "../../../types/agents.js";
+import type { CritiqueData, LoggerFunc } from "../../../types/agents";
 /**
  * Extracts critique data from an agent's result.
  * Improved type checking for message content.

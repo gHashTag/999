@@ -1,7 +1,7 @@
 import { createAgent } from "@inngest/agent-kit";
 import { deepseek } from "@inngest/ai/models";
 // Updated import paths
-import { NetworkStatus } from "../types/network.js";
+import { NetworkStatus } from "@/types/network";
 // --- End updated import paths
 // import { Sandbox } from "@e2b/code-interpreter" // Removed unused
 // Define types for dependencies (could be imported from a central types file eventually)

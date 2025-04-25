@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Inngest } from "inngest";
-import { CodingAgentEvent } from "./types/events.js";
+import { CodingAgentEvent } from "@/types/events";
 declare const inngest: Inngest<{
     id: string;
 }>;
@@ -17,15 +17,15 @@ declare const codingAgentFunction: import("inngest").InngestFunction<Omit<import
 }], import("inngest").Handler<Inngest<{
     id: string;
 }>, string, {
+    event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
     logger: import("inngest/middleware/logger").Logger;
     error: Error;
-    event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
 }>>, "triggers">, typeof codingAgentHandler, import("inngest").Handler<Inngest<{
     id: string;
 }>, string, {
+    event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
     logger: import("inngest/middleware/logger").Logger;
     error: Error;
-    event: import("inngest").FailureEventPayload<import("inngest").EventPayload<any>>;
 }>, Inngest<{
     id: string;
 }>, import("inngest").InngestMiddleware.Stack, [{

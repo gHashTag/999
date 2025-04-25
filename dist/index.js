@@ -1,14 +1,14 @@
 /* eslint-disable */
 import "dotenv/config";
 import { Inngest } from "inngest";
-import { getSandbox } from "./inngest/index.js";
+import { getSandbox } from "@/inngest";
 import { Sandbox } from "@e2b/code-interpreter";
-import { createDevOpsNetwork } from "./network/network.js";
-import { NetworkStatus } from "./types/network.js";
-import { codingAgentEventSchema } from "./types/events.js";
-import { getAllTools } from "./tools/toolDefinitions.js";
-import { createTesterAgent, createCodingAgent, createCriticAgent, } from "./agents/index.js";
-import { log } from "./utils/index.js";
+import { createDevOpsNetwork } from "@/network/network";
+import { NetworkStatus } from "@/types/network";
+import { codingAgentEventSchema } from "@/types/events";
+import { getAllTools } from "@/tools/toolDefinitions";
+import { createTesterAgent, createCodingAgent, createCriticAgent, } from "@/agents";
+import { log } from "@/utils";
 // Initialize Inngest Client
 const inngest = new Inngest({ id: "agentkit-tdd-agent" });
 // --- Main Handler --- //

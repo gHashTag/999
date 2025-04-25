@@ -2,8 +2,8 @@ import { z } from "zod"
 import { createTool } from "@inngest/agent-kit"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import type { LoggerFunc } from "../types/agents.js"
-import type { GetSandboxFunc } from "../inngest/index.js"
+import type { LoggerFunc } from "@/types/agents"
+import type { GetSandboxFunc } from "@/inngest"
 
 // --- Tool Schema Definitions --- //
 export const terminalParamsSchema = z.object({ command: z.string() })
