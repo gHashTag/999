@@ -55,7 +55,8 @@ export function createTesterAgent({
                  \`\`\`
                  **CRITICAL INSTRUCTION: Ensure the file is named exactly 'test.js'.**
                  **If critique on previous tests is provided (check state.test_critique), address the critique and revise the tests before saving using 'createOrUpdateFiles'.**
-                 Your final action MUST be a call to 'createOrUpdateFiles' with the content for 'test.js'.`,
+                 Your final action MUST be a call to 'createOrUpdateFiles' with the content for 'test.js'.
+                 **If the task description or critique is unclear, use the 'askHumanForInput' tool to ask for clarification before writing tests.**`,
     model: deepseek({
       apiKey: apiKey,
       model: modelName,
@@ -193,7 +194,8 @@ export function createCodingAgent({
                  3. **Write Implementation:** Write the final implementation code based on the tests and any critique.
                  4. **Save Code:** Save the final implementation code into 'implementation.js' using the 'createOrUpdateFiles' tool.
                  
-                 Focus on writing only the implementation code in 'implementation.js'. Do NOT re-read test files using tools.`,
+                 Focus on writing only the implementation code in 'implementation.js'. Do NOT re-read test files using tools.
+                 **If the tests or critique are unclear, or if you are unsure how to proceed, use the 'askHumanForInput' tool to ask for guidance.**`,
     model: deepseek({
       apiKey: apiKey,
       model: modelName,
@@ -350,7 +352,7 @@ export function createCriticAgent({
         basePrompt += `\nERROR: Critic agent called in unexpected state: ${status}. Cannot determine what to review.`
       }
 
-      const finalPrompt = `${basePrompt}\n\n${contentToReview}\n\n**Review Output Format:** Provide clear feedback. \n- If everything is good, state **'Tests OK'** or **'Code OK'** or **'Approved'** or **'LGTM'**. Use clear approval terms.\n- If revisions are needed, clearly state **'Revision needed'** and explain the issues/errors/problems found.\nYour response will determine the next step in the workflow.`
+      const finalPrompt = `${basePrompt}\n\n${contentToReview}\n\n**Review Output Format:** Provide clear feedback. \n- If everything is good, state **'Tests OK'** or **'Code OK'** or **'Approved'** or **'LGTM'**. Use clear approval terms.\n- If revisions are needed, clearly state **'Revision needed'** and explain the issues/errors/problems found.\n- **If you are unsure about the correctness or the review result is ambiguous, use the 'askHumanForInput' tool to request clarification before approving or requesting revision.**\nYour response will determine the next step in the workflow.`
       return finalPrompt
     },
     model: deepseek({
@@ -464,45 +466,33 @@ export function createCriticAgent({
               })
               network.state.kv.set("network_state", readyState)
             } else {
+              // Handle ambiguous critique: Set status to require human input
               log(
-                "info",
+                "warn",
                 hookStepName,
-                "Decision: Ambiguous critique on code. Assuming OK.",
-                { eventId }
+                "Decision: Ambiguous critique on code. Setting status to NEEDS_HUMAN_INPUT.",
+                { eventId, critiqueText }
               )
-              nextStatus = NetworkStatus.Enum.READY_FOR_FINAL_TEST
-              const readyState: TddNetworkState = {
+              nextStatus = NetworkStatus.Enum.NEEDS_HUMAN_INPUT
+              // Update state in KV with the new status and the critique
+              const needsHumanState: TddNetworkState = {
                 ...state,
                 task: state.task || "",
                 status: nextStatus,
                 sandboxId: state.sandboxId || sandboxId,
                 code_critique: critiqueText,
-                error: undefined,
+                error: "Ambiguous critique requires human review.",
               }
-              if (step) {
-                await step.sendEvent("send-completion-event", {
-                  name: "tdd/network.ready-for-test",
-                  data: { finalState: readyState },
-                })
-                log(
-                  "info",
-                  hookStepName,
-                  "Sent tdd/network.ready-for-test event.",
-                  { eventId }
-                )
-              } else {
-                log(
-                  "warn",
-                  hookStepName,
-                  "Step context not available in onResponse, cannot send event.",
-                  { eventId }
-                )
-              }
-              log("info", hookStepName, "Updating state for final tests.", {
-                eventId,
-                readyState,
-              })
-              network.state.kv.set("network_state", readyState)
+              log(
+                "info",
+                hookStepName,
+                "Updating state to require human input.",
+                {
+                  eventId,
+                  needsHumanState,
+                }
+              )
+              network.state.kv.set("network_state", needsHumanState)
             }
           } else {
             log("warn", hookStepName, "Critic called in unexpected state.", {

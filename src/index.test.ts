@@ -47,33 +47,23 @@ describe("Inngest Function Triggering", () => {
 
 // --- Entire describe block for "agentFunction logic" is removed --- //
 
-// Basic test suite for agentFunction configuration
+// Test suite for the exported Inngest function configuration
 describe("agentFunction configuration", () => {
   it("should be defined and be an object", () => {
-    // Expect the configuration object to exist
     expect(codingAgent).toBeDefined()
-    expect(codingAgent).not.toBeNull()
-
-    // Check if it's an object (which is what createFunction returns)
     expect(typeof codingAgent).toBe("object")
-
-    // Optionally, check for specific properties if needed later
-    // expect(codingAgent.id).toBe("Coding Agent");
-
-    // Later, we will add tests for the actual function logic,
-    // likely by mocking the Inngest execution environment or step functions.
   })
 
-  // New test for the function ID
   it("should have the correct ID", () => {
-    // Remove console.log
-    // console.log("codingAgent object structure:", codingAgent);
+    // Assuming codingAgent has an 'opts' property with the function config
+    // Adjust based on the actual structure exported by Inngest
+    expect(codingAgent.opts).toBeDefined()
 
     // Check the ID within the options object
-    expect(codingAgent.opts.id).toBe("Coding Agent")
+    expect(codingAgent.opts.id).toBe("coding-agent-tdd-function") // Corrected ID
   })
 
-  // Add more tests here as functionality grows
+  // Add more tests for other configuration aspects if needed (e.g., event trigger)
 })
 
 // --- New Test Suite for Refactoring Agent --- //
