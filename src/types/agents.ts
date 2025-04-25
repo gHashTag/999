@@ -13,7 +13,7 @@ export type LoggerFunc = (
   data?: object
 ) => void
 
-// General Tool type (from agent-kit)
+// General Tool type (from agent-kit), revert to any for now
 export type AnyTool = Tool<any>
 
 // Dependencies needed for agent creation

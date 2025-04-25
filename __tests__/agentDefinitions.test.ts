@@ -5,6 +5,7 @@ import {
   createCriticAgent,
   // Assuming the actual hook functions are exported for testing purposes
   // TesterAgent_onFinish, // We might need this if testing hooks directly // COMMENTED OUT
+  type SystemContext, // Import the SystemContext type
 } from "../src/definitions/agentDefinitions" // Changed path from @/
 // import { NetworkStatus } from "../src/types" // Changed path, COMMENTED OUT as unused (TS6133)
 // Import ToolSchema from the correct path
@@ -13,12 +14,23 @@ import { deepseek } from "@inngest/ai/models" // Mock this later if needed
 // Removed GetStepTools and EventPayload imports as they are no longer used directly in tests
 // import type { EventPayload, GetStepTools } from "inngest"
 // Import types from agent-kit, assuming ToolCallResultMessage exists
+// import type {
+//   AgentResult,
+//   ToolResultMessage,
+//   Message,
+// } from "@inngest/agent-kit" // Corrected ToolCallResultMessage -> ToolResultMessage, Added Message
 import type {
-  AgentResult,
-  ToolResultMessage,
-  Message,
-} from "@inngest/agent-kit" // Corrected ToolCallResultMessage -> ToolResultMessage, Added Message
-import type { LoggerFunc } from "../src/types/agents" // Import LoggerFunc type
+  LoggerFunc,
+  AgentDependencies,
+  AnyTool,
+} from "../src/types/agents" // Import LoggerFunc type
+// import {
+//   type AgentRunOpts,
+//   type AgentStep,
+//   type AgentRunResult,
+// } from "@inngest/agent-kit/types"
+// import { type Tool } from "@inngest/agent-kit"
+import { z } from "zod"
 
 // --- Mock Dependencies ---
 // Define the logger type // REMOVED type definition here
@@ -30,7 +42,7 @@ import type { LoggerFunc } from "../src/types/agents" // Import LoggerFunc type
 // ) => void
 
 // Mock logger with correct type signature for vi.fn
-const mockLog = vi.fn<Parameters<LoggerFunc>, ReturnType<LoggerFunc>>() // Use imported LoggerFunc for typing vi.fn
+const mockLog: LoggerFunc = vi.fn()
 
 const mockApiKey = "test-api-key"
 const mockModelName = "test-model"
@@ -387,6 +399,58 @@ describe("Agent Definitions", () => {
         expect(agent.tools.has(name)).toBe(true)
       })
       // ... other basic checks ...
+    })
+
+    it("should create Critic Agent with correct structure and filtered tools", () => {
+      const agent = createCriticAgent({
+        allTools: mockTools,
+        log: mockLog,
+        apiKey: mockApiKey,
+        modelName: mockModelName,
+      })
+      expect(agent).toBeDefined()
+      expect(agent.name).toBe("Critic Agent")
+      expect(agent.description).toBeDefined()
+      expect(agent.system).toBeDefined()
+      expect(agent.model).toBeDefined()
+      // Filter out tools not intended for the critic
+      const agentToolsMap = agent.tools as Map<string, Tool<any>> // Assert type as Map
+      expect(agentToolsMap).toBeInstanceOf(Map) // Verify it's a Map
+
+      // Check if the expected tools are present in the Map
+      const expectedToolNames = ["readFiles", "askHumanForInput"]
+      expect(agentToolsMap.size).toBe(expectedToolNames.length)
+      expectedToolNames.forEach(toolName => {
+        expect(agentToolsMap.has(toolName)).toBe(true)
+        expect(agentToolsMap.get(toolName)?.name).toBe(toolName)
+      })
+
+      // Check if the filtered-out tools are absent
+      expect(agentToolsMap.has("createOrUpdateFiles")).toBe(false)
+      expect(agentToolsMap.has("terminal")).toBe(false)
+    })
+
+    it("should generate a system prompt for Critic Agent", async () => {
+      const agent = createCriticAgent({
+        allTools: mockTools,
+        log: mockLog,
+        apiKey: mockApiKey,
+        modelName: mockModelName,
+      })
+      const mockNetwork = {
+        get: vi.fn().mockReturnValue({
+          task: "Test Task",
+          status: "NEEDS_TEST_CRITIQUE",
+          test_code: "mock test code",
+        }),
+      }
+      // Use SystemContext for type assertion
+      const systemPromptFunc = agent.system as (
+        args: SystemContext
+      ) => Promise<string>
+      const prompt = await systemPromptFunc({ network: mockNetwork })
+      expect(prompt).toContain("You are a code reviewer agent")
+      // ... rest of the test ...
     })
 
     // TODO: Add tests for system prompt generation based on state

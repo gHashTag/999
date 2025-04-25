@@ -73,13 +73,22 @@ export function createTerminalTool(
             stderr: result.stderr,
             exitCode: result.exitCode,
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
+          let errorMessage = "Unknown terminal error"
+          let errorStack = undefined
+          if (e instanceof Error) {
+            errorMessage = e.message
+            errorStack = e.stack
+          } else if (typeof e === "string") {
+            errorMessage = e
+          }
+
           log("error", `${toolStepName}_ERROR`, "Terminal command failed.", {
             eventId,
             currentSandboxId,
             command: params.command,
-            error: e.message,
-            stack: e.stack,
+            error: errorMessage,
+            stack: errorStack,
             stdout: buffers.stdout,
             stderr: buffers.stderr,
           })
@@ -87,7 +96,7 @@ export function createTerminalTool(
             stdout: buffers.stdout,
             stderr: buffers.stderr,
             exitCode: -1,
-            error: `Command failed: ${e.message}`,
+            error: `Command failed: ${errorMessage}`,
           }
         }
       })
@@ -165,7 +174,16 @@ export function createCreateOrUpdateFilesTool(
                   length: content.length,
                 }
               )
-            } catch (readError: any) {
+            } catch (readError: unknown) {
+              let errorMessage = "Unknown read error"
+              let errorStack = undefined
+              if (readError instanceof Error) {
+                errorMessage = readError.message
+                errorStack = readError.stack
+              } else if (typeof readError === "string") {
+                errorMessage = readError
+              }
+
               log(
                 "error",
                 `${toolStepName}_READ_BACK_ERROR`,
@@ -174,11 +192,12 @@ export function createCreateOrUpdateFilesTool(
                   eventId,
                   currentSandboxId,
                   filePath: file.path,
-                  error: readError.message,
+                  error: errorMessage,
+                  stack: errorStack,
                 }
               )
               throw new Error(
-                `Failed to read back file ${file.path}: ${readError.message}`
+                `Failed to read back file ${file.path}: ${errorMessage}`
               )
             }
           }
@@ -207,15 +226,29 @@ export function createCreateOrUpdateFilesTool(
             message: `Files created/updated: ${writtenFilesData.map(f => f.path).join(", ")}`,
             files: writtenFilesData,
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
+          let errorMessage = "Unknown create/update error"
+          let errorStack = undefined
+          if (e instanceof Error) {
+            errorMessage = e.message
+            errorStack = e.stack
+          } else if (typeof e === "string") {
+            errorMessage = e
+          }
+
           log(
             "error",
             `${toolStepName}_ERROR`,
             "Error in createOrUpdateFiles tool.",
-            { eventId, currentSandboxId, error: e.message, stack: e.stack }
+            {
+              eventId,
+              currentSandboxId,
+              error: errorMessage,
+              stack: errorStack,
+            }
           )
           return {
-            message: `Error creating/updating files: ${e.message}`,
+            message: `Error creating/updating files: ${errorMessage}`,
             files: [],
             error: true,
           }
@@ -259,8 +292,22 @@ export function createReadFilesTool(
               "Reading file content.",
               { eventId, currentSandboxId, file }
             )
-            const content = await sandbox.files.read(file)
-            contents.push({ path: file, content })
+            try {
+              const content = await sandbox.files.read(file)
+              contents.push({ path: file, content })
+            } catch (readError: unknown) {
+              let errorMessage = "Unknown file read error"
+              if (readError instanceof Error) {
+                errorMessage = readError.message
+              }
+              log(
+                "error",
+                `${toolStepName}_READING_FILE_ERROR`,
+                `Failed to read file: ${file}`,
+                { eventId, currentSandboxId, file, error: errorMessage }
+              )
+              contents.push({ path: file, content: `ERROR: ${errorMessage}` })
+            }
           }
           const resultString = JSON.stringify(contents)
           log("info", `${toolStepName}_SUCCESS`, "Files read successfully.", {
@@ -269,15 +316,26 @@ export function createReadFilesTool(
             resultLength: resultString.length,
           })
           return resultString
-        } catch (e: any) {
-          log("error", `${toolStepName}_ERROR`, "Error reading files.", {
+        } catch (e: unknown) {
+          let errorMessage = "Unknown readFiles error"
+          let errorStack = undefined
+          if (e instanceof Error) {
+            errorMessage = e.message
+            errorStack = e.stack
+          } else if (typeof e === "string") {
+            errorMessage = e
+          }
+          log("error", `${toolStepName}_ERROR`, "Error in readFiles tool.", {
             eventId,
             currentSandboxId,
-            files: filesToRead,
-            error: e.message,
-            stack: e.stack,
+            error: errorMessage,
+            stack: errorStack,
           })
-          return "Error: " + e.message
+          return {
+            message: `Error reading files: ${errorMessage}`,
+            files: [],
+            error: true,
+          }
         }
       })
     },
@@ -320,14 +378,25 @@ export function createRunCodeTool(
               stderrLen: stderr.length,
             })
             return stdout
-          } catch (e: any) {
-            log("error", `${toolStepName}_ERROR`, "Error running code.", {
+          } catch (e: unknown) {
+            let errorMessage = "Unknown runCode error"
+            let errorStack = undefined
+            if (e instanceof Error) {
+              errorMessage = e.message
+              errorStack = e.stack
+            } else if (typeof e === "string") {
+              errorMessage = e
+            }
+            log("error", `${toolStepName}_ERROR`, "Error in runCode tool.", {
               eventId,
               currentSandboxId,
-              error: e.message,
-              stack: e.stack,
+              error: errorMessage,
+              stack: errorStack,
             })
-            return "Error: " + e.message
+            return {
+              output: `Error executing code: ${errorMessage}`,
+              error: true,
+            }
           }
         })
       } else {
@@ -457,11 +526,11 @@ export function createProcessArtifactTool(
                 { eventId, currentSandboxId }
               )
             )
-            .catch((e: any) =>
+            .catch((e: unknown) =>
               log("warn", `${toolStepName}_CLEANUP_ERROR`, "Cleanup failed.", {
                 eventId,
                 currentSandboxId,
-                error: e.message,
+                error: e instanceof Error ? e.message : e,
               })
             )
 
@@ -472,14 +541,25 @@ export function createProcessArtifactTool(
             { eventId, currentSandboxId }
           )
           return content
-        } catch (e: any) {
+        } catch (e: unknown) {
+          let errorMessage = "Unknown processArtifact error"
+          let errorStack = undefined
+          if (e instanceof Error) {
+            errorMessage = e.message
+            errorStack = e.stack
+          } else if (typeof e === "string") {
+            errorMessage = e
+          }
           log("error", `${toolStepName}_ERROR`, "Error processing artifact.", {
             eventId,
             currentSandboxId,
-            error: e.message,
-            stack: e.stack,
+            error: errorMessage,
+            stack: errorStack,
           })
-          return `Error processing artifact: ${e.message}`
+          return {
+            message: `Error processing artifact: ${errorMessage}`,
+            error: true,
+          }
         }
       })
     },

@@ -1,7 +1,14 @@
 import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies, AnyTool } from "../../../types/agents.js"
-import { NetworkStatus, TddNetworkState } from "../../../types/network.js"
+import type { AgentDependencies, AnyTool } from "@/types/agents"
+import { NetworkStatus, TddNetworkState } from "@/types/network"
+
+// Define a more specific type for the system prompt context
+// interface SystemContext {
+//   network?: {
+//     get: (key: string) => Partial<TddNetworkState> | undefined
+//   }
+// }
 
 export function createCriticAgent({
   allTools,

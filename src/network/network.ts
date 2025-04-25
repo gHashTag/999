@@ -1,6 +1,6 @@
 import { createNetwork, Agent, type NetworkRun } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import { TddNetworkState, NetworkStatus } from "../types/network.js"
+import { TddNetworkState, NetworkStatus } from "@/types/network"
 
 // Define the Network States for TDD flow with Critique Loop
 /*

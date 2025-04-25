@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # ⚡ Правило: Запуск Тестовых Событий Inngest
 

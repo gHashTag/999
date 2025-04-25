@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 // FIX: Remove unused import
 // import { Inngest } from "inngest"
-// FIX: Import codingAgent (exported as codingAgent from index.ts)
-import { inngest, codingAgent } from "../src/index.js"
+// FIX: Import codingAgentFunction and inngest from the correct file
+import { inngest, codingAgentFunction } from "../src/inngest/index"
 
 // Define mock data for the event
 const testEventData = { input: "Write a function to add two numbers." }
@@ -32,7 +32,7 @@ describe("Inngest Function Triggering", () => {
   })
 
   it("should process a coding task event", async () => {
-    // FIX: Use the imported agent (codingAgent)
+    // FIX: Use the imported agent (codingAgentFunction)
     const result = await inngest.send({
       name: "coding-agent/run",
       data: testEventData,
@@ -40,7 +40,7 @@ describe("Inngest Function Triggering", () => {
 
     // Example assertions (adjust based on expected outcome)
     expect(result).toBeDefined()
-    // TODO: Add more specific assertions based on what codingAgentHandler should do
+    // TODO: Add more specific assertions based on what codingAgentFunction should do
     // For example, check if certain steps were called using step.invoke mocks if needed
   })
 })
@@ -50,17 +50,17 @@ describe("Inngest Function Triggering", () => {
 // Test suite for the exported Inngest function configuration
 describe("agentFunction configuration", () => {
   it("should be defined and be an object", () => {
-    expect(codingAgent).toBeDefined()
-    expect(typeof codingAgent).toBe("object")
+    expect(codingAgentFunction).toBeDefined()
+    expect(typeof codingAgentFunction).toBe("object")
   })
 
   it("should have the correct ID", () => {
-    // Assuming codingAgent has an 'opts' property with the function config
+    // Assuming codingAgentFunction has an 'opts' property with the function config
     // Adjust based on the actual structure exported by Inngest
-    expect(codingAgent.opts).toBeDefined()
+    expect(codingAgentFunction.opts).toBeDefined()
 
     // Check the ID within the options object
-    expect(codingAgent.opts.id).toBe("coding-agent-tdd-function") // Corrected ID
+    expect(codingAgentFunction.opts.id).toBe("coding-agent-tdd-function") // Corrected ID
   })
 
   // Add more tests for other configuration aspects if needed (e.g., event trigger)

@@ -16,6 +16,14 @@ import type { AgentDependencies, AnyTool } from "@/types/agents"
 // Result type for onFinish hooks that download content
 // interface FileDownloadResult { ... } // Removed as onFinish hooks are removed
 
+// Define a more specific type for the system prompt context
+// TODO: Consolidate this with the one in src/agents/critic/logic/createCriticAgent.ts
+// interface SystemContext {
+//   network?: {
+//     get: (key: string) => Partial<TddNetworkState> | undefined
+//   }
+// }
+
 export function createTesterAgent({
   allTools,
   apiKey,
