@@ -3,7 +3,7 @@ import Fastify, { FastifyInstance } from "fastify" // Import FastifyInstance for
 import { fastifyPlugin } from "inngest/fastify"
 // import { type InngestFunction } from "inngest" // Revert this import
 import { log } from "@/utils" // Import log
-import { inngest, codingAgentFunction } from "@/inngest" // Import client and function
+import { inngest, runCodingAgent } from "@/inngest" // Import client and CORRECT function name
 import { pathToFileURL } from "node:url" // Import pathToFileURL
 
 // Create Fastify instance with explicit type
@@ -12,7 +12,8 @@ const app: FastifyInstance = Fastify({ logger: false })
 // Serve the Inngest function(s) using the plugin
 app.register(fastifyPlugin, {
   client: inngest,
-  functions: [codingAgentFunction] as any[], // Revert back to any[] for now
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  functions: [runCodingAgent] as any[], // Revert back to any[] for now
 })
 
 const APP_PORT = parseInt(process.env.APP_PORT || "8484", 10) // Ensure port is number

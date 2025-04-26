@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-console */
 import {
   createAgent,
   type NetworkRun, // Keep NetworkRun for context type
@@ -7,24 +6,8 @@ import {
 import { deepseek } from "@inngest/ai/models"
 import type { AgentDependencies, AnyTool } from "@/types/agents"
 import { NetworkStatus, type TddNetworkState } from "@/types/network"
-// import { log } from "@/utils/logic/logger" // Removed unused
 
-// --- Импорт инструкций с использованием Vite ?raw ---
-import criticInstructions from "../../../.cursor/rules/AGENT_Critic.mdc?raw"
-// ----------------------------------------------------
-
-// Helper type for critique result - может быть вынесен в types
-// type CritiqueResult = { // Removed unused
-//   critique?: string
-//   approved: boolean
-// }
-
-// Define a type for the network object passed to system function
-// This is an approximation based on usage; AgentKit might have a specific type
-// interface SystemNetworkContext {
-//   get: (key: string) => Partial<TddNetworkState> | undefined
-//   // Add other network properties if needed
-// }
+import { readAgentInstructions } from "@/utils/logic/readAgentInstructions" // ADD import for utility
 
 export function createCriticAgent({
   allTools,
@@ -32,17 +15,8 @@ export function createCriticAgent({
   modelName, // Now needed for deepseek call
   // baseModel, // Removed baseModel dependency
 }: AgentDependencies) {
-  const baseSystemPrompt = criticInstructions
-
-  // Проверка, что инструкции загрузились
-  if (!baseSystemPrompt || baseSystemPrompt.trim() === "") {
-    console.error(
-      "CRITICAL_ERROR: Critic instructions could not be loaded or are empty."
-    )
-    throw new Error(
-      "Critic instructions are missing or empty. Check the path and file content: .cursor/rules/AGENT_Critic.mdc"
-    )
-  }
+  // Read base instructions using the utility function
+  const baseSystemPrompt = readAgentInstructions("Critic")
 
   return createAgent({
     name: "Critic Agent",
@@ -65,6 +39,7 @@ export function createCriticAgent({
       } else if (status === NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION) {
         dynamicContext = `\n\n**Текущая Задача:** Проверить вывод последней выполненной команды:\n${state.last_command_output || "Вывод команды отсутствует."}`
       }
+      // Use the base prompt read from the file
       return `${baseSystemPrompt}${dynamicContext}`
     },
     model: deepseek({ apiKey, model: modelName }),
@@ -76,7 +51,6 @@ export function createCriticAgent({
         "read_file", // Для чтения кода/артефактов
         "codebase_search", // Для поиска по базе
         "grep_search", // Для точного поиска
-        // "askHumanForInput", // УДАЛЕНО
       ]
       // Явно запрещенные (на всякий случай, если появятся новые)
       const forbiddenTools = ["edit_file", "run_terminal_cmd", "delete_file"]

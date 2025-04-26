@@ -2,7 +2,7 @@
 import { createTool } from "@inngest/agent-kit"
 // import type { LoggerFunc } from "@/utils/logic/logger"; // WRONG import
 import type { LoggerFunc } from "@/types/agents" // CORRECT import
-import type { GetSandboxFunc } from "@/inngest" // CORRECT type alias import
+import type { GetSandboxFunc } from "@/inngest/logic/utils" // CORRECT type alias import
 import { terminalParamsSchema } from "@/tools/schemas"
 
 // Импортируем схему из общего файла (пока он еще существует)

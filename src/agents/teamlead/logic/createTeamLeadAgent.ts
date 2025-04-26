@@ -1,42 +1,35 @@
-import { AgentDefinition } from "@inngest/agent-kit"
-import { AgentDependencies } from "@/definitions/agentDependencies" // Correct import path
-import { TeamLeadTools } from "../tools" // Assuming tools are defined here if needed later
+import { Agent } from "@inngest/agent-kit"
+import { type AgentDependencies } from "@/types/agents"
 import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 import type { AnyTool } from "@/types/agents"
+// import { teamLeadInstructions } from "../instructions" // WRONG import path
+// import teamLeadInstructions from "../../../../.cursor/rules/AGENT_TeamLead.mdc?raw" // INCORRECT relative path
+import { readAgentInstructions } from "@/utils/logic/readAgentInstructions" // ADD import for utility
 
 /**
  * Creates the definition for the Team Lead agent.
- * This agent is responsible for analyzing the overall task description
- * and decomposing it into specific, verifiable test requirements.
+ * @param deps - Agent dependencies.
+ * @returns The Team Lead agent instance.
  */
-export const createTeamLeadAgent = (
-  dependencies: AgentDependencies
-): AgentDefinition<TeamLeadTools> => {
-  const { baseModel, systemEvents, sandbox, allTools } = dependencies // Use the dependencies
+export function createTeamLeadAgent({
+  allTools,
+  apiKey,
+  modelName,
+}: AgentDependencies): Agent<AnyTool[]> {
+  const agentSpecificTools = allTools.filter((tool: AnyTool) => {
+    return tool.name === "web_search" || tool.name === "askHumanForInput"
+  })
 
-  // Инструменты, которые может использовать этот агент
-  const agentSpecificTools = allTools.filter((tool: AnyTool) =>
-    [
-      "web_search", // Keep web_search as per instructions
-      "askHumanForInput", // Add the tool for asking human
-      // Add other tools if TeamLead needs them directly
-    ].includes(tool.name)
-  )
+  // Read instructions using the utility function
+  const systemPrompt = readAgentInstructions("TeamLead")
 
-  // Use imported string
-  const systemPrompt = teamLeadInstructions
   return createAgent({
-    id: "team-lead",
     name: "Team Lead Agent",
     description:
       "Analyzes the main task and creates verifiable requirements for the Tester.",
-    system: systemPrompt,
-    llm: {
-      model: baseModel, // Используем базовую модель из зависимостей
-    },
+    model: deepseek({ apiKey, model: modelName }),
     tools: agentSpecificTools,
-    events: systemEvents, // Use system events from dependencies
-    sandbox: sandbox, // Use sandbox from dependencies
+    system: systemPrompt,
   })
 }

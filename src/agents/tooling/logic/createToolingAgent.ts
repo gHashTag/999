@@ -1,28 +1,14 @@
 import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 import type { AgentDependencies, AnyTool } from "@/types/agents"
+import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 
-// --- Импорт инструкций с использованием Vite ?raw ---
-// Relative path is correct here as .cursor is outside src
-import toolingInstructions from "../../../.cursor/rules/AGENT_Tooling.mdc?raw"
-// ----------------------------------------------------
-
-// --- Агент Инструментальщик ---
 export function createToolingAgent({
   allTools,
   apiKey,
   modelName,
 }: AgentDependencies) {
-  const systemPrompt = toolingInstructions
-
-  if (!systemPrompt || systemPrompt.trim() === "") {
-    console.error(
-      "CRITICAL_ERROR: Tooling instructions could not be loaded or are empty."
-    )
-    throw new Error(
-      "Tooling instructions are missing or empty. Check the path and file content: .cursor/rules/AGENT_Tooling.mdc"
-    )
-  }
+  const systemPrompt = readAgentInstructions("Tooling")
 
   return createAgent({
     name: "Tooling Agent",

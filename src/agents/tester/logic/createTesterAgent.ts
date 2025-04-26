@@ -1,9 +1,8 @@
 import { createAgent } from "@inngest/agent-kit"
-import { deepseek } from "@inngest/ai/models" // Убрали импорт Any
+import { deepseek } from "@inngest/ai/models"
 import type { AgentDependencies, AnyTool } from "@/types/agents"
+import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 
-// --- Импорт инструкций с использованием Vite ?raw ---
-import testerInstructions from "../../../.cursor/rules/AGENT_Tester.mdc?raw"
 // ----------------------------------------------------
 
 export function createTesterAgent({
@@ -11,23 +10,13 @@ export function createTesterAgent({
   apiKey,
   modelName,
 }: AgentDependencies) {
-  const systemPrompt = testerInstructions
-
-  if (!systemPrompt || systemPrompt.trim() === "") {
-    console.error(
-      "CRITICAL_ERROR: Tester instructions could not be loaded or are empty."
-    )
-    throw new Error(
-      "Tester instructions are missing or empty. Check the path and file content: .cursor/rules/AGENT_Tester.mdc"
-    )
-  }
+  const systemPrompt = readAgentInstructions("Tester")
 
   return createAgent({
     name: "Tester Agent",
     description:
       "Генерирует тесты или команды для их создания на основе требований.",
     system: systemPrompt,
-    // Убрали приведение к Any
     model: deepseek({ apiKey, model: modelName }),
     tools: allTools.filter((tool: AnyTool) =>
       ["web_search"].includes(tool.name)

@@ -42,7 +42,9 @@ export function lastAssistantTextMessageContent(
 export async function getSandbox(sandboxId: string): Promise<Sandbox | null> {
   // Возвращаем null если ошибка
   try {
-    const sandbox = await Sandbox.connect(sandboxId)
+    const sandbox = await Sandbox.connect(sandboxId, {
+      autoPause: true,
+    })
     await sandbox.setTimeout(5 * 60_000)
     return sandbox
   } catch (error) {

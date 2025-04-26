@@ -1,6 +1,6 @@
 // src/tools/toolDefinitions.ts
 import { z } from "zod"
-import type { GetSandboxFunc } from "@/inngest"
+import type { GetSandboxFunc } from "@/inngest/logic/utils"
 // import type { Sandbox } from "@e2b/code-interpreter"; // REMOVED: Unused import
 import type { LoggerFunc } from "@/types/agents"
 // import { log } from "@/utils/logic/logger"; // REMOVED: Unused import
