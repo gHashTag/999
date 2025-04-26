@@ -2,155 +2,87 @@
 /* eslint-disable no-console */
 import {
   createAgent,
-  type AgentResult,
-  type NetworkRun,
+  type NetworkRun, // Keep NetworkRun for context type
 } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies } from "@/types/agents"
+import type { AgentDependencies, AnyTool } from "@/types/agents"
 import { NetworkStatus, type TddNetworkState } from "@/types/network"
-import { log } from "@/utils/logic/logger"
+// import { log } from "@/utils/logic/logger" // Removed unused
 
-// Helper type for critique result
-type CritiqueResult = {
-  critique?: string // Optional critique text
-  approved: boolean // Whether the code/test is approved
-}
+// --- Импорт инструкций с использованием Vite ?raw ---
+import criticInstructions from "../../../.cursor/rules/AGENT_Critic.mdc?raw"
+// ----------------------------------------------------
+
+// Helper type for critique result - может быть вынесен в types
+// type CritiqueResult = { // Removed unused
+//   critique?: string
+//   approved: boolean
+// }
+
+// Define a type for the network object passed to system function
+// This is an approximation based on usage; AgentKit might have a specific type
+// interface SystemNetworkContext {
+//   get: (key: string) => Partial<TddNetworkState> | undefined
+//   // Add other network properties if needed
+// }
 
 export function createCriticAgent({
   allTools,
-  apiKey,
-  modelName,
+  apiKey, // Now needed for deepseek call
+  modelName, // Now needed for deepseek call
+  // baseModel, // Removed baseModel dependency
 }: AgentDependencies) {
-  // Get only the necessary tool for this agent
-  const askHumanTool = allTools.find(tool => tool.name === "askHumanForInput")
-  if (!askHumanTool) {
+  const baseSystemPrompt = criticInstructions
+
+  // Проверка, что инструкции загрузились
+  if (!baseSystemPrompt || baseSystemPrompt.trim() === "") {
+    console.error(
+      "CRITICAL_ERROR: Critic instructions could not be loaded or are empty."
+    )
     throw new Error(
-      "Required tool 'askHumanForInput' not found in provided tools."
+      "Critic instructions are missing or empty. Check the path and file content: .cursor/rules/AGENT_Critic.mdc"
     )
   }
 
   return createAgent({
     name: "Critic Agent",
-    description: "Reviews code or tests and provides critique or approval.",
-    // Updated system prompt to focus on critique and approval, not file access
-    system: `You are a senior software engineer acting as a code/test reviewer.\\nYour task is to review the provided code or tests based on the original task description and determine if it meets the requirements and quality standards.\\n\\nInput state will contain either \`state.test_code\` (for reviewing tests) or \`state.implementation_code\` (for reviewing implementation). It might also contain the original \`state.task\`.\\n\\n**Workflow:**\\n1. **Identify Input:** Determine if you are reviewing tests (status was NEEDS_TEST_CRITIQUE) or implementation (status was NEEDS_CODE_CRITIQUE).\\n2. **Review:** Analyze the provided code/tests (conceptually, based on state or previous agent output) against the task description.\\n3. **Decide:** Based on your review, decide if the code/tests are approved.\\n4. **Formulate Response:** Structure your response as a JSON object with two keys:\\n   - \`approved\`: boolean (true if approved, false otherwise)\\n   - \`critique\`: string (detailed feedback if not approved, or a short confirmation like \\\"LGTM!\\\" if approved).\\n\\n**CRITICAL INSTRUCTION:** Your *entire* response MUST be a valid JSON object matching the format: \`{ \\\"approved\\\": boolean, \\\"critique\\\": string }\`. Do NOT add explanations outside the JSON.\\n\n**Example Approved Response:**\\n\`{ \\\"approved\\\": true, \\\"critique\\\": \\\"Looks good to me. Tests cover the main cases.\\\" }\`\\n\n**Example Needs Revision Response:**\\n\`{ \\\"approved\\\": false, \\\"critique\\\": \\\"The tests are missing edge cases for zero and negative inputs. Please add these.\\\" }\`\\n\n**If the input code/tests or task description is unclear, use the \'askHumanForInput\' tool to ask for clarification *instead* of providing a review.**\\nDo NOT attempt to modify files or run commands. Your sole output is the JSON review object.`,
-    model: deepseek({
-      apiKey: apiKey,
-      model: modelName,
-    }),
-    // Pass only the askHuman tool
-    tools: [askHumanTool],
-    // Updated lifecycle hook
-    lifecycle: {
-      onResponse: async (opts: {
-        result: AgentResult
-        network?: NetworkRun<TddNetworkState>
-      }): Promise<AgentResult> => {
-        const { result, network } = opts
+    description:
+      "Проводит ревью требований, тестов, кода или результатов команд.",
+    system: async (ctx: { network?: NetworkRun<any> | undefined }) => {
+      // Use optional chaining and provide default for state
+      const state: Partial<TddNetworkState> =
+        ctx.network?.state.kv.get("network_state") || {}
+      const status = state.status
+      let dynamicContext = ""
 
-        if (!network?.state?.kv) {
-          log("warn", "CRITIC_LIFECYCLE", "Network state KV not found.")
-          result.output = [
-            {
-              type: "text",
-              role: "assistant",
-              content: "Error: Network state KV not found.",
-            },
-          ]
-          return result
-        }
-
-        const state = network.state.kv.get("network_state")
-        if (!state) {
-          log("warn", "CRITIC_LIFECYCLE", "State not found in KV.")
-          result.output = [
-            {
-              type: "text",
-              role: "assistant",
-              content: "Error: State not found in KV.",
-            },
-          ]
-          return result
-        }
-
-        let critiqueResult: CritiqueResult
-
-        try {
-          let llmOutputString: string | undefined
-          if (Array.isArray(result.output) && result.output.length > 0) {
-            const firstMessage = result.output[0]
-            if (
-              firstMessage.type === "text" &&
-              typeof firstMessage.content === "string"
-            ) {
-              llmOutputString = firstMessage.content
-            }
-          }
-
-          if (typeof llmOutputString !== "string") {
-            throw new Error(
-              `Could not extract string content from LLM output: ${JSON.stringify(result.output)}`
-            )
-          }
-          critiqueResult = JSON.parse(llmOutputString)
-          if (
-            typeof critiqueResult !== "object" ||
-            critiqueResult === null ||
-            typeof critiqueResult.approved !== "boolean" ||
-            typeof critiqueResult.critique !== "string"
-          ) {
-            throw new Error("Invalid JSON structure")
-          }
-        } catch (error: any) {
-          console.error(
-            `[CriticAgent Lifecycle] Failed to parse critique JSON. Result Output: ${JSON.stringify(result.output)}`,
-            { error: error.message }
-          )
-          critiqueResult = {
-            approved: false,
-            critique: `Error: Could not process the review response. Original LLM output: ${JSON.stringify(result.output)}`,
-          }
-        }
-
-        const currentStatus = state.status
-        let nextStatus: NetworkStatus
-        let critiqueField: keyof TddNetworkState | null = null
-
-        if (currentStatus === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
-          critiqueField = "test_critique"
-          nextStatus = critiqueResult.approved
-            ? NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION
-            : NetworkStatus.Enum.NEEDS_TEST_REVISION
-        } else if (
-          currentStatus === NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE
-        ) {
-          critiqueField = "implementation_critique"
-          nextStatus = critiqueResult.approved
-            ? NetworkStatus.Enum.COMPLETED
-            : NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION
-        } else {
-          console.warn(
-            `[CriticAgent Lifecycle] Unexpected status ${currentStatus}. Defaulting to NEEDS_TEST.`
-          )
-          nextStatus = NetworkStatus.Enum.NEEDS_TEST
-        }
-
-        state.status = nextStatus
-        if (critiqueField && critiqueField in state) {
-          state[critiqueField] = critiqueResult.critique
-        }
-        state.generated_command = undefined
-
-        network.state.kv.set("network_state", state)
-        log(
-          "info",
-          "CRITIC_LIFECYCLE",
-          `Review complete. Approved: ${critiqueResult.approved}. State updated to ${nextStatus}. Critique: ${critiqueResult.critique}`
-        )
-
-        // Return the original result object to satisfy the expected type
-        return result
-      },
+      // Add dynamic context based on status
+      if (status === NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE) {
+        dynamicContext = `\n\n**Текущая Задача:** Провести ревью следующих требований от Руководителя:\n${state.test_requirements || "Требования отсутствуют."}`
+      } else if (status === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
+        dynamicContext = `\n\n**Текущая Задача:** Провести ревью следующего кода/команды для тестов:\n${state.test_code || state.command_to_execute || "Код/команда теста отсутствует."}\n**Предыдущая критика (если есть):** ${state.test_critique || "Нет"}`
+      } else if (status === NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE) {
+        dynamicContext = `\n\n**Текущая Задача:** Провести ревью следующего кода реализации:\n${state.implementation_code || "Код реализации отсутствует."}\n**Связанные тесты:**\n${state.test_code || "Код тестов отсутствует."}\n**Предыдущая критика (если есть):** ${state.implementation_critique || "Нет"}`
+      } else if (status === NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION) {
+        dynamicContext = `\n\n**Текущая Задача:** Проверить вывод последней выполненной команды:\n${state.last_command_output || "Вывод команды отсутствует."}`
+      }
+      return `${baseSystemPrompt}${dynamicContext}`
     },
+    model: deepseek({ apiKey, model: modelName }),
+    // Инструменты для Критика (без askHumanForInput и без прямого изменения файлов/системы)
+    tools: allTools.filter((tool: AnyTool) => {
+      // Явно разрешенные инструменты
+      const allowedTools = [
+        "web_search", // Для поиска лучших практик
+        "read_file", // Для чтения кода/артефактов
+        "codebase_search", // Для поиска по базе
+        "grep_search", // Для точного поиска
+        // "askHumanForInput", // УДАЛЕНО
+      ]
+      // Явно запрещенные (на всякий случай, если появятся новые)
+      const forbiddenTools = ["edit_file", "run_terminal_cmd", "delete_file"]
+      return (
+        allowedTools.includes(tool.name) && !forbiddenTools.includes(tool.name)
+      )
+    }),
   })
 }

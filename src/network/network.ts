@@ -35,20 +35,27 @@ interface NetworkState {
 
 // FIX: Use Agent type for function parameters
 export function createDevOpsNetwork(
-  teamLeadAgent: Agent<any>, // Add TeamLead Agent
+  teamLeadAgent: Agent<any>,
   testerAgent: Agent<any>,
-  codingAgent: Agent<any>, // Keep Coder for potential future use
-  criticAgent: Agent<any>
+  codingAgent: Agent<any>,
+  criticAgent: Agent<any>,
+  toolingAgent: Agent<any>
 ) {
   const network = createNetwork({
-    name: "TeamLead TDD DevOps Network", // Updated name
-    // Add TeamLead to the list, Coder remains but might not be called by current router logic
-    agents: [teamLeadAgent, testerAgent, codingAgent, criticAgent],
+    name: "TeamLead TDD DevOps Network",
+    // Add all agents to the list
+    agents: [
+      teamLeadAgent,
+      testerAgent,
+      codingAgent,
+      criticAgent,
+      toolingAgent,
+    ],
     defaultModel: deepseek({
       apiKey: process.env.DEEPSEEK_API_KEY!,
       model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
     }),
-    maxIter: 25, // Increased max iterations for potential revisions
+    maxIter: 25,
     // Updated TDD Router Logic with TeamLead start
     defaultRouter: async ({ network }) => {
       // Use imported TddNetworkState type

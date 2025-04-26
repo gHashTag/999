@@ -1,5 +1,7 @@
 import type { Tool } from "@inngest/agent-kit"
 import { z } from "zod"
+import { type Sandbox } from "@e2b/sdk"
+import type EventEmitter from "events"
 
 // Base schema for agent roles
 export const AgentRole = z.enum(["TESTER", "CODER", "CRITIC"])
@@ -14,6 +16,7 @@ export type LoggerFunc = (
 ) => void
 
 // General Tool type (from agent-kit), revert to any for now
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyTool = Tool<any>
 
 // Dependencies needed for agent creation
@@ -22,6 +25,8 @@ export interface AgentDependencies {
   log: LoggerFunc
   apiKey: string
   modelName: string
+  systemEvents: EventEmitter
+  sandbox?: Sandbox | null | undefined
 }
 
 // Helper type for critique data extraction

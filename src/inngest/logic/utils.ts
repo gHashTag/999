@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { Sandbox } from "@e2b/code-interpreter"
+import { Sandbox } from "@e2b/sdk"
 // Убираем импорты типов из agent-kit, так как они не находятся
 // import {
 //   InferenceResult,
