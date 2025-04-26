@@ -1,7 +1,8 @@
 // import { z } from "zod"
 import { createTool } from "@inngest/agent-kit"
 // import type { LoggerFunc } from "@/utils/logic/logger"; // WRONG import
-import type { LoggerFunc } from "@/types/agents" // CORRECT import
+// import type { LoggerFunc } from "@/types/agents" // CORRECT import
+import type { HandlerLogger } from "@/types/agents" // Import HandlerLogger instead
 import type { GetSandboxFunc } from "@/inngest/logic/utils" // CORRECT type alias import
 import { terminalParamsSchema } from "@/tools/schemas"
 
@@ -9,7 +10,7 @@ import { terminalParamsSchema } from "@/tools/schemas"
 // import { terminalParamsSchema } from "../../toolDefinitions"
 
 export function createTerminalTool(
-  log: LoggerFunc, // Use type of imported log function
+  log: HandlerLogger, // Use HandlerLogger type
   getSandboxFunc: GetSandboxFunc, // Use the imported type alias
   eventId: string,
   sandboxId: string | null
@@ -21,9 +22,10 @@ export function createTerminalTool(
     handler: async params => {
       const currentSandboxId = sandboxId
       try {
-        log("info", "TOOL_RUN", `Running terminal tool for event ${eventId}`, {
+        log.info(`TOOL_RUN: Running terminal tool for event ${eventId}`, {
           toolName: "terminal",
           parameters: params,
+          eventId: eventId,
         })
 
         if (!currentSandboxId)
@@ -33,9 +35,10 @@ export function createTerminalTool(
           throw new Error(`Sandbox not found for ID: ${currentSandboxId}`)
 
         const { command } = params
-        log("info", "TERMINAL_TOOL_EXECUTE", `Executing command: ${command}`, {
+        log.info(`TERMINAL_TOOL_EXECUTE: Executing command: ${command}`, {
           sandboxId,
           command,
+          eventId: eventId,
         })
         const exec = await sandbox.commands.run(command)
 
@@ -44,15 +47,11 @@ export function createTerminalTool(
           stderr: exec.stderr,
         }
 
-        log(
-          "info",
-          "TOOL_OUTPUT",
-          `Terminal tool output for event ${eventId}`,
-          {
-            toolName: "terminal",
-            output,
-          }
-        )
+        log.info(`TOOL_OUTPUT: Terminal tool output for event ${eventId}`, {
+          toolName: "terminal",
+          output,
+          eventId: eventId,
+        })
         return output
       } catch (error: unknown) {
         // Use unknown instead of any
@@ -62,9 +61,10 @@ export function createTerminalTool(
         } else if (typeof error === "string") {
           errorMessage = error
         }
-        log("error", "TOOL_ERROR", `Terminal tool error for event ${eventId}`, {
+        log.error(`TOOL_ERROR: Terminal tool error for event ${eventId}`, {
           toolName: "terminal",
           error: errorMessage, // Log the extracted message
+          eventId: eventId,
         })
         // Rethrowing might be better handled by returning an error object
         // throw error as unknown

@@ -13,5 +13,5 @@ declare module "*.mdc" {
   // const toc: { level: string, content: string }[];
 
   // Export necessary values
-  export { markdown } // Only exporting markdown for now
+  // Only exporting markdown (already exported in line 6)
 }

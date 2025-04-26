@@ -1,9 +1,7 @@
 // src/tools/toolDefinitions.ts
 import { z } from "zod"
 import type { GetSandboxFunc } from "@/inngest/logic/utils"
-// import type { Sandbox } from "@e2b/code-interpreter"; // REMOVED: Unused import
-import type { LoggerFunc } from "@/types/agents"
-// import { log } from "@/utils/logic/logger"; // REMOVED: Unused import
+import type { AnyTool, HandlerLogger } from "@/types/agents"
 
 // --- Tool Schema Definitions (Kept Here For Now) --- //
 // TODO: Consider moving schemas to a dedicated src/tools/schemas.ts file
@@ -22,39 +20,32 @@ export const processArtifactParamsSchema = z.object({
 // Schema for askHumanForInput is defined within its own file now.
 
 // --- Import All Tool Creators --- //
-// Assuming definitions/index.ts exports all these correctly
 import {
   createTerminalTool,
-  createCreateOrUpdateFilesTool, // Prefixed unused import
-  createReadFilesTool, // Prefixed unused import
-  createRunCodeTool, // Prefixed unused import
-  createProcessArtifactTool, // Prefixed unused import
+  createCreateOrUpdateFilesTool,
+  createReadFilesTool,
+  createRunCodeTool,
+  createProcessArtifactTool,
   createAskHumanForInputTool,
-} from "./definitions" // Use index import
+} from "./definitions"
 
 /**
  * Function to get all defined tools.
  * @param log - The logging function.
- * @param getSandbox - Async function to get a sandbox instance. Needs correct type.
+ * @param getSandbox - Async function to get a sandbox instance.
  * @param eventId - The current event ID.
  * @param sandboxId - The current sandbox ID (can be null initially).
  * @returns An array of tools.
  */
 export function getAllTools(
-  log: LoggerFunc,
+  log: HandlerLogger,
   getSandbox: GetSandboxFunc,
   eventId: string,
   sandboxId: string | null
-) {
-  // Remove deps object
-
-  // Define tools using their respective creation functions with individual args
-  // Assuming createTerminalTool now expects log, getSandbox, eventId, sandboxId
+): AnyTool[] {
+  // Define tools using their respective creation functions
   const terminalTool = createTerminalTool(log, getSandbox, eventId, sandboxId)
-  // Assuming createHumanInputTool now expects log, eventId
   const askHumanTool = createAskHumanForInputTool(log, eventId)
-
-  // Add more tools here as needed, passing correct arguments
   const fileTool = createCreateOrUpdateFilesTool(
     log,
     getSandbox,
@@ -62,8 +53,8 @@ export function getAllTools(
     sandboxId
   )
   const readFileTool = createReadFilesTool(log, getSandbox, eventId, sandboxId)
-  const runCodeTool = createRunCodeTool(log, eventId, sandboxId) // Needs getSandbox? Check definition
-  const processArtifactTool = createProcessArtifactTool(log, eventId, sandboxId) // Needs getSandbox? Check definition
+  const runCodeTool = createRunCodeTool(log, eventId, sandboxId)
+  const processArtifactTool = createProcessArtifactTool(log, eventId, sandboxId)
 
   return [
     terminalTool,

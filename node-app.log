@@ -1,0 +1,110 @@
+{
+  "timestamp": "2025-04-26T18:15:17.827Z",
+  "level": "info",
+  "step": "ROUTER_START",
+  "sandboxId": null,
+  "message": "Status read from KV: undefined"
+}
+{
+  "timestamp": "2025-04-26T18:15:17.828Z",
+  "level": "info",
+  "step": "ROUTER_NO_STATUS",
+  "sandboxId": null,
+  "message": "No status found, routing to TeamLead Agent initially."
+}
+{
+  "timestamp": "2025-04-26T18:15:17.828Z",
+  "level": "info",
+  "step": "ROUTER_END",
+  "sandboxId": null,
+  "message": "Chosen agent: Team Lead Agent",
+  "chosenAgent": "Team Lead Agent"
+}
+{
+  "timestamp": "2025-04-26T18:15:26.332Z",
+  "level": "info",
+  "step": "ROUTER_START",
+  "sandboxId": null,
+  "message": "Status read from KV: undefined"
+}
+{
+  "timestamp": "2025-04-26T18:15:26.332Z",
+  "level": "info",
+  "step": "ROUTER_NO_STATUS",
+  "sandboxId": null,
+  "message": "No status found, routing to TeamLead Agent initially."
+}
+{
+  "timestamp": "2025-04-26T18:15:26.332Z",
+  "level": "info",
+  "step": "ROUTER_END",
+  "sandboxId": null,
+  "message": "Chosen agent: Team Lead Agent",
+  "chosenAgent": "Team Lead Agent"
+}
+{
+  "timestamp": "2025-04-26T18:15:26.333Z",
+  "level": "info",
+  "step": "ROUTER_START",
+  "sandboxId": null,
+  "message": "Status read from KV: undefined"
+}
+{
+  "timestamp": "2025-04-26T18:15:26.333Z",
+  "level": "info",
+  "step": "ROUTER_NO_STATUS",
+  "sandboxId": null,
+  "message": "No status found, routing to TeamLead Agent initially."
+}
+{
+  "timestamp": "2025-04-26T18:15:26.333Z",
+  "level": "info",
+  "step": "ROUTER_END",
+  "sandboxId": null,
+  "message": "Chosen agent: Team Lead Agent",
+  "chosenAgent": "Team Lead Agent"
+}
+{
+  "timestamp": "2025-04-26T18:15:34.432Z",
+  "level": "info",
+  "step": "ROUTER_START",
+  "sandboxId": null,
+  "message": "Status read from KV: undefined"
+}
+{
+  "timestamp": "2025-04-26T18:15:34.432Z",
+  "level": "info",
+  "step": "ROUTER_NO_STATUS",
+  "sandboxId": null,
+  "message": "No status found, routing to TeamLead Agent initially."
+}
+{
+  "timestamp": "2025-04-26T18:15:34.432Z",
+  "level": "info",
+  "step": "ROUTER_END",
+  "sandboxId": null,
+  "message": "Chosen agent: Team Lead Agent",
+  "chosenAgent": "Team Lead Agent"
+}
+{
+  "timestamp": "2025-04-26T18:15:34.434Z",
+  "level": "info",
+  "step": "ROUTER_START",
+  "sandboxId": null,
+  "message": "Status read from KV: undefined"
+}
+{
+  "timestamp": "2025-04-26T18:15:34.434Z",
+  "level": "info",
+  "step": "ROUTER_NO_STATUS",
+  "sandboxId": null,
+  "message": "No status found, routing to TeamLead Agent initially."
+}
+{
+  "timestamp": "2025-04-26T18:15:34.434Z",
+  "level": "info",
+  "step": "ROUTER_END",
+  "sandboxId": null,
+  "message": "Chosen agent: Team Lead Agent",
+  "chosenAgent": "Team Lead Agent"
+}

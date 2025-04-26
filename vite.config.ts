@@ -45,7 +45,7 @@ export default defineConfig(({ command }) => ({
       include: ["src/**/*.ts"],
       exclude: [
         "src/**/*.test.ts",
-        "__tests__/**/*.test.ts",
+        "src/__tests__/**/*.test.ts",
         "src/mocks/**/*.ts",
         "src/test/**/*.ts",
         "src/inngest/types.ts",

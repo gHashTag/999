@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest --watch --ui --coverage.enabled=true",
     "test:ui": "vitest --ui",
-    "test:e2e": "VITEST_E2E=true vitest run __tests__/e2e/**/*.e2e.test.ts",
+    "test:e2e": "VITEST_E2E=true vitest run src/__tests__/e2e/**/*.e2e.test.ts",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@swc/core": "^1.11.22",
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.15.2",
     "@vitest/coverage-v8": "^3.1.2",
     "@vitest/ui": "^3.1.2",
     "concurrently": "^8.2.2",
@@ -69,6 +69,7 @@
     "vite-plugin-checker": "^0.9.1",
     "vite-plugin-markdown": "^2.2.0",
     "vite-plugin-node": "^5.0.1",
+    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.1.2"
   },
   "lint-staged": {

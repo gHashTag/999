@@ -1,11 +1,12 @@
 // import { z } from "zod"
 import { createTool } from "@inngest/agent-kit"
-import type { LoggerFunc } from "@/types/agents"
+// import type { LoggerFunc } from "@/types/agents"
+import type { HandlerLogger } from "@/types/agents"
 import { getSandbox } from "@/inngest/logic/utils"
 import { runCodeParamsSchema } from "@/tools/schemas"
 
 export function createRunCodeTool(
-  log: LoggerFunc,
+  log: HandlerLogger,
   eventId: string,
   sandboxId: string | null
 ) {
@@ -17,7 +18,7 @@ export function createRunCodeTool(
     handler: async params => {
       const currentSandboxId = sandboxId
       const toolStepName = "TOOL_runCode"
-      log("info", `${toolStepName}_START`, "Running code.", {
+      log.info(`${toolStepName}_START: Running code.`, {
         eventId,
         currentSandboxId,
       })
@@ -28,23 +29,18 @@ export function createRunCodeTool(
         const sandbox = await getSandbox(currentSandboxId)
         if (!sandbox)
           throw new Error(`Sandbox not found for ID: ${currentSandboxId}`)
-        log(
-          "info",
-          `${toolStepName}_EXEC_START`,
-          "Executing code in sandbox.",
-          {
-            eventId,
-            currentSandboxId,
-            codeLength: params.code.length,
-          }
-        )
+        log.info(`${toolStepName}_EXEC_START: Executing code in sandbox.`, {
+          eventId,
+          currentSandboxId,
+          codeLength: params.code.length,
+        })
         // TODO: Verify this is the correct method on the latest E2B SDK
         // const process = await sandbox.process.start({ cmd: params.code })
         // const result = await process.wait()
         // Возвращаемся к использованию commands.run, как в terminal
         const result = await sandbox.commands.run(params.code)
 
-        log("info", `${toolStepName}_EXEC_END`, "Code execution finished.", {
+        log.info(`${toolStepName}_EXEC_END: Code execution finished.`, {
           eventId,
           currentSandboxId,
           exitCode: result.exitCode,
@@ -65,7 +61,7 @@ export function createRunCodeTool(
         } else if (typeof e === "string") {
           errorMessage = e
         }
-        log("error", `${toolStepName}_ERROR`, "Error running code.", {
+        log.error(`${toolStepName}_ERROR: Error running code.`, {
           eventId,
           currentSandboxId,
           error: errorMessage,

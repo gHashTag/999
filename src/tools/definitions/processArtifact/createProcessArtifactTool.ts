@@ -1,7 +1,7 @@
 import { createTool } from "@inngest/agent-kit"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import type { LoggerFunc } from "@/types/agents"
+import type { HandlerLogger } from "@/types/agents"
 // import type { GetSandboxFunc } from "@/inngest"
 // import { execSync } from "child_process"
 // import { readFileSync, mkdirSync, rmSync } from "fs"
@@ -10,7 +10,7 @@ import type { LoggerFunc } from "@/types/agents"
 import { processArtifactParamsSchema } from "@/tools/schemas"
 
 export function createProcessArtifactTool(
-  log: LoggerFunc,
+  log: HandlerLogger,
   // getSandbox: GetSandboxFunc, // Параметр не используется, удаляем
   eventId: string,
   sandboxId: string | null // Keep sandboxId for logging context
@@ -23,7 +23,7 @@ export function createProcessArtifactTool(
     handler: async params => {
       const currentSandboxId = sandboxId // Use sandboxId for logging
       const toolStepName = "TOOL_processArtifact"
-      log("info", `${toolStepName}_START`, "Processing artifact.", {
+      log.info(`${toolStepName}_START: Processing artifact.`, {
         eventId,
         currentSandboxId, // Log sandboxId even if not directly used for action
         artifactPath: params.artifactPath,
@@ -40,7 +40,7 @@ export function createProcessArtifactTool(
 
         // 2. Create temporary directory
         fs.mkdirSync(tempExtractDir, { recursive: true })
-        log("info", `${toolStepName}_MKDIR`, "Created temporary directory.", {
+        log.info(`${toolStepName}_MKDIR: Created temporary directory.`, {
           eventId,
           currentSandboxId,
           dir: tempExtractDir,
@@ -70,10 +70,8 @@ export function createProcessArtifactTool(
           "// Extracted content would be here (extraction disabled)",
           "utf-8"
         )
-        log(
-          "warn",
-          `${toolStepName}_EXTRACT_DISABLED`,
-          "Artifact extraction is disabled, using placeholder content.",
+        log.warn(
+          `${toolStepName}_EXTRACT_DISABLED: Artifact extraction is disabled, using placeholder content.`,
           {
             eventId,
             currentSandboxId,
@@ -87,7 +85,7 @@ export function createProcessArtifactTool(
 
         // 5. Clean up temporary directory (optional, but good practice)
         fs.rmSync(tempExtractDir, { recursive: true, force: true })
-        log("info", `${toolStepName}_CLEANUP`, "Cleaned up temp directory.", {
+        log.info(`${toolStepName}_CLEANUP: Cleaned up temp directory.`, {
           eventId,
           currentSandboxId,
           dir: tempExtractDir,
@@ -106,7 +104,7 @@ export function createProcessArtifactTool(
         } else if (typeof e === "string") {
           errorMessage = e
         }
-        log("error", `${toolStepName}_ERROR`, "Error processing artifact.", {
+        log.error(`${toolStepName}_ERROR: Error processing artifact.`, {
           eventId,
           currentSandboxId,
           artifactPath: params.artifactPath,
@@ -119,10 +117,8 @@ export function createProcessArtifactTool(
           try {
             fs.rmSync(tempExtractDir, { recursive: true, force: true })
           } catch (cleanupError) {
-            log(
-              "error",
-              `${toolStepName}_CLEANUP_ERROR`,
-              "Failed to cleanup temp directory after error.",
+            log.error(
+              `${toolStepName}_CLEANUP_ERROR: Failed to cleanup temp directory after error.`,
               { eventId, currentSandboxId, dir: tempExtractDir }
             )
           }

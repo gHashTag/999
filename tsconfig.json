@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
     /* Base Options from Node.js 18 */
-    "lib": ["es2023"],
+    "lib": ["ESNext", "DOM", "WebWorker"],
     "module": "ESNext",
-    "target": "es2022",
+    "target": "ESNext",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
@@ -48,7 +48,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "types": ["node"],
-    "typeRoots": ["./node_modules/@types", "./node_modules", "./vendor-types"]
+    "typeRoots": ["./node_modules/@types", "./node_modules"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "coverage", "html", "__tests__"]

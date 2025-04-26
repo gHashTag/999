@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 
 /**
  * Reads the instructions for a given agent from the .cursor/rules directory.
@@ -8,14 +9,15 @@ import path from "node:path"
  * @throws Error if the file cannot be read or is empty.
  */
 export function readAgentInstructions(agentName: string): string {
+  const currentFilePath = fileURLToPath(import.meta.url)
+  const currentDir = path.dirname(currentFilePath)
+  // Navigate up from src/utils/logic to the project root
+  const projectRoot = path.resolve(currentDir, "../../../")
+  console.log("[readAgentInstructions] Calculated projectRoot:", projectRoot)
+
   const fileName = `AGENT_${agentName}.mdc`
-  const instructionsPath = path.resolve(
-    __dirname,
-    "..", // Up from logic
-    "..", // Up from utils
-    ".cursor/rules",
-    fileName
-  )
+  const instructionsPath = path.resolve(projectRoot, ".cursor/rules", fileName)
+  console.log("[readAgentInstructions] Resolved path:", instructionsPath)
 
   let instructions: string
   try {

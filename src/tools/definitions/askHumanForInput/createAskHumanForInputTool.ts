@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { createTool } from "@inngest/agent-kit"
-import type { LoggerFunc } from "@/types/agents"
+// import type { LoggerFunc } from "@/types/agents"
+import type { HandlerLogger } from "@/types/agents" // Import HandlerLogger
 // import type { GetSandboxFunc } from "@/inngest"; // Not needed for this tool
 
 // Схема может быть определена здесь или импортирована
@@ -13,7 +14,7 @@ export const askHumanForInputParamsSchema = z.object({
 })
 
 export function createAskHumanForInputTool(
-  log: LoggerFunc,
+  log: HandlerLogger, // Use HandlerLogger type
   eventId: string // sandboxId and getSandbox might not be needed here
 ) {
   return createTool({
@@ -23,7 +24,7 @@ export function createAskHumanForInputTool(
     parameters: askHumanForInputParamsSchema, // Используем схему
     handler: async params => {
       const toolStepName = "TOOL_askHumanForInput"
-      log("warn", `${toolStepName}_INVOKED`, "Agent requires human input.", {
+      log.warn(`${toolStepName}_INVOKED: Agent requires human input.`, {
         eventId,
         question: params.question,
         context: params.context,
@@ -35,15 +36,10 @@ export function createAskHumanForInputTool(
       const humanResponse = "<HUMAN_INPUT_REQUIRED>"
 
       // Simulate getting a response (in a real scenario, this would involve external interaction)
-      log(
-        "info",
-        `${toolStepName}_RESPONSE_SIMULATED`,
-        "Simulating response.",
-        {
-          eventId,
-          humanResponse,
-        }
-      )
+      log.info(`${toolStepName}_RESPONSE_SIMULATED: Simulating response.`, {
+        eventId,
+        humanResponse,
+      })
 
       return {
         response: humanResponse,

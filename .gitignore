@@ -116,6 +116,64 @@ dist
 html/
 dist/
 artifacts/
+__tests__/**/*.js
+__tests__/**/*.js.map
+__tests__/**/*.d.ts
 
 # Copied Vendor Types
 vendor-types/
+
+# Node.js dependencies
+node_modules/
+
+# Build artifacts
+dist/
+coverage/
+html/
+artifacts/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Environment variables
+.env
+.env*.local
+.env*.production
+.env*.development
+.env*.test
+!.env.example
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE settings
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# TypeScript compilation artifacts in source folders
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+src/**/*.d.ts.map
+src/__tests__/**/*.js
+src/__tests__/**/*.js.map
+src/__tests__/**/*.d.ts
+src/__tests__/**/*.d.ts.map
+
+# pm2 ecosystem file
+ecosystem.config.js
+
+# Test snapshots and reports (adjust as needed)
+# __snapshots__/
+# test-report.xml

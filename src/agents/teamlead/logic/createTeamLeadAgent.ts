@@ -3,9 +3,7 @@ import { type AgentDependencies } from "@/types/agents"
 import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 import type { AnyTool } from "@/types/agents"
-// import { teamLeadInstructions } from "../instructions" // WRONG import path
-// import teamLeadInstructions from "../../../../.cursor/rules/AGENT_TeamLead.mdc?raw" // INCORRECT relative path
-import { readAgentInstructions } from "@/utils/logic/readAgentInstructions" // ADD import for utility
+import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 
 /**
  * Creates the definition for the Team Lead agent.
@@ -18,10 +16,9 @@ export function createTeamLeadAgent({
   modelName,
 }: AgentDependencies): Agent<AnyTool[]> {
   const agentSpecificTools = allTools.filter((tool: AnyTool) => {
-    return tool.name === "web_search" || tool.name === "askHumanForInput"
+    return tool.name === "askHumanForInput"
   })
 
-  // Read instructions using the utility function
   const systemPrompt = readAgentInstructions("TeamLead")
 
   return createAgent({

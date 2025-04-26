@@ -7,7 +7,7 @@ set -e
 echo "🏗️ Building the project..."
 pnpm run build
 
-echo "🧪 Running tests..."
-pnpm run test
+echo "�� Running tests..."
+VITEST_E2E=true pnpm run test
 
 echo "🎉 Build and tests completed successfully!" 

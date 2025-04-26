@@ -32,4 +32,23 @@ export const handlers = [
   }),
 
   // Add other handlers here if needed for other APIs
+
+  // Mock Inngest event API
+  http.post("http://localhost:8288/e/:key", ({ params }) => {
+    console.log(`[MSW] Intercepted Inngest event to ${params.key}`)
+    return HttpResponse.json({
+      status: 200,
+      body: JSON.stringify({
+        state: {
+          status: "NEEDS_REQUIREMENTS_CRITIQUE",
+          task: "Create a simple add function.",
+          test_requirements: [
+            "Should add two numbers correctly",
+            "Should handle negative numbers",
+            "Should return 0 when no arguments provided",
+          ],
+        },
+      }),
+    })
+  }),
 ]
