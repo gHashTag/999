@@ -1,3 +1,7 @@
 export * from "./tester"
 export * from "./coder"
 export * from "./critic"
+export * from "./coder/logic/createCodingAgent"
+export * from "./critic/logic/createCriticAgent"
+export * from "./tester/logic/createTesterAgent"
+export * from "./teamlead/logic/createTeamLeadAgent"

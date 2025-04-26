@@ -11,6 +11,7 @@ module.exports = {
   rules: {
     "prettier/prettier": "warn",
     "no-unused-vars": "off",
+    "no-console": "error",
     "@typescript-eslint/no-unused-vars": [
       "warn",
       { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
