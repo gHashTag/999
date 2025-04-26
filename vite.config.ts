@@ -3,6 +3,7 @@ import { defineConfig } from "vite"
 import { VitePluginNode } from "vite-plugin-node"
 import path from "path" // Import path module
 import checker from "vite-plugin-checker"
+import mdPlugin, { Mode } from "vite-plugin-markdown" // ADDED: Import markdown plugin
 
 export default defineConfig(({ command }) => ({
   // Shared settings for both serve and build
@@ -79,6 +80,11 @@ export default defineConfig(({ command }) => ({
       // esbuildOptions: {},
     }),
     checker({ typescript: true }),
+    // ADDED: Configure markdown plugin to import raw content
+    mdPlugin({
+      mode: [Mode.MARKDOWN], // Specify we need the raw markdown string
+      // We can add Mode.HTML etc. later if needed
+    }),
   ],
 
   // Optimize dependencies for SSR build if needed

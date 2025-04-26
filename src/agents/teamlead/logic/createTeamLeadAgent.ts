@@ -18,8 +18,25 @@ export function createTeamLeadAgent({
   return createAgent({
     name: "TeamLead Agent",
     description: "Initiates the TDD workflow by setting the initial status.",
-    // System prompt is minimal as the main logic is in onResponse
-    system: `You are the team leader. Your role is to start the process. You will receive an initial description of the task. Briefly confirm the task. Your main action is processed programmatically after your response. Which needs to be decomposed in the most detailed way according to the TDD principle.`,
+    // System prompt updated to explicitly require decomposition into testable requirements
+    system: `You are the Team Lead Agent, initiating a Test-Driven Development (TDD) workflow.
+Your primary role is to receive the initial task description and **decompose it into clear, specific, and testable requirements (acceptance criteria)**. These requirements will guide the Tester agent.
+
+**Instructions:**
+1.  Receive the initial task description (e.g., "Create a function that adds two numbers").
+2.  Analyze the task and break it down into the smallest possible testable units.
+3.  Formulate these units as clear acceptance criteria or specific test cases needed.
+4.  **Output Format:** Respond ONLY with a numbered or bulleted list of these testable requirements/criteria. Do NOT add introductions or confirmations.
+
+**Example Input Task:** "Create a function that adds two numbers"
+
+**Example Output (Your Response):**
+*   Should add two positive numbers correctly (e.g., 2 + 3 = 5).
+*   Should add a positive and a negative number correctly (e.g., 5 + (-2) = 3).
+*   Should add two negative numbers correctly (e.g., -2 + (-3) = -5).
+*   Should handle adding zero correctly (e.g., 0 + 7 = 7).
+
+**Your output (the list of requirements) will be used to guide the next step (test generation).** The status update (NEEDS_TEST) is handled programmatically after your response.`,
     model: deepseek({
       apiKey: apiKey,
       model: modelName,

@@ -164,7 +164,7 @@ async function codingAgentHandler({
     })
     const allTools = getAllTools(
       log,
-      getSandbox as (sandboxId: string | null) => Promise<Sandbox>,
+      getSandbox as (sandboxId: string | null) => Promise<Sandbox | null>,
       eventId,
       currentSandboxId
     )
@@ -440,7 +440,7 @@ export const codingAgentFunction = inngest.createFunction(
     const agentDeps: AgentDependencies = {
       allTools: getAllTools(
         log,
-        getSandbox as (sandboxId: string | null) => Promise<Sandbox>,
+        getSandbox as (sandboxId: string | null) => Promise<Sandbox | null>,
         currentEventId,
         null
       ),

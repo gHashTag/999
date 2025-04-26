@@ -1,4 +1,4 @@
-import { createAgent, Agent, type NetworkRun } from "@inngest/agent-kit"
+import { createAgent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 // Updated import paths
 import { TddNetworkState, NetworkStatus } from "@/types/network"
@@ -111,7 +111,6 @@ export function createCriticAgent({
         network?.get("network_state") || {}
       const status = state.status
       let basePrompt = `You are a code reviewer agent. Your task is to review provided code and/or tests based on the original task description: \"${state.task || "Unknown task"}\".`
-      let contentToReview = ""
 
       if (status === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
         const critiqueInput = state.test_critique || "No critique provided."
