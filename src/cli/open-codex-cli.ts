@@ -1,13 +1,17 @@
 #!/usr/bin/env node
-import { createOpenCodexAgent } from "../agents/open-codex/logic/createOpenCodexAgent"
-import { createCodingAgent } from "../agents/coder/logic/createCodingAgent"
-import { createCriticAgent } from "../agents/critic/logic/createCriticAgent"
-import { createTesterAgent } from "../agents/tester/logic/createTesterAgent"
-import { createTeamLeadAgent } from "../agents/teamlead/logic/createTeamLeadAgent"
-import { createToolingAgent } from "../agents/tooling/logic/createToolingAgent"
+import { createOpenCodexAgent } from "../agents/open-codex/logic/createOpenCodexAgent.js"
+import { createCodingAgent } from "../agents/coder/logic/createCodingAgent.js"
+import { createCriticAgent } from "../agents/critic/logic/createCriticAgent.js"
+import { createTesterAgent } from "../agents/tester/logic/createTesterAgent.js"
+import { createTeamLeadAgent } from "../agents/teamlead/logic/createTeamLeadAgent.js"
+import { createToolingAgent } from "../agents/tooling/logic/createToolingAgent.js"
 import readline from "node:readline/promises"
 import { EventEmitter } from "events"
 import { type HandlerLogger } from "@/types/agents"
+import { openCodex } from "open-codex"
+import fs from "fs/promises"
+import { Command } from "commander"
+import { log } from "@/utils/logic/logger"
 
 // Создаем логгер для агентов
 const simpleLogger: HandlerLogger = {
@@ -369,3 +373,120 @@ main().catch((err: unknown) => {
   )
   process.exit(1)
 })
+
+// --- Commander Setup ---
+const program = new Command()
+
+program
+  .name("open-codex-cli")
+  .description("CLI wrapper for the Open Codex library")
+  .version("0.1.0")
+
+program
+  .command("generate")
+  .description("Generate code based on a prompt and optional context files")
+  .option("-p, --prompt <string>", "The main prompt for code generation", "")
+  .option("-pf, --prompt-file <path>", "Path to a file containing the prompt")
+  .option(
+    "-c, --context-files <paths...>",
+    "Paths to files or directories to use as context"
+  )
+  .option("-o, --output-file <path>", "Path to save the generated code")
+  .option(
+    "-e, --execute",
+    "Execute the generated code in a sandbox (requires E2B setup)"
+  )
+  .action(async options => {
+    let prompt = options.prompt
+
+    // Read prompt from file if specified
+    if (options.promptFile) {
+      try {
+        prompt = await fs.readFile(options.promptFile, "utf-8")
+        log(
+          "info",
+          "CLI_PROMPT_FILE",
+          `Read prompt from file: ${options.promptFile}`
+        )
+      } catch (err: any) {
+        log(
+          "error",
+          "CLI_PROMPT_FILE_ERROR",
+          `Error reading prompt file: ${err.message}`
+        )
+        process.exit(1)
+      }
+    }
+
+    if (!prompt) {
+      log(
+        "error",
+        "CLI_PROMPT_REQUIRED",
+        "Error: Prompt is required. Use -p or -pf."
+      )
+      process.exit(1)
+    }
+
+    const contextFilePaths = options.contextFiles || []
+
+    try {
+      const result = await openCodex({
+        prompt,
+        contextFilePaths,
+        execute: options.execute,
+        logger: log,
+      })
+
+      if (result.code) {
+        log("info", "CLI_GENERATED_CODE_HEADER", "\n--- Generated Code ---")
+        log("info", "CLI_GENERATED_CODE_CONTENT", result.code)
+        log("info", "CLI_GENERATED_CODE_FOOTER", "----------------------")
+
+        if (options.outputFile) {
+          try {
+            await fs.writeFile(options.outputFile, result.code, "utf-8")
+            log(
+              "info",
+              "CLI_OUTPUT_SAVED",
+              `Generated code saved to: ${options.outputFile}`
+            )
+          } catch (err: any) {
+            log(
+              "error",
+              "CLI_OUTPUT_ERROR",
+              `Error writing output file: ${err.message}`
+            )
+          }
+        }
+      }
+
+      if (result.executionResult) {
+        log("info", "CLI_EXEC_RESULT_HEADER", "\n--- Execution Result ---")
+        log(
+          "info",
+          "CLI_EXEC_RESULT_STDOUT",
+          `Stdout: ${result.executionResult.stdout}`
+        )
+        log(
+          "info",
+          "CLI_EXEC_RESULT_STDERR",
+          `Stderr: ${result.executionResult.stderr}`
+        )
+        log(
+          "info",
+          "CLI_EXEC_RESULT_ERROR",
+          `Error: ${result.executionResult.error || "None"}`
+        )
+        log("info", "CLI_EXEC_RESULT_FOOTER", "------------------------")
+      }
+    } catch (error: any) {
+      log(
+        "error",
+        "CLI_OPENCODEX_ERROR",
+        `Open Codex execution failed: ${error.message}`
+      )
+      process.exit(1)
+    }
+  })
+
+program.parse(process.argv)

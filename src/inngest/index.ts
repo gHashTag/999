@@ -12,8 +12,13 @@ import { processNetworkResult } from "@/inngest/logic/resultUtils"
 import { createDevOpsNetwork } from "@/network/network"
 import { HandlerStepName } from "@/types/handlerSteps"
 import { Network } from "@inngest/agent-kit"
+import { log } from "@/utils/logic/logger"
 
-console.log(`[index.ts TOP LEVEL] NODE_ENV: ${process.env.NODE_ENV}`)
+log(
+  "info",
+  "TOP_LEVEL",
+  `[index.ts TOP LEVEL] NODE_ENV: ${process.env.NODE_ENV}`
+)
 
 // Initialize Inngest Client
 // If we have a custom logger (like Winston), pass it here

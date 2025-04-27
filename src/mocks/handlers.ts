@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw"
+import { log } from "@/utils/logic/logger"
 // import { NetworkStatus } from "@/types/network"
 
 // Define a basic mock response for the DeepSeek API
@@ -16,8 +17,11 @@ export const handlers = [
   http.post("/api/inngest", async ({ request }) => {
     const event = await request.json()
     const eventId = `mock-event-id-${Date.now()}`
-    console.log(
-      `[MSW] Intercepted POST /api/inngest for event: ${JSON.stringify(event)}. Returning ID: ${eventId}`
+    log(
+      "info",
+      "MSW_INGEST_POST",
+      `[MSW] Intercepted POST /api/inngest for event. Returning ID: ${eventId}`,
+      { event: JSON.stringify(event) }
     )
     // Return a mock response similar to what Inngest might return
     return HttpResponse.json({
@@ -30,7 +34,7 @@ export const handlers = [
 
   // Mock the DeepSeek API endpoint (Keep this one)
   http.post("https://api.deepseek.com/v1/chat/completions", () => {
-    console.log("[MSW] Intercepted DeepSeek API call")
+    log("info", "MSW_DEEPSEEK", "[MSW] Intercepted DeepSeek API call")
     // Return a generic successful response for LLM calls
     return HttpResponse.json({
       id: "chatcmpl-mock-id",
@@ -60,8 +64,11 @@ export const handlers = [
   http.post("http://localhost:8288/e/*", async ({ request }) => {
     const payload = await request.json()
     const runId = `mock-run-id-${Date.now()}`
-    console.log(
-      `[MSW] Intercepted POST to Inngest Dev Server (/e/*) with payload: ${JSON.stringify(payload)}. Returning runId: ${runId}`
+    log(
+      "info",
+      "MSW_DEV_SERVER_POST",
+      `[MSW] Intercepted POST to Inngest Dev Server (/e/*). Returning runId: ${runId}`,
+      { payload: JSON.stringify(payload) }
     )
     // Return a simple success response, maybe mimicking some parts of the real response
     return HttpResponse.json(

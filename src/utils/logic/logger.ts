@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import chalk from "chalk" // Import chalk
 
 // Determine the project root relative to the current file using import.meta.url
 const __filename = fileURLToPath(import.meta.url)
@@ -30,6 +31,13 @@ const logFilePath = path.join(projectRoot, "node-app.log")
 //   [key: string]: unknown; // Allow other properties
 // }
 
+// Define color mapping for levels
+const levelColors = {
+  info: chalk.blue,
+  warn: chalk.yellow,
+  error: chalk.red,
+}
+
 /**
  * Simple file logger.
  * Writes structured logs to node-app.log.
@@ -53,17 +61,33 @@ export const log = (
     ...data,
   }
 
-  const logString = JSON.stringify(logEntry, null, 2)
+  // Stringify once for the file log
+  const logStringForFile = JSON.stringify(logEntry, null, 2)
 
-  // Log to console
-  console.log(logString)
+  // Log to console with colors
+  const color = levelColors[level] || chalk.white
+  const consoleTimestamp = chalk.gray(`[${logEntry.timestamp}]`)
+  const consoleLevel = color.bold(`[${level.toUpperCase()}]`)
+  const consoleStep = chalk.cyan(`[${stepName}]`)
+  const consoleSandbox = logEntry.sandboxId
+    ? chalk.magenta(`[Sandbox: ${logEntry.sandboxId}]`)
+    : ""
+  const consoleMessage = color(message)
+  // Optionally log data to console in a simplified way or keep it out
+  // const consoleData = Object.keys(data).length > 0 ? chalk.dim(` ${JSON.stringify(data)}`) : '';
+  console.log(
+    `${consoleTimestamp} ${consoleLevel} ${consoleStep}${consoleSandbox} ${consoleMessage}`
+  ) // Removed consoleData for cleaner output
 
   // Append to main log file ONLY
   try {
-    fs.appendFileSync(logFilePath, logString + "\n", "utf-8")
+    fs.appendFileSync(logFilePath, logStringForFile + "\n", "utf-8")
   } catch (err) {
+    // Use chalk for the critical error message in console too
     console.error(
-      `[LOGGER CRITICAL ERROR] Failed to write to MAIN log file ${logFilePath}:`,
+      chalk.red.bold(
+        `[LOGGER CRITICAL ERROR] Failed to write to MAIN log file ${logFilePath}:`
+      ),
       err
     )
   }

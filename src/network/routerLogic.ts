@@ -2,6 +2,7 @@ import { Agent, Network, type NetworkRun } from "@inngest/agent-kit"
 import { TddNetworkState, NetworkStatus } from "@/types/network"
 import { type Agents } from "@/types/agents"
 import { HandlerLogger } from "@/types/agents"
+import { log } from "@/utils/logic/logger"
 
 // Type definition for the agents structure passed to chooseNextAgent
 // FIX: Use the imported Agents type instead of defining AgentsMap
@@ -32,7 +33,7 @@ export function parseAndInitializeState(
   const rawStateFromKv = network?.state?.kv?.get("network_state")
   const currentSandboxId = (rawStateFromKv as any)?.sandboxId || null
 
-  console.log("info", "ROUTER_RAW_STATE_VALUE", "Value directly from KV:", {
+  log("info", "ROUTER_RAW_STATE_VALUE", "Value directly from KV:", {
     rawState: rawStateFromKv
       ? JSON.stringify(rawStateFromKv)
       : "undefined or null",
@@ -50,7 +51,7 @@ export function parseAndInitializeState(
     parseError = e instanceof Error ? e.message : String(e)
   }
 
-  console.log(
+  log(
     "info",
     "ROUTER_RAW_STATE",
     `Raw state read from KV: ${parseError ? `PARSE ERROR: ${parseError}` : rawStateFromKv ? "OK" : "null"}`,
@@ -69,7 +70,7 @@ export function parseAndInitializeState(
       status: NetworkStatus.Enum.IDLE,
       sandboxId: undefined,
     }
-    console.log(
+    log(
       "warn",
       "ROUTER_STATE_INIT_FALLBACK",
       "State was null or invalid, using fallback.",
@@ -94,7 +95,7 @@ export function chooseNextAgent(
   const currentStatus = state.status
   const currentSandboxId = state.sandboxId || null
 
-  console.log("info", "ROUTER_START", `Status read from KV: ${currentStatus}`, {
+  log("info", "ROUTER_START", `Status read from KV: ${currentStatus}`, {
     status: currentStatus,
     sandboxId: currentSandboxId,
   })
@@ -102,7 +103,7 @@ export function chooseNextAgent(
   let nextAgent: Agent<any> | undefined = undefined
 
   if (!currentStatus || currentStatus === NetworkStatus.Enum.IDLE) {
-    console.log(
+    log(
       "info",
       "ROUTER_NO_STATUS_OR_IDLE",
       `Status is ${currentStatus || "undefined"}, routing to TeamLead Agent initially.`,
@@ -112,7 +113,7 @@ export function chooseNextAgent(
   } else {
     switch (currentStatus) {
       case NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE:
-        console.log(
+        log(
           "info",
           "ROUTER_TO_CRITIC_REQUIREMENTS",
           `Status is ${currentStatus}. Routing to Critic Agent for requirements.`,
@@ -123,7 +124,7 @@ export function chooseNextAgent(
 
       case NetworkStatus.Enum.NEEDS_TEST:
       case NetworkStatus.Enum.NEEDS_TEST_REVISION:
-        console.log(
+        log(
           "info",
           "ROUTER_TO_TESTER",
           `Status is ${currentStatus}. Routing to Tester Agent.`,
@@ -133,7 +134,7 @@ export function chooseNextAgent(
         break
 
       case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION:
-        console.log(
+        log(
           "info",
           "ROUTER_TO_CODER",
           `Status is ${currentStatus}. Routing to Coding Agent.`,
@@ -145,7 +146,7 @@ export function chooseNextAgent(
       case NetworkStatus.Enum.NEEDS_TEST_CRITIQUE:
       case NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION:
       case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE:
-        console.log(
+        log(
           "info",
           "ROUTER_TO_CRITIC",
           `Status is ${currentStatus}. Routing to Critic Agent.`,
@@ -156,7 +157,7 @@ export function chooseNextAgent(
 
       // Stop network loop cases
       case NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION:
-        console.log(
+        log(
           "info",
           "ROUTER_STOP_FOR_COMMAND",
           "Status is NEEDS_COMMAND_EXECUTION. Stopping agent network loop.",
@@ -166,7 +167,7 @@ export function chooseNextAgent(
         break
       case NetworkStatus.Enum.COMPLETED:
       case NetworkStatus.Enum.FAILED:
-        console.log(
+        log(
           "info",
           "ROUTER_STOP_COMPLETED_FAILED",
           `Task already ended with status: ${currentStatus}. Stopping.`,
@@ -175,7 +176,7 @@ export function chooseNextAgent(
         // nextAgent remains undefined
         break
       case NetworkStatus.Enum.NEEDS_HUMAN_INPUT:
-        console.log(
+        log(
           "info",
           "ROUTER_STOP_FOR_HUMAN",
           "Status is NEEDS_HUMAN_INPUT. Stopping agent network loop.",
@@ -184,7 +185,7 @@ export function chooseNextAgent(
         // nextAgent remains undefined
         break
       default:
-        console.log(
+        log(
           "error",
           "ROUTER_UNKNOWN_STATUS",
           `Unknown or unhandled status: ${currentStatus}. Stopping.`,
@@ -195,7 +196,7 @@ export function chooseNextAgent(
     }
   }
   // Log chosen agent
-  console.log(
+  log(
     "info",
     "ROUTER_END",
     `Chosen agent: ${nextAgent?.name || "None (Stopping)"}`,
@@ -219,19 +220,19 @@ export function saveStateToKv(
   state: TddNetworkState | null
 ) {
   if (state) {
-    console.log(
+    log(
       "info",
       "KV_SET_BEFORE_RETURN", // Reusing this log step name for now
       "Saving state to KV.",
       { status: state.status, sandboxId: state.sandboxId }
     )
     // Add detailed log of the state being saved
-    console.log("info", "KV_SET_VALUE", "State value being saved:", {
+    log("info", "KV_SET_VALUE", "State value being saved:", {
       stateToSave: JSON.stringify(state),
     })
     network?.state?.kv?.set("network_state", state)
   } else {
-    console.log("warn", "KV_SET_SKIP", "Skipping KV set because state is null.")
+    log("warn", "KV_SET_SKIP", "Skipping KV set because state is null.")
   }
 }
 

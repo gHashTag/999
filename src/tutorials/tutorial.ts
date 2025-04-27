@@ -1,5 +1,10 @@
 import { createAgent, createNetwork, anthropic } from "@inngest/agent-kit"
 import { createServer } from "@inngest/agent-kit/server"
+// import { serve } from "@hono/node-server"
+// import { Hono } from "hono"
+// import { Inngest, type Context } from "inngest"
+// import { serveStatic } from "@hono/node-server/serve-static"
+import { log } from "@/utils/logic/logger" // Import the logger
 
 // Check for API key (optional, but good practice)
 if (!process.env.ANTHROPIC_API_KEY) {
@@ -16,9 +21,8 @@ const dbaAgent = createAgent({
     "You are a PostgreSQL expert database administrator. " +
     "You only provide answers to questions linked to Postgres database schema, indexes, extensions.",
   model: anthropic({
-    // Use the model specified in the tutorial
-    model: "claude-3-5-haiku-20240307", // Using specific Haiku version if 'latest' causes issues, fallback to tutorial's likely intent
-    apiKey: process.env.ANTHROPIC_API_KEY, // Pass the API key
+    model: "claude-3-haiku-20240307", // Corrected model name based on common availability
+    apiKey: process.env.ANTHROPIC_API_KEY,
     defaultParameters: {
       max_tokens: 1000,
     },
@@ -34,9 +38,8 @@ const securityAgent = createAgent({
     "You are a PostgreSQL security expert. " +
     "You only provide answers to questions linked to PostgreSQL security topics such as encryption, access control, audit logging, and compliance best practices.",
   model: anthropic({
-    // Use the model specified in the tutorial
-    model: "claude-3-5-haiku-20240307", // Using specific Haiku version
-    apiKey: process.env.ANTHROPIC_API_KEY, // Pass the API key
+    model: "claude-3-haiku-20240307", // Corrected model name
+    apiKey: process.env.ANTHROPIC_API_KEY,
     defaultParameters: {
       max_tokens: 1000,
     },
@@ -48,26 +51,76 @@ const devOpsNetwork = createNetwork({
   name: "DevOps team",
   agents: [dbaAgent, securityAgent],
   defaultModel: anthropic({
-    // Use the model specified in the tutorial for the router
-    model: "claude-3-5-haiku-20240307", // Using specific Haiku version
-    apiKey: process.env.ANTHROPIC_API_KEY, // Pass the API key
+    model: "claude-3-haiku-20240307", // Corrected model name
+    apiKey: process.env.ANTHROPIC_API_KEY,
     defaultParameters: {
-      max_tokens: 1000, // Router might need fewer tokens, but keep consistency for now
+      max_tokens: 1000,
     },
   }),
-  // Note: No maxIter or custom router defined, using defaults as per tutorial
 })
 
-// Server Setup using createServer
-console.log("Starting AgentKit server for tutorial...")
-const server = createServer({
-  agents: [dbaAgent, securityAgent], // Serve individual agents
-  networks: [devOpsNetwork], // Serve the network
-  // No specific client needed here as createServer handles it
-})
-
-const PORT = process.env.TUTORIAL_PORT || 3000 // Use a specific port or default
-
-server.listen(PORT, () =>
-  console.log(`Tutorial AgentKit server running on http://localhost:${PORT}!`)
+// Server Setup using createServer (for agents/network API)
+log(
+  "info",
+  "TUTORIAL_SETUP",
+  "Starting AgentKit server for tutorial agents/network..."
 )
+const agentServer = createServer({
+  agents: [dbaAgent, securityAgent],
+  networks: [devOpsNetwork],
+})
+
+const TUTORIAL_AGENT_PORT = process.env.TUTORIAL_PORT || 3001 // Use a different port for this server
+
+// Use agentServer.listen instead of Hono's serve
+agentServer.listen(TUTORIAL_AGENT_PORT, () =>
+  log(
+    "info",
+    "TUTORIAL_AGENT_SERVER_READY",
+    `Tutorial AgentKit Agent/Network server running on http://localhost:${TUTORIAL_AGENT_PORT}!`
+  )
+)
+
+// Hono App Setup (Reduced as Inngest functionality is removed) - REMOVED
+// const app = new Hono()
+// const INNGEST_APP_PORT = 3000 // Port not needed if Hono isn't serving
+
+// Correct Inngest Client Initialization - REMOVED as not used
+// const inngest = new Inngest({
+//   id: "tutorial-inngest-app",
+// });
+
+// Define the event structure if needed for type safety - REMOVED
+// interface HelloWorldEvent {
+//   name: "app/hello.world";
+//   data: { name?: string };
+// }
+
+// Middleware for Inngest - REMOVED
+// app.use("/api/inngest", inngest.createServeHandler());
+
+// Serve static files for Inngest UI - REMOVED
+// app.use("/inngest-ui/*", serveStatic({ root: "./node_modules/inngest/dist/ui" }));
+// app.get("/", (c: any) => c.redirect("/inngest-ui/"));
+
+// Remove the trigger endpoint - REMOVED
+// app.get("/trigger", ...);
+
+// Add a basic root route for the Hono app (Optional, if you want Hono for something else)
+// app.get("/", (c) => c.text("Hono Server for Tutorial is Running!"));
+
+// Start the Hono server - REMOVED as AgentKit server handles agents
+// log("info", "TUTORIAL_HONO_START", "Starting Hono server for tutorial...");
+// serve(
+//   {
+//     fetch: app.fetch,
+//     port: INNGEST_APP_PORT,
+//   },
+//   (info: { address: string; port: number }) => {
+//     log(
+//       "info",
+//       "TUTORIAL_HONO_READY",
+//       `Tutorial Hono server running on http://${info.address}:${info.port}!`
+//     );
+//   }
+// );

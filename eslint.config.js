@@ -33,10 +33,7 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "no-debugger": "warn",
-      "no-console": [
-        "warn",
-        { allow: ["warn", "error", "info", "debug", "table"] },
-      ],
+      "no-console": ["warn", { allow: ["warn", "error"] }],
       "prefer-const": "warn",
       "no-useless-escape": "off",
       "no-prototype-builtins": "warn",
@@ -58,6 +55,7 @@ export default tseslint.config(
       "artifacts/",
       "*.mjs", // Ignore MJS files globally for now, handle separately if needed
       "open-codex/", // Игнорируем пакет open-codex
+      "vendor-types/", // Игнорируем скопированные типы вендоров
     ],
   }
 )
