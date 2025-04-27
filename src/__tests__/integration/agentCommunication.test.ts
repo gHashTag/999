@@ -1,14 +1,17 @@
-import { createCoderAgent } from "../../agents/coder/logic/createCoderAgent"
-import { createCriticAgent } from "../../agents/critic/logic/createCriticAgent"
-import { createOpenCodexAgent } from "../../agents/open-codex/logic/createOpenCodexAgent"
+import { createCoderAgent } from "@/agents/coder/logic/createCoderAgent"
+import { createCriticAgent } from "@/agents/critic/logic/createCriticAgent"
+import { createOpenCodexAgent } from "@/agents/open-codex/logic/createOpenCodexAgent"
 import { describe, it, expect, vi } from "vitest"
 import type {
   AgentDependencies,
   // AvailableAgent, // Removed unused import
-} from "../../types/agents"
+} from "@/types/agents"
 
 // Minimal mock dependencies for this integration test
-const mockDeps: AgentDependencies = {
+const mockDeps: AgentDependencies & {
+  instructions?: string // For Coder
+  criticInstructions?: string // For Critic
+} = {
   allTools: [], // Start with no tools, agents might filter or use defaults
   log: {
     info: vi.fn(),
@@ -21,6 +24,9 @@ const mockDeps: AgentDependencies = {
   modelName: "test-model",
   systemEvents: { emit: vi.fn() } as any,
   sandbox: null,
+  // Add mock instructions specifically for coder and critic
+  instructions: "mock coder instructions",
+  criticInstructions: "mock critic instructions",
 }
 
 // Empty available agents for this test
@@ -29,8 +35,18 @@ const mockDeps: AgentDependencies = {
 describe("Minimal agent communication", () => {
   it("should perform basic question-answer between agents", async () => {
     // Create agents with mock dependencies
-    const coder = createCoderAgent(mockDeps)
-    const critic = createCriticAgent(mockDeps)
+    if (!mockDeps.instructions)
+      throw new Error("Mock coder instructions missing")
+    const coder = createCoderAgent({
+      instructions: mockDeps.instructions,
+      ...mockDeps,
+    })
+    if (!mockDeps.criticInstructions)
+      throw new Error("Mock critic instructions missing")
+    const critic = createCriticAgent({
+      instructions: mockDeps.criticInstructions,
+      ...mockDeps,
+    })
 
     // Simple question from critic to coder
     const question = "Can you write a simple sum function?"

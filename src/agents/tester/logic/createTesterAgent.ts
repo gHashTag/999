@@ -1,19 +1,24 @@
 import { Agent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies, AnyTool } from "@/types/agents"
+import type {
+  AgentDependencies,
+  AnyTool,
+  // StateData,
+} from "@/types/agents"
 // import type { TddNetworkState } from '@/types/network.types'
-import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 
 // ----------------------------------------------------
 
 /**
  * Creates the Tester agent.
- * @param dependencies - The dependencies for the agent.
+ * @param dependencies - The dependencies for the agent, including instructions.
+ * @param instructions - The system instructions for the agent.
  * @returns The Tester agent instance.
  */
-export const createTesterAgent = (
-  dependencies: AgentDependencies
-): Agent<any> => {
+export const createTesterAgent = ({
+  instructions,
+  ...dependencies
+}: { instructions: string } & AgentDependencies): Agent<any> => {
   const { apiKey, modelName, allTools, log } = dependencies
   // const {
   //   allTools, // Destructure tools from dependencies
@@ -21,11 +26,14 @@ export const createTesterAgent = (
   //   systemEvents, // Destructure event emitter from dependencies
   // } = dependencies
 
-  const systemPrompt = readAgentInstructions("Tester")
-
-  // Use allTools directly, filtering logic remains
+  // Filter tools specifically needed by Tester
   const toolsToUse = allTools.filter((tool: AnyTool) =>
-    ["updateTaskState", "runTerminalCommand"].includes(tool.name)
+    [
+      "runCommand", // Example: If Tester needs to run commands
+      "readFile",
+      "updateTaskState",
+      // Add other tool names as needed
+    ].includes(tool.name)
   )
 
   log?.info("Creating Tester Agent", { toolCount: toolsToUse.length }) // Optional logging
@@ -33,8 +41,8 @@ export const createTesterAgent = (
   return new Agent({
     name: "Tester Agent",
     description:
-      "Генерирует тесты или команды для их создания на основе требований.",
-    system: systemPrompt,
+      "Создает или выполняет команды для создания тестов, запускает тесты и анализирует результаты.",
+    system: instructions, // Use passed instructions
     model: deepseek({ apiKey, model: modelName }),
     tools: toolsToUse, // Use the determined tools
   })

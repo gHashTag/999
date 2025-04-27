@@ -30,6 +30,7 @@ export interface AgentDependencies {
   modelName: string
   systemEvents: typeof systemEvents
   sandbox: Sandbox | null
+  eventId?: string
   agents?: {
     teamLead: Agent<TddNetworkState>
     tester: Agent<TddNetworkState>

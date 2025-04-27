@@ -1,30 +1,31 @@
 #!/usr/bin/env node
-import { createOpenCodexAgent } from "../agents/open-codex/logic/createOpenCodexAgent.js"
 import { createCodingAgent } from "../agents/coder/logic/createCodingAgent.js"
 import { createCriticAgent } from "../agents/critic/logic/createCriticAgent.js"
 import { createTesterAgent } from "../agents/tester/logic/createTesterAgent.js"
 import { createTeamLeadAgent } from "../agents/teamlead/logic/createTeamLeadAgent.js"
 import { createToolingAgent } from "../agents/tooling/logic/createToolingAgent.js"
-import readline from "node:readline/promises"
-import { EventEmitter } from "events"
-import { type HandlerLogger } from "@/types/agents"
-import { openCodex } from "open-codex"
-import fs from "fs/promises"
+import { log as appLog } from "../utils/logic/logger.js"
+import { systemEvents } from "../utils/logic/systemEvents.js"
+import { getAllTools } from "../tools/toolDefinitions.js"
+import { getSandbox } from "../inngest/utils/sandboxUtils.js"
+import { readAgentInstructions } from "../utils/logic/readAgentInstructions.js"
+import type { AgentDependencies, HandlerLogger } from "../types/agents.js"
 import { Command } from "commander"
-import { log } from "@/utils/logic/logger"
+import fs from "fs/promises"
+import ora from "ora"
+import readline from "readline/promises"
 
-// Создаем логгер для агентов
-const simpleLogger: HandlerLogger = {
-  info: (...args: unknown[]): void => console.log("[INFO]", ...args),
-  warn: (...args: unknown[]): void => console.warn("[WARN]", ...args),
-  error: (...args: unknown[]): void => console.error("[ERROR]", ...args),
-  debug: (...args: unknown[]): void => console.debug("[DEBUG]", ...args),
-  log: (...args: unknown[]): void => console.log(...args),
+// Use the imported appLog as the logger for this CLI
+const log: HandlerLogger = appLog as any
+
+// Define a simple logger for cases where HandlerLogger might not be fully compatible
+// or for direct console output if needed during debugging.
+const simpleLogger = {
+  info: (...args: any[]) => console.log("[INFO]", ...args),
+  warn: (...args: any[]) => console.warn("[WARN]", ...args),
+  error: (...args: any[]) => console.error("[ERROR]", ...args),
+  debug: (...args: any[]) => console.debug("[DEBUG]", ...args),
 }
-
-// Полная mock реализация sandbox
-// Используем null вместо mock объекта, так как sandbox опционален в AgentDependencies
-const sandbox = null
 
 async function main() {
   const rl = readline.createInterface({
@@ -32,333 +33,138 @@ async function main() {
     output: process.stdout,
   })
 
-  // Минимальные зависимости для агентов
-  const baseDeps = {
-    log: simpleLogger,
-    apiKey: process.env.DEEPSEEK_API_KEY || "",
-    modelName: process.env.DEEPSEEK_MODEL || "deepseek-coder",
-    allTools: [],
-    systemEvents: new EventEmitter(),
-    sandbox: sandbox,
+  log.info("Initializing Open Codex CLI agents...")
+  const apiKey = process.env.DEEPSEEK_API_KEY || ""
+  const modelName = process.env.OPEN_CODEX_MODEL || "deepseek-coder"
+
+  if (!apiKey) {
+    log.warn("DEEPSEEK_API_KEY not found in environment for Open Codex CLI.")
   }
 
-  // Для PoC отключаем проверку API ключа
-  if (!baseDeps.apiKey) {
-    simpleLogger.warn("Running in local mode without API key")
-    baseDeps.apiKey = "local-mode"
-  }
-
-  // Для PoC пропускаем проверку валидности API ключа
-
-  // Создаем всех доступных агентов с методом run
-  const agents: Record<string, { ask: (q: string) => Promise<string> }> = {
-    coder: {
-      ask: async (q: string): Promise<string> => {
-        const result = await createCodingAgent(baseDeps).run(q)
-        if (!result || !result.output) {
-          throw new Error("Invalid response from coder agent")
-        }
-        const message = result.output.join("\n")
-        baseDeps.systemEvents.emit("agentMessage", {
-          from: "coder",
-          to: "user",
-          message,
-        })
-        return message
-      },
-    },
-    critic: {
-      ask: async (q: string) => {
-        const result = await createCriticAgent(baseDeps).run(q)
-        baseDeps.systemEvents.emit("agentMessage", {
-          from: "critic",
-          to: "user",
-          message: result.output.join("\n"),
-        })
-        return result.output.join("\n")
-      },
-    },
-    tester: {
-      ask: async (q: string) => {
-        const result = await createTesterAgent(baseDeps).run(q)
-        baseDeps.systemEvents.emit("agentMessage", {
-          from: "tester",
-          to: "user",
-          message: result.output.join("\n"),
-        })
-        return result.output.join("\n")
-      },
-    },
-    teamlead: {
-      ask: async (q: string) => {
-        const result = await createTeamLeadAgent(baseDeps).run(q)
-        baseDeps.systemEvents.emit("agentMessage", {
-          from: "teamlead",
-          to: "user",
-          message: result.output.join("\n"),
-        })
-        return result.output.join("\n")
-      },
-    },
-    tooling: {
-      ask: async (q: string) => {
-        const result = await createToolingAgent(baseDeps).run(q)
-        baseDeps.systemEvents.emit("agentMessage", {
-          from: "tooling",
-          to: "user",
-          message: result.output.join("\n"),
-        })
-        return result.output.join("\n")
-      },
-    },
-  }
-
-  // Добавляем обработчик сообщений между агентами с проверкой типов
-  baseDeps.systemEvents.on(
-    "agentMessage",
-    ({ from, to, message }: { from: string; to: string; message: string }) => {
-      // Validate message structure
-      if (typeof message !== "string" || message.trim() === "") {
-        simpleLogger.error(`Invalid message from ${from} agent:`, message)
-        return
-      }
-
-      if (to === "user") {
-        simpleLogger.info(`${from} Agent → User:`, message)
-        return
-      }
-
-      const targetAgent = agents[to as keyof typeof agents]
-      if (!targetAgent) {
-        simpleLogger.error(`Unknown agent target: ${to}`)
-        return
-      }
-
-      simpleLogger.info(`${from} Agent → ${to} Agent:`, message)
-
-      // Track message processing time
-      const startTime = Date.now()
-      targetAgent
-        .ask(message)
-        .then((response: unknown) => {
-          if (typeof response !== "string") {
-            throw new Error(
-              `Agent ${to} returned invalid response type: ${typeof response}`
-            )
-          }
-
-          simpleLogger.debug(
-            `Agent ${to} processed message in ${Date.now() - startTime}ms`
-          )
-          baseDeps.systemEvents.emit("agentMessage", {
-            from: to,
-            to: from,
-            message: response,
-          })
-        })
-        .catch((err: Error) => {
-          simpleLogger.error(
-            `Error in agent ${to} communication (${Date.now() - startTime}ms):`,
-            {
-              message: err.message,
-              stack: err.stack,
-            }
-          )
-        })
-    }
+  const sandbox = await getSandbox("")
+  const eventId = "codex-cli-event-main"
+  const allTools = getAllTools(
+    log,
+    getSandbox,
+    eventId,
+    sandbox?.sandboxId ?? null
   )
 
-  const agent = createOpenCodexAgent(agents)
+  log.info("Loading agent instructions for Open Codex CLI...")
+  const [
+    coderInstructions,
+    criticInstructions,
+    testerInstructions,
+    teamLeadInstructions,
+    toolingInstructions,
+  ] = await Promise.all([
+    readAgentInstructions("Coder"),
+    readAgentInstructions("Critic"),
+    readAgentInstructions("Tester"),
+    readAgentInstructions("TeamLead"),
+    readAgentInstructions("Tooling"),
+  ])
+  log.info("Instructions loaded for Open Codex CLI agents.")
 
-  // Автоматический запуск диалога между агентами
-  async function startAgentDialogue(
-    initiator: keyof typeof agents,
-    message: string
-  ) {
-    try {
-      const response = await agents[initiator].ask(message)
-      simpleLogger.info(`${initiator} Agent → All:`, response)
-
-      // Рассылка ответа всем агентам
-      for (const [agentName, agentObj] of Object.entries(agents)) {
-        if (agentName !== initiator) {
-          agentObj
-            .ask(response)
-            .then(reply => {
-              simpleLogger.info(
-                `${agentName} Agent → ${initiator} Agent:`,
-                reply
-              )
-            })
-            .catch(err => {
-              simpleLogger.error(`Error in ${agentName} agent reply:`, err)
-            })
-        }
-      }
-    } catch (err) {
-      simpleLogger.error(`Error in ${initiator} agent communication:`, err)
-    }
+  const baseDeps: Omit<AgentDependencies, "agents"> = {
+    apiKey,
+    modelName,
+    allTools,
+    log,
+    systemEvents,
+    sandbox,
+    eventId,
   }
 
-  simpleLogger.info(
-    "Open Codex CLI. Введите вопрос или 'agentName: вопрос' для маршрутизации"
-  )
-  simpleLogger.info("Доступные агенты:", Object.keys(agents).join(", "))
-  simpleLogger.info("Введите 'exit' для выхода\n")
+  const agents = {
+    coder: createCodingAgent({ ...baseDeps, instructions: coderInstructions }),
+    critic: createCriticAgent({
+      ...baseDeps,
+      instructions: criticInstructions,
+    }),
+    tester: createTesterAgent({
+      ...baseDeps,
+      instructions: testerInstructions,
+    }),
+    teamLead: createTeamLeadAgent({
+      ...baseDeps,
+      instructions: teamLeadInstructions,
+    }),
+    tooling: createToolingAgent({
+      ...baseDeps,
+      instructions: toolingInstructions,
+    }),
+  }
+  log.info("Open Codex CLI agents created.")
 
-  // Запускаем автоматический диалог между агентами
-  startAgentDialogue("teamlead", "Начнем обсуждение задачи")
+  // Placeholder for the open-codex agent logic - adjust as needed
+  const openCodexAgent = {
+    ask: async (question: string) => {
+      log.info("Open Codex Agent received:", question)
+      return "Mock response"
+    },
+  }
 
-  let running = true
-  while (running) {
-    const question = await rl.question("You: ")
+  while (true) {
+    const question = await rl.question(
+      "Enter your request (or type 'agent:message' or 'exit'): "
+    )
+
     if (question.toLowerCase() === "exit") {
-      running = false
-      continue
+      break
     }
 
-    // Автономный режим работы
-    if (question.toLowerCase() === "auto") {
-      simpleLogger.info("Активирован автономный режим работы агентов")
-      while (running) {
-        // Автоматический выбор агента и генерация вопроса
-        const agentNames = Object.keys(agents)
-        const randomAgent =
-          agentNames[Math.floor(Math.random() * agentNames.length)]
-        const randomQuestion = `Вопрос от автономного режима: ${Math.random().toString(36).substring(7)}`
+    const match = question.match(/^(\w+):\s*(.*)$/)
 
+    if (match) {
+      const agentName = match[1].toLowerCase().trim()
+      const message = match[2]
+
+      if (agentName === "opencodex" || agentName === "open_codex") {
+        const spinner = ora("Open Codex Agent thinking...").start()
         try {
-          const response =
-            await agents[randomAgent as keyof typeof agents].ask(randomQuestion)
-          simpleLogger.info(`${randomAgent} Agent:`, response)
-
-          // Рассылка ответа другим агентам
-          for (const [otherAgentName, otherAgent] of Object.entries(agents)) {
-            if (otherAgentName !== randomAgent) {
-              otherAgent
-                .ask(response)
-                .then(reply => {
-                  simpleLogger.info(
-                    `${otherAgentName} Agent → ${randomAgent} Agent:`,
-                    reply
-                  )
-                })
-                .catch(err => {
-                  simpleLogger.error(
-                    `Ошибка в автономном режиме агента ${otherAgentName}:`,
-                    err
-                  )
-                })
-            }
-          }
-
-          // Задержка между автономными запросами
-          await new Promise(resolve => setTimeout(resolve, 5000))
-        } catch (err) {
-          simpleLogger.error(
-            `Ошибка в автономном режиме агента ${randomAgent}:`,
-            err
-          )
-        }
-      }
-      continue
-    }
-
-    // Проверяем формат 'agentName:message' для маршрутизации
-    type AgentKey = keyof typeof agents
-
-    if (question.includes(":")) {
-      const [agentName, message] = question.split(":")
-      const trimmedName = agentName.trim() as AgentKey
-      if (
-        trimmedName === "open-codex" ||
-        trimmedName === "open_codex" ||
-        trimmedName === "openCodex"
-      ) {
-        // Специальная обработка для общения с Open Codex агентом
-        try {
-          const response = await agent.ask(message.trim())
+          const response = await openCodexAgent.ask(message.trim())
+          spinner.succeed("Open Codex Agent responded.")
           simpleLogger.info("Open Codex Agent:", response)
-
-          // Рассылка ответа всем агентам
-          for (const [otherAgentName, otherAgent] of Object.entries(agents)) {
-            otherAgent
-              .ask(response)
-              .then(reply => {
-                simpleLogger.info(
-                  `${otherAgentName} Agent → Open Codex Agent:`,
-                  reply
-                )
-              })
-              .catch(err => {
-                simpleLogger.error(
-                  `Error in ${otherAgentName} agent reply:`,
-                  err
-                )
-              })
-          }
         } catch (err) {
+          spinner.fail("Open Codex Agent failed.")
           simpleLogger.error(
             `Error in Open Codex agent communication: ${err instanceof Error ? err.message : String(err)}`
           )
         }
-      } else if (agents[trimmedName]) {
+      } else if (agents[agentName as keyof typeof agents]) {
+        const targetAgent = agents[agentName as keyof typeof agents]
+        const spinner = ora(`${agentName} Agent thinking...`).start()
         try {
-          const response = await agents[trimmedName].ask(message.trim())
-          simpleLogger.info(`${trimmedName} Agent:`, response)
-
-          // Автоматическая рассылка ответа другим агентам
-          for (const [otherAgentName, otherAgent] of Object.entries(agents)) {
-            if (otherAgentName !== trimmedName) {
-              otherAgent
-                .ask(response)
-                .then(reply => {
-                  simpleLogger.info(
-                    `${otherAgentName} Agent → ${trimmedName} Agent:`,
-                    reply
-                  )
-                })
-                .catch(err => {
-                  simpleLogger.error(
-                    `Error in ${otherAgentName} agent reply:`,
-                    err
-                  )
-                })
-            }
-          }
+          const result = await targetAgent.run(message.trim())
+          spinner.succeed(`${agentName} Agent responded.`)
+          simpleLogger.info(
+            `${agentName} Agent:`,
+            result?.output?.join("\n") ?? "No output"
+          )
         } catch (err: unknown) {
-          const baseErrorMessage = `Error in ${trimmedName} agent communication: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-          simpleLogger.error(baseErrorMessage)
-          if (
-            err &&
-            typeof err === "object" &&
-            "response" in err &&
-            err.response &&
-            typeof err.response === "object" &&
-            "data" in err.response &&
-            err.response.data &&
-            typeof err.response.data === "object" &&
-            "error" in err.response.data &&
-            err.response.data.error &&
-            typeof err.response.data.error === "object" &&
-            "message" in err.response.data.error &&
-            typeof err.response.data.error.message === "string"
-          ) {
-            simpleLogger.error(`API Error: ${err.response.data.error.message}`)
-          } else {
-            // Optional: Log the whole error object if the structure is unexpected
-            // simpleLogger.error("Full error object:", err);
-          }
-          throw new Error(baseErrorMessage)
+          spinner.fail(`${agentName} Agent failed.`)
+          simpleLogger.error(
+            `Error in ${agentName} agent communication: ${err instanceof Error ? err.message : String(err)}`
+          )
         }
       } else {
-        simpleLogger.error(`Unknown agent: ${trimmedName}`)
+        simpleLogger.error(`Unknown agent: ${agentName}`)
       }
     } else {
-      const response = await agent.ask(question)
-      simpleLogger.info("Open Codex Agent:", response)
+      // Default to coder agent if no prefix
+      const spinner = ora("Coder Agent thinking...").start()
+      try {
+        const result = await agents.coder.run(question)
+        spinner.succeed("Coder Agent responded.")
+        simpleLogger.info(
+          "Coder Agent:",
+          result?.output?.join("\n") ?? "No output"
+        )
+      } catch (error: any) {
+        spinner.fail("Coder Agent failed.")
+        simpleLogger.error("Error interacting with Coder agent:", error.message)
+      }
     }
   }
 
@@ -367,9 +173,7 @@ async function main() {
 
 main().catch((err: unknown) => {
   simpleLogger.error(
-    `Unhandled error in main function: ${
-      err instanceof Error ? err.message : String(err)
-    }`
+    `Unhandled error in main function: ${err instanceof Error ? err.message : String(err)}`
   )
   process.exit(1)
 })
@@ -398,92 +202,34 @@ program
   )
   .action(async options => {
     let prompt = options.prompt
-
-    // Read prompt from file if specified
     if (options.promptFile) {
       try {
         prompt = await fs.readFile(options.promptFile, "utf-8")
-        log(
-          "info",
+        log.info(
           "CLI_PROMPT_FILE",
           `Read prompt from file: ${options.promptFile}`
         )
       } catch (err: any) {
-        log(
-          "error",
+        log.error(
           "CLI_PROMPT_FILE_ERROR",
           `Error reading prompt file: ${err.message}`
         )
         process.exit(1)
       }
     }
-
     if (!prompt) {
-      log(
-        "error",
+      log.error(
         "CLI_PROMPT_REQUIRED",
         "Error: Prompt is required. Use -p or -pf."
       )
       process.exit(1)
     }
-
-    const contextFilePaths = options.contextFiles || []
-
     try {
-      const result = await openCodex({
-        prompt,
-        contextFilePaths,
-        execute: options.execute,
-        logger: log,
-      })
-
-      if (result.code) {
-        log("info", "CLI_GENERATED_CODE_HEADER", "\n--- Generated Code ---")
-        log("info", "CLI_GENERATED_CODE_CONTENT", result.code)
-        log("info", "CLI_GENERATED_CODE_FOOTER", "----------------------")
-
-        if (options.outputFile) {
-          try {
-            await fs.writeFile(options.outputFile, result.code, "utf-8")
-            log(
-              "info",
-              "CLI_OUTPUT_SAVED",
-              `Generated code saved to: ${options.outputFile}`
-            )
-          } catch (err: any) {
-            log(
-              "error",
-              "CLI_OUTPUT_ERROR",
-              `Error writing output file: ${err.message}`
-            )
-          }
-        }
-      }
-
-      if (result.executionResult) {
-        log("info", "CLI_EXEC_RESULT_HEADER", "\n--- Execution Result ---")
-        log(
-          "info",
-          "CLI_EXEC_RESULT_STDOUT",
-          `Stdout: ${result.executionResult.stdout}`
-        )
-        log(
-          "info",
-          "CLI_EXEC_RESULT_STDERR",
-          `Stderr: ${result.executionResult.stderr}`
-        )
-        log(
-          "info",
-          "CLI_EXEC_RESULT_ERROR",
-          `Error: ${result.executionResult.error || "None"}`
-        )
-        log("info", "CLI_EXEC_RESULT_FOOTER", "------------------------")
-      }
+      log.warn("generate command needs implementation using created agents.")
     } catch (error: any) {
-      log(
-        "error",
-        "CLI_OPENCODEX_ERROR",
-        `Open Codex execution failed: ${error.message}`
+      log.error(
+        "CLI_GENERATE_ERROR",
+        `Generate command failed: ${error.message}`
       )
       process.exit(1)
     }

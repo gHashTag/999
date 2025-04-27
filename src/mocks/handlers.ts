@@ -1,6 +1,6 @@
 import { http, HttpResponse } from "msw"
 import { log } from "@/utils/logic/logger"
-// import { NetworkStatus } from "@/types/network"
+import { NetworkStatus } from "@/types/network"
 
 // Define a basic mock response for the DeepSeek API
 // const mockDeepseekResponse = { /* ... */ };
@@ -75,6 +75,31 @@ export const handlers = [
       {
         message: "Events received (MSW Mock for /e/*)",
         run_id: runId, // Provide a mock run ID
+      },
+      { status: 200 }
+    )
+  }),
+
+  // FIX: Add mock for GET /v1/runs/:runId to simulate run completion
+  http.get(`http://localhost:8288/v1/runs/:runId`, ({ params }) => {
+    const { runId } = params
+    log(
+      "info",
+      "MSW_GET_RUN",
+      `[MSW] Intercepted GET /v1/runs/${runId}. Simulating completion.`
+    )
+    // Simulate a completed run with a mock final state
+    const mockFinalState = {
+      status: NetworkStatus.Enum.COMPLETED, // Simulate desired final status
+      task: "Mock task completed",
+      // Add other relevant state fields if needed by the test
+    }
+    return HttpResponse.json(
+      {
+        id: runId,
+        status: "COMPLETED",
+        output: JSON.stringify(mockFinalState), // Stringify the final state
+        // Add other run properties if needed
       },
       { status: 200 }
     )

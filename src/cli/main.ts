@@ -1,5 +1,5 @@
 // import chalk from "chalk"
-import { createMockDependencies } from "./utils/mockDependencies.js"
+// import { createMockDependencies } from "./utils/mockDependencies.js" // Remove unused import
 import { createCliAgents } from "./agents/cliAgents.js"
 import { simpleChatFlow } from "./flows/simpleChatFlow.js"
 import { log } from "@/utils/logic/logger"
@@ -12,11 +12,11 @@ async function main() {
 
   try {
     // 1. Create dependencies (currently mocks)
-    const dependencies = createMockDependencies()
+    // const dependencies = createMockDependencies() // Remove unused variable
     log("info", "CLI_DEPS", "Dependencies created.")
 
     // 2. Create agent instances for the CLI
-    const agents = createCliAgents(dependencies)
+    const agents = await createCliAgents()
     log("info", "CLI_AGENTS", "CLI agents created.")
 
     // 3. Run the desired flow

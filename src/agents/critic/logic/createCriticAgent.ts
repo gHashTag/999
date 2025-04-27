@@ -1,66 +1,45 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  Agent,
-  type NetworkRun, // Keep NetworkRun for context type
-  // createAgent, // Removed unused import
-} from "@inngest/agent-kit"
+import { Agent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 import type {
-  AgentDependencies, // Import from local types
-  AnyTool, // Import from local types
-  // AvailableAgent // Removed import
-} from "@/types/agents" // Correct path
-import { NetworkStatus, type TddNetworkState } from "@/types/network"
-// import type { TddNetworkState } from '@/types/network.types' // Likely unused
+  AgentDependencies,
+  AnyTool,
+  // StateData,
+} from "@/types/agents"
+// Removed unused imports:
+// import { NetworkStatus, type TddNetworkState } from "@/types/network"
+// import { NetworkRun } from '@inngest/agent-kit'
 
-import { readAgentInstructions } from "@/utils/logic/readAgentInstructions" // ADD import for utility
+/**
+ * Creates the Critic agent.
+ * @param dependencies - The dependencies for the agent, including instructions.
+ * @param instructions - The system instructions for the agent.
+ * @returns The Critic agent instance.
+ */
+export const createCriticAgent = ({
+  instructions,
+  ...dependencies
+}: { instructions: string } & AgentDependencies): Agent<any> => {
+  const { apiKey, modelName, allTools, log } = dependencies
 
-export const createCriticAgent = (
-  dependencies: AgentDependencies
-  // availableAgents: AvailableAgent[] // Removed parameter
-): Agent<any> => {
-  const { apiKey, modelName, allTools, log } = dependencies // Destructure needed deps
-
-  // Use allTools directly, filtering logic remains
-  const toolsToUse = allTools.filter((tool: AnyTool) => {
-    const allowedTools = [
-      "read_file",
-      "codebase_search",
-      "grep_search",
+  // Filter tools specifically needed by Critic
+  const toolsToUse = allTools.filter((tool: AnyTool) =>
+    [
+      "readFile",
+      "web_search", // Critic might need to check best practices
       "updateTaskState",
-    ]
-    const forbiddenTools = ["edit_file", "run_terminal_cmd", "delete_file"]
-    return (
-      allowedTools.includes(tool.name) && !forbiddenTools.includes(tool.name)
-    )
-  })
+      // Add other tool names as needed
+    ].includes(tool.name)
+  )
 
-  const baseSystemPrompt = readAgentInstructions("Critic")
+  // Removed: const systemPrompt = readAgentInstructions("Critic")
 
-  log?.info("Creating Critic Agent", { toolCount: toolsToUse.length }) // Optional logging
+  log?.info("Creating Critic Agent", { toolCount: toolsToUse.length })
 
   return new Agent({
     name: "Critic Agent",
-    description:
-      "Проводит ревью требований, тестов, кода или результатов команд.",
-    system: async (ctx: { network?: NetworkRun<any> | undefined }) => {
-      const state: Partial<TddNetworkState> =
-        ctx.network?.state.kv.get("network_state") || {}
-      const status = state.status
-      let dynamicContext = ""
-
-      // FIX: Use NetworkStatus.Enum.VALUE for comparisons
-      if (status === NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE) {
-        dynamicContext = `\n\n**Текущая Задача:** Провести ревью следующих требований от Руководителя:\n${state.test_requirements || "Требования отсутствуют."}`
-      } else if (status === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
-        dynamicContext = `\n\n**Текущая Задача:** Провести ревью следующего кода/команды для тестов:\n${state.test_code || state.command_to_execute || "Код/команда теста отсутствует."}\n**Предыдущая критика (если есть):** ${state.test_critique || "Нет"}`
-      } else if (status === NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE) {
-        dynamicContext = `\n\n**Текущая Задача:** Провести ревью следующего кода реализации:\n${state.implementation_code || "Код реализации отсутствует."}\n**Связанные тесты:**\n${state.test_code || "Код тестов отсутствует."}\n**Предыдущая критика (если есть):** ${state.implementation_critique || "Нет"}`
-      } else if (status === NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION) {
-        dynamicContext = `\n\n**Текущая Задача:** Проверить вывод последней выполненной команды:\n${state.last_command_output || "Вывод команды отсутствует."}`
-      }
-      return `${baseSystemPrompt}${dynamicContext}`
-    },
+    description: "Оценивает код, тесты и результаты, выполняет рефакторинг.",
+    system: instructions, // Use passed instructions
     model: deepseek({ apiKey, model: modelName }),
     tools: toolsToUse,
   })

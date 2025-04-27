@@ -1,31 +1,27 @@
-import { createAgent } from "@inngest/agent-kit"
+import { Agent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 import type { AgentDependencies, AnyTool } from "@/types/agents"
-import { readAgentInstructions } from "@/utils/logic/readAgentInstructions" // ADD import for utility
 
-export function createCodingAgent({
-  allTools,
-  apiKey, // Keep for fallback
-  modelName, // Keep for fallback
-}: AgentDependencies) {
-  // Read instructions using the utility function
-  const systemPrompt = readAgentInstructions("Coder")
+export const createCodingAgent = ({
+  instructions,
+  ...dependencies
+}: { instructions: string } & AgentDependencies): Agent<any> => {
+  const { apiKey, modelName, allTools, log } = dependencies
 
-  return createAgent({
-    name: "Coding Agent",
-    description:
-      "Writes or fixes implementation code based on tests and critique.",
-    system: systemPrompt,
-    // Use deepseek directly
-    model: deepseek({
-      apiKey: apiKey,
-      model: modelName,
-    }),
-    // Coder needs web search, codebase search, and file/terminal tools
-    tools: allTools.filter((tool: AnyTool) =>
-      ["codebase_search", "grep_search", "edit_file", "read_file"].includes(
-        tool.name
-      )
-    ),
+  // Filter tools specifically needed by Coder
+  const toolsToUse = allTools.filter((tool: AnyTool) =>
+    ["runTerminalCommand", "createOrUpdateFiles", "readFiles"].includes(
+      tool.name
+    )
+  )
+
+  log?.info("Creating Coder Agent", { toolCount: toolsToUse.length })
+
+  return new Agent({
+    name: "Coder Agent",
+    description: "Пишет код для прохождения тестов, следуя стилю и паттернам.",
+    system: instructions,
+    model: deepseek({ apiKey, model: modelName }),
+    tools: toolsToUse,
   })
 }

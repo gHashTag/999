@@ -36,7 +36,7 @@ export const runCodingAgent = inngest.createFunction(
   codingAgentHandler // Defined below
 )
 // --- Main Handler (Restored Full Logic) --- //
-async function codingAgentHandler({
+export async function codingAgentHandler({
   event,
   step,
   logger,

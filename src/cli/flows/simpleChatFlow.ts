@@ -1,36 +1,48 @@
-import { createCliAgents } from "../agents/cliAgents.js"
-import { createMockDependencies } from "../utils/mockDependencies.js"
-import { log } from "@/utils/logic/logger" // Import the logger
+import { CliAgents } from "../agents/cliAgents"
+// import { createMockDependencies } from "../utils/mockDependencies.js" // Remove unused import
+// import { createCliAgents } from "../agents/cliAgents.js" // Remove unused import
+import { log } from "@/utils/logic/logger"
 
 /**
- * A simple flow demonstrating interaction between Coder and Tester agents.
+ * A simple, hardcoded chat flow for demonstrating agent interaction.
  */
-export async function simpleChatFlow(
-  agents?: ReturnType<typeof createCliAgents>
-) {
-  log("info", "FLOW_START", "Starting simple agent chat flow...")
+export async function simpleChatFlow(agents: CliAgents) {
+  log("info", "SIMPLE_FLOW_START", "Starting simple chat flow...")
 
-  // Use provided agents or create new ones if not provided
-  const { coder, tester } = agents || createCliAgents(createMockDependencies())
+  const { coder, tester } = agents // Use agents passed as arguments
 
-  // Initial prompt for the Coder
-  const question = "Generate a simple TypeScript function to add two numbers."
-  log("info", "FLOW_ASK_CODER", `Coder asks: ${question}`)
+  let currentQuestion = "Write a simple TypeScript function to add two numbers."
+  log("info", "SIMPLE_FLOW_Q1", `Initial question: ${currentQuestion}`)
 
-  // Coder generates code
-  const codeResponse = await coder.ask(question)
-  const code = codeResponse
-  if (!code) {
-    log("warn", "FLOW_NO_CODE", "Coder did not generate code.")
-    return
+  try {
+    // Interaction 1: Coder generates code
+    const codeResult = await coder.run(currentQuestion) // Use .run
+    const code = codeResult?.output?.join("\n") ?? ""
+    if (!code) {
+      log("warn", "SIMPLE_FLOW_NO_CODE", "Coder did not provide code.")
+      return
+    }
+    log("info", "SIMPLE_FLOW_CODE", `Coder generated:\n${code}`)
+
+    // Interaction 2: Tester reviews code
+    const testInput = `Review this code:\n\n${code}`
+    const testResult = await tester.run(testInput) // Use .run
+    const review = testResult?.output?.join("\n") ?? ""
+    log("info", "SIMPLE_FLOW_REVIEW", `Tester review: ${review}`)
+
+    // Interaction 3: Coder refines based on review (or next question)
+    currentQuestion = `Refine the code based on this review: ${review}. Or just add error handling for non-number inputs.`
+    log("info", "SIMPLE_FLOW_Q2", `Next question: ${currentQuestion}`)
+    const refinedCodeResult = await coder.run(currentQuestion) // Use .run
+    const refinedCode = refinedCodeResult?.output?.join("\n") ?? ""
+    log("info", "SIMPLE_FLOW_REFINED", `Coder refinement:\n${refinedCode}`)
+  } catch (error) {
+    log(
+      "error",
+      "SIMPLE_FLOW_ERROR",
+      `Error during simple flow: ${error instanceof Error ? error.message : String(error)}`
+    )
   }
-  log("info", "FLOW_CODE_RESPONSE", `Coder response:\n${code}`)
 
-  // Tester reviews the code
-  log("info", "FLOW_ASK_TESTER", `Tester reviews the code...`)
-  const testResponse = await tester.ask(`Review this code:\n${code}`)
-  const testResult = testResponse
-  log("info", "FLOW_TEST_RESPONSE", `Tester response:\n${testResult}`)
-
-  log("info", "FLOW_END", "Simple chat flow finished.")
+  log("info", "SIMPLE_FLOW_END", "Simple chat flow finished.")
 }

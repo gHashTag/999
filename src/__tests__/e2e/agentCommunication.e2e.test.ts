@@ -51,5 +51,13 @@ describe("Agent Communication E2E Tests", () => {
 
     // Verify logging
     expect(mockLogger.info).toHaveBeenCalled()
+
+    // Trigger an error by sending to an unknown agent
+    await agent.ask("unknown: another message")
+
+    // Verify logging (expect error log for unknown agent)
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining("Unknown agent: unknown")
+    )
   })
 })

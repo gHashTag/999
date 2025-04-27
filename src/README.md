@@ -22,4 +22,10 @@ Following the strict directory structure rule:
 - **Consult Regularly:** Refer to this document and the READMEs within subdirectories to understand the project structure.
 - **Keep Updated:** If you add new top-level directories or significantly change the purpose of existing ones, **update this README accordingly**.
 
+## Структура директории
+- `types/` - Централизованное хранилище всех типов проекта
+  - Типы агентов
+  - Типы событий
+  - Сетевые типы
+
 _Ом Шанти._ 🙏

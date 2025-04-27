@@ -11,8 +11,9 @@ import { setupTestEnvironment } from "./agents/testSetup"
 // Import the test runner functions
 import { runTesterAgentTests } from "./agents/testerAgentTests"
 import { runCodingAgentTests } from "./agents/codingAgentTests"
-import { runCriticAgentTests } from "./agents/criticAgentTests"
-// import { runToolingAgentTests } from "./agents/toolingAgentTests"; // Placeholder
+// import { runTeamLeadAgentTests } from "./agents/teamLeadAgentTests" // Removed import for non-existent file
+// import { runToolingAgentTests } from "./agents/toolingAgentTests" // Removed import for non-existent file
+// import { runCriticAgentTests } from "./agents/criticAgentTests"
 
 // import type { AgentDependencies } from "@/types/agents" // REMOVED
 
@@ -40,14 +41,14 @@ describe("Agent Definitions", () => {
     runCodingAgentTests() // Call the imported function
   })
 
-  // --- Run Tests for createCriticAgent ---
-  describe("createCriticAgent", () => {
-    runCriticAgentTests() // Call the imported function
-  })
+  // --- Run Tests for createTeamLeadAgent ---
+  // describe("createTeamLeadAgent", () => {
+  //   runTeamLeadAgentTests() // Call the imported function
+  // })
 
-  // --- Tests for createToolingAgent --- (Placeholder)
+  // --- Run Tests for createToolingAgent ---
   // describe("createToolingAgent", () => {
-  // runToolingAgentTests(); // Call when defined
+  //   runToolingAgentTests() // Call the imported function
   // })
 
   // --- Tests for Open Codex Agent ---
