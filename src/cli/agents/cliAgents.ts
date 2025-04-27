@@ -10,6 +10,7 @@ import { systemEvents } from "@/utils/logic/systemEvents"
 import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 import { getSandbox } from "@/inngest/utils/sandboxUtils"
 import { Agent } from "@inngest/agent-kit"
+import { TddNetworkState } from "@/types/network"
 
 // Define the structure for the CLI agents object
 export interface CliAgents {
@@ -72,29 +73,18 @@ export async function createCliAgents(): Promise<CliAgents> {
     eventId,
   }
 
-  // Create agents using the base dependencies and specific instructions
-  const coder = createCodingAgent({
-    ...baseDependencies,
-    instructions: coderInstructions,
-  })
-  const tester = createTesterAgent({
-    ...baseDependencies,
-    instructions: testerInstructions,
-  })
-  const critic = createCriticAgent({
-    ...baseDependencies,
-    instructions: criticInstructions,
-  })
-  const teamLead = createTeamLeadAgent({
+  // Move dependency definitions inside the function
+  const coderDeps = { ...baseDependencies, instructions: coderInstructions }
+  const testerDeps = { ...baseDependencies, instructions: testerInstructions }
+  const criticDeps = { ...baseDependencies, instructions: criticInstructions }
+  const teamLeadDeps = {
     ...baseDependencies,
     instructions: teamLeadInstructions,
-  })
-  const tooling = createToolingAgent({
-    ...baseDependencies,
-    instructions: toolingInstructions,
-  })
+  }
+  const toolingDeps = { ...baseDependencies, instructions: toolingInstructions }
 
   const agents: CliAgents = {
+    // Use the deps variables for creation
     coder: createCodingAgent(coderDeps) as Agent<TddNetworkState>,
     tester: createTesterAgent(testerDeps) as Agent<TddNetworkState>,
     critic: createCriticAgent(criticDeps) as Agent<TddNetworkState>,

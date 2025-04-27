@@ -5,7 +5,6 @@ import { EventEmitter } from "events"
 import chalk from "chalk"
 import { simpleChatFlow } from "./flows/simpleChatFlow.js"
 import { createCliAgents } from "./agents/cliAgents.js"
-import { createMockDependencies } from "./utils/mockDependencies.js"
 import { log as appLog } from "../utils/logic/logger.js"
 import { Command } from "commander"
 
@@ -75,9 +74,9 @@ async function main() {
   }
 
   // Create agents for the first PoC section
-  const pocAgents: Record<string, { ask: (q: string) => Promise<string> }> = {
+  const pocAgents: Record<string, { ask: () => Promise<string> }> = {
     coder: {
-      ask: async (q: string) => {
+      ask: async () => {
         appLog(
           "warn",
           "POC_AGENT_DISABLED",
@@ -87,7 +86,7 @@ async function main() {
       },
     },
     critic: {
-      ask: async (q: string) => {
+      ask: async () => {
         appLog(
           "warn",
           "POC_AGENT_DISABLED",
@@ -97,7 +96,7 @@ async function main() {
       },
     },
     tester: {
-      ask: async (q: string) => {
+      ask: async () => {
         appLog(
           "warn",
           "POC_AGENT_DISABLED",
@@ -107,7 +106,7 @@ async function main() {
       },
     },
     teamlead: {
-      ask: async (q: string) => {
+      ask: async () => {
         appLog(
           "warn",
           "POC_AGENT_DISABLED",
@@ -117,7 +116,7 @@ async function main() {
       },
     },
     tooling: {
-      ask: async (q: string) => {
+      ask: async () => {
         appLog(
           "warn",
           "POC_AGENT_DISABLED",
@@ -163,7 +162,8 @@ async function main() {
   appLog("info", "CLI_INFO", "PoC Mode exited. Starting main flow...")
 
   // SECTION 2: Main logic using createMockDependencies
-  const dependencies = createMockDependencies()
+  // Remove unused variable
+  // const dependencies = createMockDependencies()
 
   // Create agents using the main dependencies - NOW ASYNC
   // createCliAgents now handles instruction loading internally
@@ -220,9 +220,6 @@ main().catch(err => {
 
 export async function runAgentChat() {
   simpleLogger.info("AGENT_CHAT_START", "Starting agent chat...")
-
-  // Create dependencies (currently mocks) - Remove unused
-  // const dependencies = createMockDependencies()
 
   // Create agent instances for the CLI - Remove argument
   const agents = await createCliAgents()
