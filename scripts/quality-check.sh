@@ -6,10 +6,10 @@ set -e
 
 echo "🧐 Running code quality checks..."
 
-echo "🎨 Checking formatting with Prettier..."
-pnpm run format:check
+echo "💅 Checking formatting with Prettier..."
+bun run format:check
 
-echo "🧹 Checking linting with ESLint..."
-pnpm run lint
+echo "🧐 Linting with ESLint..."
+bun run lint
 
 echo "✅ Code quality checks passed!" 

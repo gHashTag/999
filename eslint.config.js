@@ -57,6 +57,7 @@ export default tseslint.config(
       ".cursor/",
       "artifacts/",
       "*.mjs", // Ignore MJS files globally for now, handle separately if needed
+      "open-codex/", // Игнорируем пакет open-codex
     ],
   }
 )

@@ -1,51 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "dotenv/config"
 
-import { Inngest, type Context, type EventPayload } from "inngest"
-import { Sandbox } from "@e2b/sdk" // Use @e2b/sdk
-import { createDevOpsNetwork, type NetworkRun } from "@/network/network"
-import { CodingAgentEvent, codingAgentEventSchema } from "@/types/events"
-import { AgentDependencies } from "@/types/agents"
-import { getAllTools } from "@/tools/toolDefinitions"
-import {
-  createTesterAgent,
-  createCodingAgent,
-  createCriticAgent,
-  createTeamLeadAgent,
-  createToolingAgent,
-} from "@/agents"
-// import { log } from "@/utils/logic/logger" // No longer needed here
-import { getSandbox } from "./logic/utils" // Ensure this uses @e2b/sdk internally
-import { TddNetworkState, NetworkStatus } from "@/types/network"
-import { systemEvents } from "@/utils/logic/systemEvents"
+import { Inngest } from "inngest"
+import { type TddNetworkState } from "@/types/network"
+import { CodingAgentHandlerArgs } from "@/types/inngest"
+import { validateEventData } from "@/inngest/logic/validateEventData"
+import { ensureSandboxId } from "@/inngest/logic/sandboxUtils"
+import { initializeOrRestoreState } from "@/inngest/logic/stateUtils"
+import { createAgentDependencies } from "@/inngest/logic/dependencyUtils"
+import { processNetworkResult } from "@/inngest/logic/resultUtils"
+import { createDevOpsNetwork } from "@/network/network"
+import { HandlerStepName } from "@/types/handlerSteps"
+import { Network } from "@inngest/agent-kit"
+
+console.log(`[index.ts TOP LEVEL] NODE_ENV: ${process.env.NODE_ENV}`)
 
 // Initialize Inngest Client
 // If we have a custom logger (like Winston), pass it here
 // export const inngest = new Inngest({ id: "agentkit-tdd-agent", logger: customLogger });
-export const inngest = new Inngest({ id: "agentkit-tdd-agent" }) // Using default console logger for now
-
-// Initial ENV check might still use the global logger if needed before handler context exists
-// Or we can move this check inside the handler if preferred
-// import { log as globalLog } from "@/utils/logic/logger" // Use a different name if needed
-// globalLog("info", "ENV_CHECK", "Checking Keys", {
-//   inngestKey: process.env.INNGEST_SIGNING_KEY ? "Loaded" : "MISSING",
-//   deepseekKey: process.env.DEEPSEEK_API_KEY ? "Loaded" : "MISSING",
-// })
-
-// Define Logger interface locally based on observed .d.ts
-interface HandlerLogger {
-  info(...args: unknown[]): void
-  warn(...args: unknown[]): void
-  error(...args: unknown[]): void
-  debug(...args: unknown[]): void
-}
-
-// Define the type for the handler arguments
-type CodingAgentHandlerArgs = {
-  event: EventPayload<CodingAgentEvent>
-  step: Context["step"]
-  logger: HandlerLogger
-}
+export const inngest = new Inngest({
+  id: "agentkit-tdd-agent",
+  // logger: log, // Removed: Incorrect usage. Rely on default or handler-provided logger.
+}) // Using custom file logger now // <- Comment misleading, removed custom logger for now
 
 // Define the Inngest function *before* the handler that uses it for invoke
 // Note: We define the handler function below, TS allows this forward reference.
@@ -54,497 +30,128 @@ export const runCodingAgent = inngest.createFunction(
   { event: "coding-agent/run" },
   codingAgentHandler // Defined below
 )
-
-// --- Main Handler --- //
+// --- Main Handler (Restored Full Logic) --- //
 async function codingAgentHandler({
   event,
   step,
   logger,
 }: CodingAgentHandlerArgs) {
-  const handlerStartTime = Date.now()
-  // Use contextual logger
+  // Log the full event object at the very beginning
   logger.info(
-    { step: "HANDLER_ENTERED" }, // Inngest logger often takes metadata as first arg
-    "Handler invoked.",
-    {
-      eventId: event?.id,
-      eventName: event?.name,
-      incomingStatus: (event.data as any)?.currentState?.status,
-    }
+    { step: "HANDLER_DEBUG_FULL_EVENT" },
+    "Inspecting full event object received from @inngest/test:",
+    { fullEvent: event }
   )
 
-  if (!step) {
-    // Use contextual logger
-    logger.error({ step: "STEP_UNDEFINED" }, "Step context is undefined!", {
-      eventId: event?.id,
-    })
-    return { error: "Step context was undefined." }
-  }
+  const handlerStartTime = Date.now()
+  logger.info({ step: HandlerStepName.HANDLER_ENTERED }, "Handler invoked.", {
+    eventId: event?.id,
+    eventName: event?.name,
+    rawData: event?.data, // Log raw data for debugging
+  })
 
-  const validatedData = codingAgentEventSchema.safeParse(event.data)
-  if (!validatedData.success) {
-    // Use contextual logger
-    logger.error(
-      { step: "HANDLER_INVALID_DATA" },
-      "Invalid event data received.",
-      {
-        eventId: event?.id,
-        validationErrors: validatedData.error.issues,
-      }
-    )
-    return { error: "Invalid event data." }
-  }
-
-  let currentState = validatedData.data.currentState as
-    | TddNetworkState
-    | undefined
-  const taskInput = validatedData.data.input
-  const eventId = event.id
-  if (!eventId) {
-    // Use contextual logger
-    logger.error(
-      { step: "HANDLER_MISSING_EVENT_ID" },
-      "Event ID is missing after validation."
-    )
-    throw new Error("Event ID is missing after validation.")
-  }
+  let finalState: TddNetworkState | null = null // Initialize finalState
 
   try {
-    let currentSandboxId: string | null | undefined = currentState?.sandboxId
-
-    // --- Logging Sandbox ID --- //
-    // Use contextual logger
-    logger.info(
-      { step: "SANDBOX_CHECK_START" },
-      "Checking for existing sandbox ID.",
-      {
-        eventId,
-      }
-    )
-    if (!currentSandboxId) {
-      // Use contextual logger
-      logger.info(
-        { step: "GET_SANDBOX_ID_START" },
-        "No sandbox ID, creating new.",
-        {
-          eventId,
-        }
-      )
-      const newSandboxId = await step.run("get-sandbox-id", async () => {
-        // Use contextual logger (from outer scope)
-        logger.info(
-          { step: "CREATE_SANDBOX_STEP_START" },
-          "Creating sandbox...",
-          {
-            eventId,
-          }
-        )
-        const sandbox = await Sandbox.create({ autoPause: true })
-        // Use contextual logger
-        logger.info({ step: "CREATE_SANDBOX_STEP_END" }, "Sandbox created.", {
-          eventId,
-          newSandboxId: sandbox.sandboxId,
-        })
-        return sandbox.sandboxId
-      })
-      currentSandboxId = newSandboxId
-      // Use contextual logger
-      logger.info({ step: "GET_SANDBOX_ID_END" }, "Got new sandbox ID.", {
-        eventId,
-        sandboxId: currentSandboxId,
-      })
-    } else {
-      // Use contextual logger
-      logger.info(
-        { step: "GET_SANDBOX_ID_SKIP" },
-        "Reusing existing sandbox ID.",
-        {
-          eventId,
-          sandboxId: currentSandboxId,
-        }
-      )
-    }
-    // Use contextual logger
-    logger.info({ step: "SANDBOX_CHECK_END" }, "Finished sandbox ID check.", {
-      eventId,
-      sandboxId: currentSandboxId,
-    })
-
-    if (!currentSandboxId)
-      throw new Error("Sandbox ID missing after creation attempt.")
-
-    // --- Logging State Initialization --- //
-    // Use contextual logger
-    logger.info({ step: "STATE_INIT_START" }, "Initializing/Reusing state.", {
-      eventId,
-      inputTask: taskInput,
-      hasCurrentState: !!currentState,
-    })
-
-    if (!currentState) {
-      currentState = {
-        task: taskInput,
-        status: NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE,
-        sandboxId: currentSandboxId,
-      }
-      // Use contextual logger
-      logger.info({ step: "STATE_INITIALIZED" }, "Initialized new state.", {
-        eventId,
-        sandboxId: currentSandboxId,
-        status: currentState.status,
-      })
-    } else {
-      currentState.sandboxId = currentSandboxId // Ensure sandboxId is updated even if state exists
-      if (!currentState.status) {
-        currentState.status = NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE
-        // Use contextual logger
-        logger.warn(
-          { step: "STATE_STATUS_MISSING" },
-          "Status missing, setting to NEEDS_REQUIREMENTS_CRITIQUE.",
-          { eventId }
-        )
-      }
-      // Use contextual logger
-      logger.info({ step: "STATE_REUSED" }, "Reusing existing state.", {
-        eventId,
-        sandboxId: currentSandboxId,
-        status: currentState.status,
-      })
-    }
-    // Use contextual logger
-    logger.info({ step: "STATE_INIT_END" }, "Finished state initialization.", {
-      eventId,
-      finalStatus: currentState?.status,
-    })
-
-    // Use contextual logger for creating tools message
-    logger.info({ step: "CREATE_TOOLS_START" }, "Creating tools...", {
-      eventId,
-      sandboxId: currentSandboxId,
-    })
-    // Pass the contextual logger to getAllTools
-    const allTools = getAllTools(
-      logger, // Use the contextual logger
-      getSandbox,
-      eventId,
-      currentSandboxId
-    )
-    logger.info({ step: "CREATE_TOOLS_END" }, "Tools created.", {
-      eventId,
-      sandboxId: currentSandboxId,
-      toolCount: allTools.length,
-    })
-
-    // Use contextual logger for creating agents message
-    logger.info({ step: "CREATE_AGENTS_START" }, "Creating agents...", {
-      eventId,
-      sandboxId: currentSandboxId,
-    })
-    // Pass the contextual logger to AgentDependencies
-    const agentDeps: AgentDependencies = {
-      allTools,
-      log: logger, // Use the contextual logger
-      apiKey: process.env.DEEPSEEK_API_KEY!,
-      modelName: process.env.DEEPSEEK_MODEL || "deepseek-coder",
-      systemEvents,
-      sandbox: await getSandbox(currentSandboxId),
-    }
-    const teamLeadAgent = createTeamLeadAgent(agentDeps)
-    const testerAgent = createTesterAgent(agentDeps)
-    const codingAgent = createCodingAgent(agentDeps)
-    const criticAgent = createCriticAgent(agentDeps)
-    const toolingAgent = createToolingAgent(agentDeps)
-    // Use contextual logger
-    logger.info({ step: "CREATE_AGENTS_END" }, "Agents created.", {
-      eventId,
-      sandboxId: currentSandboxId,
-    })
-
-    const devOpsNetwork = createDevOpsNetwork(
-      teamLeadAgent,
-      testerAgent,
-      codingAgent,
-      criticAgent,
-      toolingAgent
-    )
-
-    // Use contextual logger
-    logger.info(
-      { step: "STATE_BEFORE_KV_SET" }, // Keep the debug log for now
-      "Logging currentState before setting in network KV.",
-      {
-        eventId,
-        currentStateObject: JSON.stringify(currentState, null, 2), // Log the whole object
-      }
-    )
-    logger.info(
-      { step: "STATE_RESTORE_NETWORK" },
-      "Restoring state into network.",
-      {
-        eventId,
-        status: currentState.status,
-      }
-    )
-
-    if (!currentState)
-      throw new Error("currentState is undefined before setting KV store")
-    devOpsNetwork.state.kv.set("network_state", currentState)
-
-    // Use contextual logger
-    logger.info({ step: "NETWORK_RUN_START" }, "Running DevOps network...", {
-      eventId,
-      currentStatus: currentState.status,
-    })
-
-    let networkResult: NetworkRun<TddNetworkState> | undefined
-    try {
-      networkResult = await devOpsNetwork.run(currentState.task)
-      // Use contextual logger
-      logger.info(
-        { step: "NETWORK_RUN_SUCCESS" },
-        "DevOps network finished successfully.",
-        {
-          eventId,
-          finalStatus: networkResult?.state.kv.get("network_state")?.status,
-        }
-      )
-    } catch (networkError: any) {
-      // Use contextual logger
-      logger.error({ step: "NETWORK_RUN_ERROR" }, "Error during network run.", {
-        eventId,
-        error: networkError.message,
-        stack: networkError.stack,
-      })
-
-      throw networkError
-    }
-
-    if (!networkResult) {
-      // Use contextual logger
-      logger.warn(
-        { step: "NETWORK_RUN_NO_RESULT" },
-        "Network run returned undefined.",
-        {
-          eventId,
-        }
-      )
-
-      if (currentState) {
-        currentState.status = NetworkStatus.Enum.FAILED
-      } else {
-        // Use contextual logger
-        logger.error(
-          { step: "HANDLER_CRITICAL_STATE_LOSS_NO_RESULT" },
-          "Original currentState lost and network returned no result.",
-          { eventId }
-        )
-
-        throw new Error(
-          "Critical state loss during handler execution - no network result."
-        )
-      }
+    // 1. Validate Data
+    const validationResult = validateEventData(event, logger)
+    if (validationResult.error) {
+      // Return error consistent with the catch block format
       return {
-        message: "Agent network run returned no result.",
-        finalState: currentState,
+        error: validationResult.error,
+        finalState: null,
+        executionTimeMs: Date.now() - handlerStartTime,
       }
     }
+    const validatedEventData = validationResult.data!
+    const eventId = event.id ?? "unknown-event-id" // Use actual or default event ID
 
-    const finalState = networkResult.state.kv.get("network_state") as
-      | TddNetworkState
-      | undefined
+    // 2. Ensure Sandbox ID
+    // Note: In test environment, ensureSandboxId is mocked via vi.mock
+    const sandboxId = await ensureSandboxId(
+      validatedEventData.currentState,
+      step,
+      logger,
+      eventId
+    )
 
-    if (!finalState) {
-      // Use contextual logger
-      logger.error(
-        { step: "HANDLER_FINAL_STATE_MISSING" },
-        "Final state missing from network result KV.",
-        { eventId }
-      )
+    // 3. Initialize or Restore State
+    const currentState = initializeOrRestoreState(
+      validatedEventData,
+      sandboxId,
+      logger,
+      eventId
+    )
+    finalState = currentState // Update finalState after initialization/restore
 
-      if (currentState) {
-        currentState.status = NetworkStatus.Enum.FAILED
-      } else {
-        // Use contextual logger
-        logger.error(
-          { step: "HANDLER_CRITICAL_STATE_LOSS_NO_FINAL" },
-          "Original currentState lost and final state missing.",
-          { eventId }
-        )
+    // 4. Create Dependencies (Agents, Tools)
+    const agentDeps = await createAgentDependencies(logger, sandboxId, eventId)
+    const agents = agentDeps.agents // Extract agents
 
-        throw new Error(
-          "Critical state loss during handler execution - no final state."
-        )
-      }
-      return {
-        error: "Final state missing after network run.",
-        finalState: currentState,
-      }
+    // Add a check to satisfy TypeScript's potential undefined concern
+    if (
+      !agents ||
+      !agents.teamLead ||
+      !agents.tester ||
+      !agents.coder ||
+      !agents.critic ||
+      !agents.tooling
+    ) {
+      throw new Error("Failed to create one or more core agents.")
     }
 
-    // Use contextual logger
+    // 5. Create and Run Network - Pass agents individually
+    const devOpsNetwork: Network<TddNetworkState> = createDevOpsNetwork(
+      agents.teamLead, // Pass individual agents
+      agents.tester,
+      agents.coder,
+      agents.critic,
+      agents.tooling
+    )
+
     logger.info(
-      { step: "FINAL_STATE_LOGGING" },
-      "Logging final state before handler exit.",
+      { step: HandlerStepName.NETWORK_RUN_START },
+      "Starting agent network run.",
+      { eventId, initialState: currentState }
+    )
+    // Remove setting state before run
+    // devOpsNetwork.state.kv.set('network_state', currentState);
+    // FIX: Call network.run with the task description string
+    const result = await devOpsNetwork.run(currentState.task)
+
+    // Get final state from KV store (assuming router saves it under 'network_state')
+    // Reading the final state from result.state.kv should still be correct
+    finalState = (result.state.kv.get("network_state") ||
+      result.state.kv.all()) as TddNetworkState
+
+    logger.info(
+      { step: HandlerStepName.NETWORK_RUN_SUCCESS },
+      "Agent network run completed.",
       {
         eventId,
-        status: finalState.status,
-        task: finalState.task,
+        finalStatus: finalState?.status,
       }
     )
 
-    // Use contextual logger
-    logger.info(
-      { step: "HANDLER_PROCESS_RESULT" },
-      "Processing network result.",
-      {
-        eventId,
-        finalStatus: finalState.status,
-        commandToExecute: finalState.command_to_execute,
-      }
-    )
-
-    // --- Command Execution Logic ---
-    if (finalState.status === NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION) {
-      const command = finalState.command_to_execute
-      if (command && command.trim()) {
-        // Use contextual logger
-        logger.info(
-          { step: "HANDLER_RUN_COMMAND" },
-          "Running command (currently stubbed)...",
-          {
-            eventId,
-            command,
-          }
-        )
-
-        // Temporarily stub out E2B command execution <<<--- STUBBED BLOCK
-        const commandOutput = await step.run(
-          "execute-command-stubbed",
-          async () => {
-            // Return dummy data for now
-            // Use contextual logger
-            logger.warn(
-              { step: "E2B_STUBBED" },
-              "E2B command execution is currently stubbed.",
-              { eventId }
-            )
-
-            return {
-              stdout: "[STUBBED] Command output for: " + command,
-              stderr: "",
-              exitCode: 0,
-            }
-          }
-        ) // <<<--- END OF STUBBED BLOCK
-
-        // Use contextual logger
-        logger.info(
-          { step: "HANDLER_COMMAND_EXECUTED" },
-          "Command execution stubbed.",
-          {
-            eventId,
-            exitCode: commandOutput.exitCode,
-          }
-        )
-
-        finalState.last_command_output = `Exit Code: ${commandOutput.exitCode}\\n\\nSTDOUT:\\n${commandOutput.stdout}\\n\\nSTDERR:\\n${commandOutput.stderr}`
-        finalState.status = NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION
-        finalState.command_to_execute = undefined
-
-        // Use contextual logger
-        logger.info(
-          { step: "HANDLER_REINVOKE_AFTER_COMMAND" },
-          "Re-invoking handler after command.",
-          { eventId, newStatus: finalState.status }
-        )
-
-        // Correct step.invoke structure: invoke(stepId, { function, data }) <<<--- CORRECT INVOKE STRUCTURE
-        await step.invoke(
-          "reinvoke-handler-after-command", // Step ID (string)
-          {
-            // Options object
-            function: runCodingAgent, // The function to invoke
-            data: {
-              // Data payload
-              input: finalState.task,
-              currentState: finalState,
-            },
-          }
-        )
-        return {
-          message: "Command execution stubbed, re-invoked handler.",
-          finalState,
-        }
-      } else {
-        // Use contextual logger
-        logger.warn(
-          { step: "HANDLER_NO_COMMAND" },
-          "Status NEEDS_COMMAND_EXECUTION but command is empty.",
-          { eventId }
-        )
-
-        finalState.status = NetworkStatus.Enum.FAILED
-      }
-    } else if (finalState.status === NetworkStatus.Enum.NEEDS_HUMAN_INPUT) {
-      // Use contextual logger
-      logger.info(
-        { step: "HANDLER_HUMAN_INPUT_NEEDED" },
-        "Stopping for human input.",
-        {
-          eventId,
-          finalStatus: finalState.status,
-        }
-      )
-
-      // Stop the process
-    } else {
-      // Use contextual logger
-      logger.info(
-        { step: "HANDLER_NO_ACTION" },
-        "No further action needed by handler.",
-        {
-          eventId,
-          finalStatus: finalState.status,
-        }
-      )
-    }
-
-    const handlerEndTime = Date.now()
-    // Use contextual logger
-    logger.info({ step: "HANDLER_COMPLETED" }, "Handler finished processing.", {
-      eventId,
-      finalStatus: finalState.status,
-      durationMs: handlerEndTime - handlerStartTime,
-    })
-
-    return { message: "Agent network run completed.", finalState }
+    // 6. Process Result
+    return await processNetworkResult(result, step, logger, eventId)
   } catch (error: any) {
-    const handlerEndTime = Date.now()
-    // Use contextual logger
+    const executionTimeMs = Date.now() - handlerStartTime
     logger.error(
-      { step: "HANDLER_ERROR" },
+      { step: HandlerStepName.HANDLER_ERROR },
       "An error occurred in the handler.",
       {
-        eventId,
         error: error.message,
         stack: error.stack,
-        durationMs: handlerEndTime - handlerStartTime,
+        finalStateBeforeError: finalState, // Log the state before the error
+        executionTimeMs,
       }
     )
-
-    if (currentState) {
-      currentState.status = NetworkStatus.Enum.FAILED
-    }
+    // Ensure consistent return format on error
     return {
-      error: `Handler failed: ${error.message}`,
-      finalState: currentState,
+      error: error.message || "Unknown handler error",
+      finalState: finalState, // Return the last known state
+      executionTimeMs,
     }
   }
 }
-
-// Definition is now at the top, before usage in invoke
-// export const runCodingAgent = inngest.createFunction(
-//   { id: "run-coding-agent-network", name: "Run Coding Agent Network" },
-//   { event: "coding-agent/run" },
-//   codingAgentHandler
-// );

@@ -1,69 +1,155 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-console */
-/* eslint-disable no-extra-semi */
+
 import { spawn } from "child_process"
 import type { ChildProcess } from "child_process"
 import fetch from "node-fetch"
 import { AbortController } from "node-abort-controller" // Импортируем AbortController
-import path from "node:path" // Add path import
-import fs from "node:fs" // Add fs import
-// import { AbortController } from 'node-abort-controller'; // Раскомментировать, если нужно глобально
+// Remove path and fs imports as they are no longer needed
+// import path from "node:path" // Add path import
+// import fs from "node:fs" // Add fs import
 
 // Константа, используемая в waitForUrl
 const CHECK_INTERVAL_MS = 1000
-// --- Константы для sendInngestEvent ---
-const INNGEST_DEV_URL = "http://localhost:8288"
-// TODO: Вынести в .env?
-const EVENT_KEY_ID = "a9tBvZMPD66QNEy3goIPmrSZ6tin2SQ1jWANGG148rbeCgB0" // Временно хардкод
-const EVENT_API_URL = `${INNGEST_DEV_URL}/e/${EVENT_KEY_ID}`
-const SEND_EVENT_TIMEOUT_MS = 5000 // Таймаут для отправки события
-const projectRoot = path.resolve(__dirname, "../../") // Define project root
-const e2eLogFilePath = path.join(projectRoot, "logs/e2e-test-run.log") // Define test log path
 
-// --- Утилиты для Тестового Лога ---
+// Remove unused constants
+// const INNGEST_DEV_URL = "http://localhost:8288"
+// const EVENT_KEY_ID = "a9tBvZMPD66QNEy3goIPmrSZ6tin2SQ1jWANGG148rbeCgB0"
+// const EVENT_API_URL = `${INNGEST_DEV_URL}/e/${EVENT_KEY_ID}`
+// const projectRoot = path.resolve(__dirname, "../../../")
+// const appLogFilePath = path.join(projectRoot, "node-app.log")
 
-/**
- * Clears the E2E test log file.
- */
-export const clearTestLogFile = (): void => {
+// Remove unused log file functions
+/* // Keep this comment if needed
+export const readAndParseAppLog = (linesToRead = 200): any[] => {
+  // ... implementation ...
+}
+*/ // Keep this comment if needed
+
+// FIX: Uncomment sendInngestEvent function
+// Remove unused sendInngestEvent function // <- Remove this comment line
+// * // <- Remove this line
+export async function sendInngestEvent(
+  eventName: string,
+  eventData: Record<string, unknown>,
+  apiUrl = "http://localhost:8288/e/a9tBvZMPD66QNEy3goIPmrSZ6tin2SQ1jWANGG148rbeCgB0"
+) {
   try {
-    if (fs.existsSync(e2eLogFilePath)) {
-      fs.writeFileSync(e2eLogFilePath, "", "utf-8")
-      console.log(`[TEST PREP] Cleared log file: ${e2eLogFilePath}`)
-    } else {
-      console.log(
-        `[TEST PREP] Log file not found, no need to clear: ${e2eLogFilePath}`
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{ name: eventName, data: eventData }]),
+    })
+    const body = await response.text()
+    return { status: response.status, body }
+  } catch (error: any) {
+    console.error(`Error sending Inngest event ${eventName}:`, error)
+    return { status: 500, body: error.message }
+  }
+}
+// */ // <- Remove this line
+
+// FIX: Uncomment pollInngestRunResult function
+// Remove unused pollInngestRunResult function // <- Remove this comment line
+// * // <- Remove this line
+export const pollInngestRunResult = async (
+  runId: string,
+  timeoutMs: number = 120000, // Default timeout 2 minutes
+  pollIntervalMs: number = 2000, // Poll every 2 seconds
+  apiUrl = "http://localhost:8288"
+): Promise<any | null> => {
+  const startTime = Date.now()
+  const runApiUrl = `${apiUrl}/v1/runs/${runId}`
+
+  console.log(
+    `Polling for result of run ${runId} at ${runApiUrl} for ${timeoutMs}ms...`
+  )
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      const response = await fetch(runApiUrl)
+      if (response.ok) {
+        const runData: unknown = await response.json()
+        if (
+          typeof runData === "object" &&
+          runData !== null &&
+          "status" in runData &&
+          typeof runData.status === "string"
+        ) {
+          if (
+            runData.status === "COMPLETED" ||
+            runData.status === "FAILED" ||
+            runData.status === "CANCELLED"
+          ) {
+            console.log(
+              `Run ${runId} finished with status: ${runData.status} after ${
+                (Date.now() - startTime) / 1000
+              }s`
+            )
+            // Attempt to parse output JSON if it exists and is a string
+            let finalState = null
+            if (
+              typeof runData === "object" &&
+              runData !== null &&
+              "output" in runData &&
+              runData.output &&
+              typeof runData.output === "string"
+            ) {
+              try {
+                finalState = JSON.parse(runData.output)
+              } catch (e) {
+                console.warn(
+                  `Failed to parse run output JSON for run ${runId}: ${e}. Output was: ${
+                    runData.output
+                  }`
+                )
+                finalState = { rawOutput: runData.output } // Return raw if parsing fails
+              }
+            } else if (
+              typeof runData === "object" &&
+              runData !== null &&
+              "output" in runData
+            ) {
+              finalState = (runData as { output: any }).output // Assign directly if not a string or null/undefined
+            }
+            const errorResult =
+              typeof runData === "object" &&
+              runData !== null &&
+              "error" in runData
+                ? (runData as { error: any }).error
+                : undefined
+            return {
+              status: (runData as { status: string }).status,
+              error: errorResult,
+              finalState,
+            }
+          }
+          // else: still running, continue polling
+        } else {
+          console.warn(
+            `Polling run ${runId}: Received unexpected data structure.`,
+            { runData }
+          )
+        }
+      } else {
+        console.warn(
+          `Polling run ${runId}: API returned status ${response.status}. Retrying...`
+        )
+      }
+    } catch (error: any) {
+      console.error(
+        `Polling run ${runId}: Error fetching status - ${error.message}`
       )
     }
-  } catch (error: any) {
-    console.error(
-      `[TEST PREP ERROR] Failed to clear log file ${e2eLogFilePath}:`,
-      error
-    )
-    // Optionally re-throw or handle error differently
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs))
   }
-}
 
-/**
- * Reads the content of the E2E test log file.
- * @returns The content of the log file, or an empty string if the file doesn't exist or is empty.
- */
-export const readTestLogFile = (): string => {
-  try {
-    if (fs.existsSync(e2eLogFilePath)) {
-      return fs.readFileSync(e2eLogFilePath, "utf-8")
-    } else {
-      console.warn(`[TEST READ WARN] Log file not found: ${e2eLogFilePath}`)
-      return "" // Return empty string if file doesn't exist
-    }
-  } catch (error: any) {
-    console.error(
-      `[TEST READ ERROR] Failed to read log file ${e2eLogFilePath}:`,
-      error
-    )
-    return "" // Return empty string on error
-  }
+  console.error(`Polling run ${runId} timed out after ${timeoutMs}ms.`)
+  return null // Indicate timeout
 }
+// */ // <- Remove this line
+
+// Keep waitForUrl and runCommand as they might be useful for other E2E tests
 
 // Функция для ожидания доступности URL
 export const waitForUrl = async (
@@ -140,45 +226,4 @@ export const runCommand = (
   )
 
   return proc
-}
-
-// --- Функция для отправки события Inngest ---
-export const sendInngestEvent = async (
-  eventName: string,
-  eventData: Record<string, any>,
-  timeout: number = SEND_EVENT_TIMEOUT_MS
-): Promise<{ status: number; body: string }> => {
-  console.log(
-    `Sending event '${eventName}' to ${EVENT_API_URL} with timeout ${timeout}ms`
-  )
-  let eventResponseStatus = 0
-  let responseBody = ""
-  const controller = new AbortController()
-  const signal = controller.signal
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(EVENT_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: eventName,
-        data: eventData,
-      }),
-      signal,
-    })
-    clearTimeout(timeoutId)
-    eventResponseStatus = response.status
-    responseBody = await response.text()
-    console.log(
-      `Event '${eventName}' submission response: Status=${eventResponseStatus}, Body=${responseBody}`
-    )
-    return { status: eventResponseStatus, body: responseBody }
-  } catch (error: any) {
-    clearTimeout(timeoutId)
-    console.error(`Failed to send event '${eventName}':`, error)
-    throw new Error(
-      `Failed to send event '${eventName}' to ${EVENT_API_URL}: ${error.message}`
-    )
-  }
 }

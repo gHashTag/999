@@ -1,7 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-extra-semi */
 /* eslint-disable no-console */
-import { describe, it, expect, beforeAll, afterAll } from "vitest"
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest"
 // Удаляем импорты spawn и fetch, так как они теперь в utils.ts
 // import { spawn } from "child_process"
 
@@ -13,10 +11,9 @@ import {
   // waitForUrl, // Removed unused import
   // runCommand, // Removed unused import
   sendInngestEvent,
-  clearTestLogFile,
-  readTestLogFile,
+  pollInngestRunResult,
 } from "./utils"
-// import { NetworkStatus } from "../../types/network"
+import { NetworkStatus } from "@/types/network"
 
 // --- Константы и Утилиты ---
 // const ROOT_DIR = path.resolve(__dirname, "../../") // Removed unused variable
@@ -35,7 +32,6 @@ const TEST_TIMEOUT_MS = 120000 // 2 минуты на выполнение ша�
 // let appProcess: ChildProcess | null = null // Removed unused variable
 // let appOutput = "" // Собираем stdout сервера приложения
 
-// eslint-disable-next-line prefer-const
 let testSandboxId: string = "placeholder-sandbox-id"
 /* // Removed unused function
 const pollForRunState = async (
@@ -60,13 +56,16 @@ const pollForRunState = async (
 
 // Используем sequential для гарантии порядка выполнения шагов
 describe.sequential("E2E: Coding Agent Full Flow", () => {
+  let eventIdForCompletedTest: string | undefined
+  let eventIdForCritiqueTest: string | undefined
+
   // Очистка выполняется один раз перед всеми тестами
   beforeAll(async () => {
     console.log(
       "Skipping E2E test setup: Assuming servers are already running."
     )
     // Clear the specific test log file
-    clearTestLogFile()
+    // clearTestLogFile()
     // // START: Remove server management from test
     // console.log("Starting E2E test setup: Killing existing processes...")
     // const killProc = runCommand(
@@ -188,28 +187,51 @@ describe.sequential("E2E: Coding Agent Full Flow", () => {
       DEFAULT_EVENT_DATA
     )
     expect(eventResponse.status).toBe(200)
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // DEBUG: Log the actual response body
+    console.log("Response body for COMPLETED check:", eventResponse.body)
+    // Capture eventId for later use
+    try {
+      const body = JSON.parse(eventResponse.body)
+      eventIdForCompletedTest = body?.ids?.[0] // Store for the COMPLETED test
+      console.log(
+        `[TEST] Event ID for COMPLETED check: ${eventIdForCompletedTest}`
+      )
+    } catch (e) {
+      console.error(
+        "Failed to parse event response body for completed test:",
+        e
+      )
+    }
+    expect(eventIdForCompletedTest).toBeDefined()
+    // No need for extra sleep here
   }, 15000)
 
-  // Шаг 5: Проверка, что обработчик события был вызван
+  // --- Re-enable and update skipped tests ---
   it(
-    "should eventually log a FINAL_STATE_LOGGING with status COMPLETED",
+    "should eventually run to COMPLETED status", // Renamed for clarity
     async () => {
-      await expect
-        .poll(() => readTestLogFile(), {
-          timeout: TEST_TIMEOUT_MS - 5000,
-          interval: 2000,
-        })
-        .toMatch(/FINAL_STATE_LOGGING.*status.+COMPLETED/)
+      expect(eventIdForCompletedTest).toBeDefined() // Ensure we have the eventId
+
+      const result = await pollInngestRunResult(
+        eventIdForCompletedTest!,
+        TEST_TIMEOUT_MS - 5000
+      )
+
+      expect(result).toBeDefined()
+      expect(result).not.toBeNull()
+      expect(result.error).toBeNull()
+
+      const finalState = result.finalState
+      expect(finalState).toBeDefined()
+      expect(finalState.status).toBe(NetworkStatus.Enum.COMPLETED) // Check for COMPLETED
 
       console.log("Agent network completed successfully with status COMPLETED.")
     },
     TEST_TIMEOUT_MS
   )
 
-  // Раскомментируем и адаптируем этот тест
   it(
-    "should handle initial add(a,b) task and reach NEEDS_REQUIREMENTS_CRITIQUE state",
+    "should handle initial task and transition to NEEDS_REQUIREMENTS_CRITIQUE", // Renamed for clarity
     async () => {
       console.log("--- Test: Initial Task -> NEEDS_REQUIREMENTS_CRITIQUE ---")
       const eventResponse = await sendInngestEvent(
@@ -218,18 +240,45 @@ describe.sequential("E2E: Coding Agent Full Flow", () => {
       )
       expect(eventResponse.status).toBe(200)
 
-      // Даем время на обработку и запись логов
-      await new Promise(resolve => setTimeout(resolve, 10000)) // Wait 10 seconds
+      // DEBUG: Log the actual response body
+      console.log("Response body for CRITIQUE check:", eventResponse.body)
 
-      // Проверяем логи из файла
-      console.log("Checking logs for state transition...")
-      const logContent = readTestLogFile() // Read from the test log file
-      expect(logContent).toMatch(
-        /ROUTER_TO_CRITIC.+"status":"NEEDS_REQUIREMENTS_CRITIQUE"/
+      // Capture eventId for this specific test
+      try {
+        const body = JSON.parse(eventResponse.body)
+        eventIdForCritiqueTest = body?.ids?.[0]
+        console.log(
+          `[TEST] Event ID for CRITIQUE check: ${eventIdForCritiqueTest}`
+        )
+      } catch (e) {
+        console.error(
+          "Failed to parse event response body for critique test:",
+          e
+        )
+      }
+      expect(eventIdForCritiqueTest).toBeDefined()
+
+      // Poll for the result of this specific event
+      const result = await pollInngestRunResult(
+        eventIdForCritiqueTest!,
+        TEST_TIMEOUT_MS - 5000
       )
+
+      expect(result).toBeDefined()
+      expect(result).not.toBeNull()
+      expect(result.error).toBeNull()
+
+      const finalState = result.finalState
+      expect(finalState).toBeDefined()
+      expect(finalState.status).toBe(
+        NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE
+      )
+      expect(finalState.task).toBe(DEFAULT_EVENT_DATA.input)
+      expect(finalState.test_requirements).toBeDefined()
     },
-    TEST_TIMEOUT_MS // Use the defined timeout
+    TEST_TIMEOUT_MS
   )
+  // -------------------------------------------
 
   // Пока закомментируем остальные тесты, чтобы сфокусироваться на первом шаге
   /*
@@ -239,3 +288,10 @@ describe.sequential("E2E: Coding Agent Full Flow", () => {
   })
   */
 })
+
+// Increase timeout for E2E tests
+vi.setConfig({ testTimeout: 180000 }) // 180 seconds
+
+// Mock the DeepSeek API endpoint
+// Удаляем импорт несуществующего файла
+// import { server } from "../../mocks/node"

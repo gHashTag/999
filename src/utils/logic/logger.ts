@@ -10,14 +10,14 @@ const currentDir = path.dirname(__filename)
 const projectRoot = path.resolve(currentDir, "../../../")
 
 const logFilePath = path.join(projectRoot, "node-app.log")
-// Define path for the E2E test log file
-const e2eLogFilePath = path.join(projectRoot, "logs/e2e-test-run.log")
+// Remove E2E log file path
+// const e2eLogFilePath = path.join(projectRoot, "src/logs/e2e-test-run.log")
 
-// Ensure the logs directory exists
-const logsDir = path.dirname(e2eLogFilePath)
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true })
-}
+// Ensure the main logs directory exists (project root)
+// const logsDir = path.dirname(e2eLogFilePath) // No longer needed
+// if (!fs.existsSync(logsDir)) { // No longer needed
+//   fs.mkdirSync(logsDir, { recursive: true }) // No longer needed
+// }
 
 // FIX: Remove problematic import
 // import { sandboxId } from "../index.js"; // Assuming sandboxId is accessible globally or passed differently
@@ -31,26 +31,24 @@ if (!fs.existsSync(logsDir)) {
 // }
 
 /**
- * Helper for structured logging.
- * Writes to both console and node-app.log file.
- * @param level - Log level ('info', 'warn', 'error')
- * @param stepName - Name of the step/context
- * @param message - Log message
- * @param data - Additional data object (optional)
+ * Simple file logger.
+ * Writes structured logs to node-app.log.
  */
 export const log = (
   level: "info" | "warn" | "error",
   stepName: string,
   message: string,
-  data: object = {}
+  data: Record<string, any> = {} // Keep data flexible
 ) => {
-  const currentSandboxId = (data as any).sandboxId || null
+  // Remove isE2ETestContext logic
+  const currentSandboxId = data?.sandboxId || null
 
   const logEntry = {
     timestamp: new Date().toISOString(),
     level,
     step: stepName,
     sandboxId: currentSandboxId,
+    // Remove isE2ETestContext field
     message,
     ...data,
   }
@@ -60,26 +58,15 @@ export const log = (
   // Log to console
   console.log(logString)
 
-  // Append to main log file
+  // Append to main log file ONLY
   try {
     fs.appendFileSync(logFilePath, logString + "\n", "utf-8")
   } catch (err) {
-    // Log error writing to file *only* to console to avoid infinite loop
     console.error(
-      `[Logger Error] Failed to write to main log file ${logFilePath}:`,
+      `[LOGGER CRITICAL ERROR] Failed to write to MAIN log file ${logFilePath}:`,
       err
     )
   }
 
-  // Append to E2E test log file if in test environment
-  if (process.env.NODE_ENV === "test") {
-    try {
-      fs.appendFileSync(e2eLogFilePath, logString + "\n", "utf-8")
-    } catch (err) {
-      console.error(
-        `[Logger Error] Failed to write to E2E test log file ${e2eLogFilePath}:`,
-        err
-      )
-    }
-  }
+  // Remove conditional E2E log writing block
 }

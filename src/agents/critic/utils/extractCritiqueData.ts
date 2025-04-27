@@ -1,14 +1,5 @@
-import type { AgentResult, Message } from "@inngest/agent-kit"
-import type { CritiqueData, LoggerFunc } from "../../../types/agents"
-
-// Define a more specific type for the expected structure of the last message
-// This helps TypeScript understand the possible properties
-// We assume the relevant message has role 'assistant'
-interface AssistantMessage {
-  role?: "assistant" | string // Role might not always be exactly 'assistant'
-  type?: "text" | "tool_call" | string // Allow other string types but prioritize known ones
-  content?: string | object | null // content can be string, object, or null
-}
+import type { AgentResult } from "@inngest/agent-kit"
+import { HandlerLogger, type CritiqueData } from "@/types/agents"
 
 /**
  * Extracts critique data from an agent's result.
@@ -16,137 +7,99 @@ interface AssistantMessage {
  */
 export function extractCritiqueData(
   result: AgentResult | undefined,
-  log: LoggerFunc
+  log: HandlerLogger
 ): CritiqueData {
-  if (!result) return { error: "Agent result is missing." }
-  let outputText = ""
-
-  // Check if output is an array of messages (standard structure)
-  if (Array.isArray(result.output) && result.output.length > 0) {
-    const lastMessage = result.output[result.output.length - 1] as Message // Assert as base Message
-
-    // Handle different message types within the last message
-    if (lastMessage?.role === "assistant") {
-      // Now we know it's an assistant message, assert the more specific type
-      const assistantMessage = lastMessage as AssistantMessage
-
-      if (assistantMessage.type === "text") {
-        // Ensure content is a string for text messages
-        if (typeof assistantMessage.content === "string") {
-          outputText = assistantMessage.content
-        } else {
-          // Handle potentially structured content within text message if needed
-          outputText = String(assistantMessage.content ?? "")
-          log(
-            "warn",
-            "extractCritiqueData",
-            "TextMessage content was not a simple string, converted.",
-            { content: assistantMessage.content }
-          )
-        }
-      } else if (assistantMessage.type === "tool_call") {
-        log(
-          "warn",
-          "extractCritiqueData",
-          "Last message was tool_call, critique extraction might be incomplete.",
-          { lastMessage: assistantMessage } // Use asserted type
-        )
-        outputText = "[Assistant called a tool]" // Placeholder text
-      } else {
-        // Handle other potential types if necessary, or log unexpected type
-        const unknownType = assistantMessage.type || "unknown"
-        log(
-          "warn",
-          "extractCritiqueData",
-          `Unexpected message type '${unknownType}' in last assistant message.`,
-          { lastMessage: assistantMessage } // Use asserted type
-        )
-        // Attempt to stringify content as fallback, checking if content exists
-        try {
-          outputText =
-            assistantMessage.content !== undefined
-              ? JSON.stringify(assistantMessage.content)
-              : "[No Content]"
-        } catch {
-          outputText = "[Unstringifyable Content]"
-        }
-      }
-    } else {
-      // Log if the last message wasn't from the assistant
-      log(
-        "warn",
-        "extractCritiqueData",
-        "Last message was not from assistant role.",
-        { lastMessage }
-      )
-      // Attempt to stringify the whole message as a fallback
-      try {
-        outputText = JSON.stringify(lastMessage)
-      } catch {
-        outputText = "[Unstringifyable Message]"
-      }
-    }
-  } else if (typeof result.output === "string") {
-    // Handle cases where output might just be a string
-    outputText = result.output
-    log("warn", "extractCritiqueData", "Agent output was a direct string.", {
-      output: result.output,
-    })
-  } else {
-    // Final fallback if output structure is completely unexpected
-    log("error", "extractCritiqueData", "Unexpected agent output format.", {
-      output: result.output,
-    })
-    try {
-      outputText = JSON.stringify(result.output) || "[Empty/Invalid Output]"
-    } catch {
-      outputText = "[Unstringifyable Output]"
-    }
+  if (!result) {
+    log.error("extractCritiqueData", "Agent result is missing.")
+    return { error: "Agent result is missing." }
   }
 
-  const critiqueLower = outputText.toLowerCase()
-
-  const needsRevision =
-    critiqueLower.includes("revision") ||
-    critiqueLower.includes("issue") ||
-    critiqueLower.includes("error") || // Be careful this doesn't catch agent errors themselves
-    critiqueLower.includes("fix") ||
-    critiqueLower.includes("problem")
-  const isApproved =
-    critiqueLower.includes("approved") ||
-    critiqueLower.includes("ok") ||
-    critiqueLower.includes("looks good") ||
-    critiqueLower.includes("lgtm")
-
-  // Avoid triggering revision if it's just reporting an agent/tool error message
-  const likelyErrorMessage =
-    (critiqueLower.includes("error:") || critiqueLower.includes("failed:")) &&
-    !critiqueLower.includes("no error") // Add exclusion for phrases like "no error"
-
-  if (likelyErrorMessage && !isApproved) {
-    // If it looks like an error message and not explicitly approved, treat as error
-    return { error: `Critic agent output indicates error: ${outputText}` }
+  if (!result.output || result.output.length === 0) {
+    log.warn("extractCritiqueData", "Agent output is empty.")
+    return { error: "Agent output is empty." }
   }
 
-  // If both flags are somehow true (e.g., "revision approved"), approval wins.
-  if (isApproved) {
-    return { critique: outputText, isApproved: true, needsRevision: false }
-  } else if (needsRevision) {
-    return { critique: outputText, needsRevision: true, isApproved: false }
+  // Assuming the critique is in the last message
+  const lastMessage = result.output[result.output.length - 1]
+
+  if (lastMessage.type !== "text") {
+    log.warn("extractCritiqueData", "Last agent message is not text.", {
+      type: lastMessage.type,
+    })
+    return { error: "Last agent message is not text." }
+  }
+
+  // FIX: Check if content is a string before trimming
+  let content = ""
+  if (typeof lastMessage.content === "string") {
+    content = lastMessage.content.trim()
   } else {
-    // Ambiguous case - neither approval nor revision keywords found.
-    // Let's default to needing revision if unclear, but log warning.
-    log(
-      "warn",
+    // Handle non-string content (e.g., array of TextContent)
+    log.warn(
       "extractCritiqueData",
-      "Ambiguous critique, defaulting to needsRevision=true",
-      { outputText }
+      "Last message content was not a string, converting.",
+      { contentType: typeof lastMessage.content }
     )
-    return {
-      critique: outputText,
-      needsRevision: true,
-      isApproved: false,
-      // error: "Ambiguous critique", // Optionally mark as ambiguous error
+    // Attempt to stringify or join if it's an array
+    try {
+      content = Array.isArray(lastMessage.content)
+        ? lastMessage.content.map(c => c.text || "").join(" ") // Example for TextContent[]
+        : JSON.stringify(lastMessage.content)
+    } catch (e) {
+      content = "[Unprocessable Content]"
+      log.error("extractCritiqueData", "Failed to process non-string content", {
+        error: e,
+      })
+    }
+    content = content.trim() // Trim the processed content
+  }
+
+  // Try to parse JSON
+  if (content.startsWith("```json") && content.endsWith("```")) {
+    const jsonString = content.substring(7, content.length - 3).trim()
+    try {
+      const parsedJson = JSON.parse(jsonString)
+      log.info("extractCritiqueData", "Successfully parsed JSON response.", {
+        parsedJson,
+      })
+      // Validate parsed structure (basic check)
+      if (typeof parsedJson.approved === "boolean") {
+        return {
+          isApproved: parsedJson.approved,
+          critique: parsedJson.critique || "",
+          // refactored_code: parsedJson.refactored_code || null, // Assuming this field exists
+        }
+      } else {
+        log.error(
+          "extractCritiqueData",
+          "Parsed JSON missing required fields.",
+          { parsedJson }
+        )
+        return { error: "Parsed JSON missing required fields." }
+      }
+    } catch (error) {
+      log.error("extractCritiqueData", "Failed to parse JSON response.", {
+        error,
+        jsonString,
+      })
+      return { error: "Failed to parse JSON response." }
     }
   }
+
+  // Handle non-JSON responses (assume direct critique text)
+  log.warn("extractCritiqueData", "Agent output was a direct string.", {
+    content,
+  })
+  // Heuristic: Assume it's a negative critique if it doesn't contain common positive keywords
+  const isLikelyApproved = ["approved", "lgTM", "looks good"].some(keyword =>
+    content.toLowerCase().includes(keyword)
+  )
+
+  return {
+    critique: content,
+    isApproved: isLikelyApproved, // Best guess
+  }
+  /* // Original complex logic - replaced by simpler JSON check
+  // ... existing logic ...
+  */
 }

@@ -1,7 +1,8 @@
 // src/tools/toolDefinitions.ts
 import { z } from "zod"
-import type { GetSandboxFunc } from "@/inngest/logic/utils"
+import { type GetSandboxFunc } from "@/inngest/utils/sandboxUtils"
 import type { AnyTool, HandlerLogger } from "@/types/agents"
+// import { createTool } from "@inngest/agent-kit"; // Removed - createTool comes from definitions now
 
 // --- Tool Schema Definitions (Kept Here For Now) --- //
 // TODO: Consider moving schemas to a dedicated src/tools/schemas.ts file
@@ -19,15 +20,20 @@ export const processArtifactParamsSchema = z.object({
 })
 // Schema for askHumanForInput is defined within its own file now.
 
-// --- Import All Tool Creators --- //
-import {
-  createTerminalTool,
-  createCreateOrUpdateFilesTool,
-  createReadFilesTool,
-  createRunCodeTool,
-  createProcessArtifactTool,
-  createAskHumanForInputTool,
-} from "./definitions"
+// Define schema for the mock web_search tool - REMOVED
+// const webSearchParamsSchema = z.object({ ... });
+
+// --- Import Tool Creators Directly from Subdirectories --- //
+import { createTerminalTool } from "./definitions/terminal"
+import { createCreateOrUpdateFilesTool } from "./definitions/createOrUpdateFiles"
+import { createReadFilesTool } from "./definitions/readFiles"
+import { createRunCodeTool } from "./definitions/runCode"
+import { createProcessArtifactTool } from "./definitions/processArtifact"
+import { createAskHumanForInputTool } from "./definitions/askHumanForInput"
+import { createUpdateTaskStateTool } from "./definitions/updateTaskStateTool"
+
+// --- Mock Web Search Tool - REMOVED --- //
+// const createWebSearchMockTool = ( ... ) => { ... };
 
 /**
  * Function to get all defined tools.
@@ -55,6 +61,7 @@ export function getAllTools(
   const readFileTool = createReadFilesTool(log, getSandbox, eventId, sandboxId)
   const runCodeTool = createRunCodeTool(log, eventId, sandboxId)
   const processArtifactTool = createProcessArtifactTool(log, eventId, sandboxId)
+  const updateStateTool = createUpdateTaskStateTool(log, eventId)
 
   return [
     terminalTool,
@@ -63,5 +70,6 @@ export function getAllTools(
     readFileTool,
     runCodeTool,
     processArtifactTool,
+    updateStateTool,
   ]
 }

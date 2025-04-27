@@ -9,7 +9,7 @@ import type {
   Tool,
   Agent,
 } from "@inngest/agent-kit"
-import { type TddNetworkState, NetworkStatus } from "@/types/network"
+import { type TddNetworkState } from "@/types/network"
 
 // Mock logger
 export const mockLog: HandlerLogger = {
@@ -17,6 +17,7 @@ export const mockLog: HandlerLogger = {
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
+  log: vi.fn(),
 }
 
 // Mock constants
@@ -33,25 +34,19 @@ export const mockTools: AnyTool[] = [
     handler: vi.fn(),
   },
   {
-    name: "terminal",
+    name: "runTerminalCommand",
     description: "mock",
     parameters: {},
     handler: vi.fn(),
   },
   {
-    name: "readFiles",
+    name: "read_file",
     description: "mock",
     parameters: {},
     handler: vi.fn(),
   },
   {
     name: "askHumanForInput",
-    description: "mock",
-    parameters: {},
-    handler: vi.fn(),
-  },
-  {
-    name: "web_search",
     description: "mock",
     parameters: {},
     handler: vi.fn(),
@@ -75,7 +70,7 @@ export const mockTools: AnyTool[] = [
     handler: vi.fn(),
   },
   {
-    name: "read_file",
+    name: "updateTaskState",
     description: "mock",
     parameters: {},
     handler: vi.fn(),
@@ -83,7 +78,7 @@ export const mockTools: AnyTool[] = [
 ]
 
 // Mock AgentDependencies
-export const mockAgentDeps: _AgentDependencies = {
+export const dependencies: _AgentDependencies = {
   allTools: mockTools,
   log: mockLog,
   apiKey: mockApiKey,
@@ -135,5 +130,4 @@ export {
 export { type _AgentDependencies, type AnyTool, type HandlerLogger }
 export { type AgentResult, type _NetworkRun, type Tool, type Agent }
 export { EventEmitter }
-export { type TddNetworkState, NetworkStatus }
-export { deepseek }
+export { type TddNetworkState }

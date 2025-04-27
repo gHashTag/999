@@ -3,7 +3,7 @@ import Fastify, { FastifyInstance } from "fastify" // Import FastifyInstance for
 import { fastifyPlugin } from "inngest/fastify"
 // import { type InngestFunction } from "inngest" // Revert this import
 import { log } from "@/utils" // Import log
-import { inngest, runCodingAgent } from "@/inngest" // Import client and CORRECT function name
+import { inngest, runCodingAgent } from "@/inngest/index" // Import client and CORRECT function name
 import { pathToFileURL } from "node:url" // Import pathToFileURL
 
 // Create Fastify instance with explicit type

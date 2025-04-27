@@ -1,35 +1,55 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  createAgent,
+  Agent,
   type NetworkRun, // Keep NetworkRun for context type
+  // createAgent, // Removed unused import
 } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies, AnyTool } from "@/types/agents"
+import type {
+  AgentDependencies, // Import from local types
+  AnyTool, // Import from local types
+  // AvailableAgent // Removed import
+} from "@/types/agents" // Correct path
 import { NetworkStatus, type TddNetworkState } from "@/types/network"
+// import type { TddNetworkState } from '@/types/network.types' // Likely unused
 
 import { readAgentInstructions } from "@/utils/logic/readAgentInstructions" // ADD import for utility
 
-export function createCriticAgent({
-  allTools,
-  apiKey, // Now needed for deepseek call
-  modelName, // Now needed for deepseek call
-  // baseModel, // Removed baseModel dependency
-}: AgentDependencies) {
-  // Read base instructions using the utility function
+export const createCriticAgent = (
+  dependencies: AgentDependencies
+  // availableAgents: AvailableAgent[] // Removed parameter
+): Agent<any> => {
+  const { apiKey, modelName, allTools, log } = dependencies // Destructure needed deps
+
+  // Use allTools directly, filtering logic remains
+  const toolsToUse = allTools.filter((tool: AnyTool) => {
+    const allowedTools = [
+      "read_file",
+      "codebase_search",
+      "grep_search",
+      "updateTaskState",
+    ]
+    const forbiddenTools = ["edit_file", "run_terminal_cmd", "delete_file"]
+    return (
+      allowedTools.includes(tool.name) && !forbiddenTools.includes(tool.name)
+    )
+  })
+
   const baseSystemPrompt = readAgentInstructions("Critic")
 
-  return createAgent({
+  log?.info("Creating Critic Agent", { toolCount: toolsToUse.length }) // Optional logging
+
+  return new Agent({
     name: "Critic Agent",
     description:
       "Проводит ревью требований, тестов, кода или результатов команд.",
     system: async (ctx: { network?: NetworkRun<any> | undefined }) => {
-      // Use optional chaining and provide default for state
       const state: Partial<TddNetworkState> =
         ctx.network?.state.kv.get("network_state") || {}
       const status = state.status
       let dynamicContext = ""
 
-      // Add dynamic context based on status
+      // FIX: Use NetworkStatus.Enum.VALUE for comparisons
       if (status === NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE) {
         dynamicContext = `\n\n**Текущая Задача:** Провести ревью следующих требований от Руководителя:\n${state.test_requirements || "Требования отсутствуют."}`
       } else if (status === NetworkStatus.Enum.NEEDS_TEST_CRITIQUE) {
@@ -39,24 +59,9 @@ export function createCriticAgent({
       } else if (status === NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION) {
         dynamicContext = `\n\n**Текущая Задача:** Проверить вывод последней выполненной команды:\n${state.last_command_output || "Вывод команды отсутствует."}`
       }
-      // Use the base prompt read from the file
       return `${baseSystemPrompt}${dynamicContext}`
     },
     model: deepseek({ apiKey, model: modelName }),
-    // Инструменты для Критика (без askHumanForInput и без прямого изменения файлов/системы)
-    tools: allTools.filter((tool: AnyTool) => {
-      // Явно разрешенные инструменты
-      const allowedTools = [
-        "web_search", // Для поиска лучших практик
-        "read_file", // Для чтения кода/артефактов
-        "codebase_search", // Для поиска по базе
-        "grep_search", // Для точного поиска
-      ]
-      // Явно запрещенные (на всякий случай, если появятся новые)
-      const forbiddenTools = ["edit_file", "run_terminal_cmd", "delete_file"]
-      return (
-        allowedTools.includes(tool.name) && !forbiddenTools.includes(tool.name)
-      )
-    }),
+    tools: toolsToUse,
   })
 }

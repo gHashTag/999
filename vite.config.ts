@@ -1,10 +1,11 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite"
+import { defineConfig, loadEnv } from "vite"
 import { VitePluginNode } from "vite-plugin-node"
 import path from "path" // Import path module
 import checker from "vite-plugin-checker"
 // Temporarily comment out markdown plugin import and usage
 // import { markdown as mdPlugin, Mode } from "vite-plugin-markdown";
+import tsconfigPaths from "vite-tsconfig-paths" // Add this import
 
 export default defineConfig(({ command }) => ({
   // Shared settings for both serve and build
@@ -39,6 +40,9 @@ export default defineConfig(({ command }) => ({
   test: {
     globals: true,
     environment: "node",
+    include: ["src/__tests__/**/*.test.ts"],
+    cache: { dir: null },
+    globalSetup: "./src/__tests__/globalSetup.ts",
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -51,9 +55,11 @@ export default defineConfig(({ command }) => ({
         "src/inngest/types.ts",
         "node_modules/**",
         "dist/**",
+        "open-codex/**",
+        "**/open-codex/codex-cli/**",
       ],
     },
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: ["./src/__tests__/setup.ts"],
     reporters: ["default", "html"],
     outputFile: {
       html: "./html/index.html",
@@ -62,6 +68,7 @@ export default defineConfig(({ command }) => ({
 
   // Plugins
   plugins: [
+    tsconfigPaths(), // Add this line
     ...VitePluginNode({
       // Specify the adapter to use (express for our case)
       // The path should point to the file where the Express app is created and listened on
@@ -88,18 +95,14 @@ export default defineConfig(({ command }) => ({
   ],
 
   // Optimize dependencies for SSR build if needed
+  // Убираем optimizeDeps
   // optimizeDeps: {
-  //   // It might be necessary to disable optimizing deps for SSR builds
-  //   // or specifically include/exclude certain dependencies
-  //   disabled: false,
+  //   include: ["zod"],
   // },
 
   // Define build target for Node.js compatibility if needed
+  // Убираем ssr
   // ssr: {
-  //   // Specify Node.js version target if necessary
-  //   // target: 'node18',
-  //   // Ensure external dependencies are handled correctly
-  //   // noExternal: ['@inngest/agent-kit', 'inngest', '@e2b/code-interpreter', /* other deps */ ],
-  //   // external: [],
+  //   noExternal: ["zod"],
   // },
 }))

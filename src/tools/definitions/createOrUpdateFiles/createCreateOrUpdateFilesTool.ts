@@ -2,7 +2,7 @@
 import { createTool } from "@inngest/agent-kit"
 // import type { LoggerFunc } from "@/types/agents"
 import type { HandlerLogger } from "@/types/agents"
-import { getSandbox } from "@/inngest/logic/utils"
+import { getSandbox } from "@/inngest/utils/sandboxUtils"
 import { createOrUpdateFilesParamsSchema } from "@/tools/schemas"
 
 export function createCreateOrUpdateFilesTool(

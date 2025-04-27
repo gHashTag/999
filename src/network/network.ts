@@ -1,9 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-console */
+
 import { createNetwork, Agent, type NetworkRun } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import { TddNetworkState, NetworkStatus } from "@/types/network"
+import { TddNetworkState } from "@/types/network" // ADD import
 import { log } from "@/utils/logic/logger" // Corrected import to 'log'
+// Import router logic functions
+import {
+  parseAndInitializeState,
+  chooseNextAgent,
+  saveStateToKv,
+} from "./routerLogic"
+import { type Agents } from "@/types/agents" // Import Agents type
 
 // Define the Network States for TDD flow with Critique Loop
 /*
@@ -41,9 +48,8 @@ export function createDevOpsNetwork(
   criticAgent: Agent<any>,
   toolingAgent: Agent<any>
 ) {
-  const network = createNetwork({
+  const network = createNetwork<TddNetworkState>({
     name: "TeamLead TDD DevOps Network",
-    // Add all agents to the list
     agents: [
       teamLeadAgent,
       testerAgent,
@@ -56,133 +62,43 @@ export function createDevOpsNetwork(
       model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
     }),
     maxIter: 25,
-    // Updated TDD Router Logic with TeamLead start
     defaultRouter: async ({ network }) => {
-      // Use imported TddNetworkState type
-      const state = (network?.state?.kv?.get("network_state") ||
-        {
-          // Initial state is now effectively set by TeamLead, router shouldn't need a default status
-          // status: "NEEDS_TEST", // Removed default status assumption
-        }) as TddNetworkState
-
-      const currentStatus = state.status
-
-      // Log the state *before* routing logic
-      log("info", "ROUTER_START", `Status read from KV: ${currentStatus}`, {
-        status: currentStatus,
+      const routerIterationStart = Date.now() // Timestamp for iteration start
+      log("info", "ROUTER_ITERATION_START", "Router iteration starting.", {
+        iterationStart: routerIterationStart,
       })
 
-      let nextAgent: Agent<any> | undefined = undefined // Variable to store the chosen agent
+      const state = parseAndInitializeState(network)
+      const currentSandboxId = state.sandboxId || null
 
-      // --- Initial State Routing --- If status is missing, start with TeamLead
-      if (!currentStatus) {
-        log(
-          "info",
-          "ROUTER_NO_STATUS",
-          "No status found, routing to TeamLead Agent initially."
-        )
-        nextAgent = teamLeadAgent
-      } else {
-        // --- Existing State Routing --- Based on the defined statuses
-        switch (currentStatus) {
-          case NetworkStatus.Enum.IDLE: // Handle IDLE state, perhaps route to TeamLead or stop
-            log("info", "ROUTER_IDLE", "Status is IDLE. Stopping.", {
-              status: currentStatus,
-            })
-            // Or route to TeamLead: nextAgent = teamLeadAgent;
-            break // Added break for IDLE
-
-          case NetworkStatus.Enum.NEEDS_TEST:
-          case NetworkStatus.Enum.NEEDS_TEST_REVISION:
-          case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION: // Tester also handles implementation revision requests
-            log(
-              "info",
-              "ROUTER_TO_TESTER",
-              `Status is ${currentStatus}. Routing to Tester Agent.`,
-              { status: currentStatus }
-            )
-            nextAgent = testerAgent
-            break
-
-          // case NetworkStatus.Enum.NEEDS_CODE: // Coder not directly called in this flow
-          // case NetworkStatus.Enum.NEEDS_CODE_REVISION: // Handled by Tester generating new command
-          //   log(
-          //     "info",
-          //     "ROUTER_TO_CODER",
-          //     `Status is ${currentStatus}. Routing to Coding Agent.`,
-          //     { eventId: network?.eventId, status: currentStatus }
-          //   );
-          //   nextAgent = codingAgent;
-          //   break;
-
-          case NetworkStatus.Enum.NEEDS_TEST_CRITIQUE:
-          case NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION:
-          case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE:
-            log(
-              "info",
-              "ROUTER_TO_CRITIC",
-              `Status is ${currentStatus}. Routing to Critic Agent.`,
-              { status: currentStatus }
-            )
-            nextAgent = criticAgent
-            break
-
-          // Stop network loop when command execution is needed (handled by Handler)
-          case NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION:
-            log(
-              "info",
-              "ROUTER_STOP_FOR_COMMAND",
-              "Status is NEEDS_COMMAND_EXECUTION. Stopping agent network loop for handler execution."
-            )
-            // nextAgent remains undefined to stop the loop
-            break
-
-          // Stop network loop on completion or failure
-          case NetworkStatus.Enum.COMPLETED:
-          case NetworkStatus.Enum.FAILED:
-            log(
-              "info",
-              "ROUTER_STOP_COMPLETED",
-              `Task already ended with status: ${currentStatus}. Stopping.`,
-              { status: currentStatus }
-            )
-            // nextAgent remains undefined to stop
-            break
-
-          case NetworkStatus.Enum.NEEDS_HUMAN_INPUT:
-            log(
-              "info",
-              "ROUTER_STOP_FOR_HUMAN",
-              "Status is NEEDS_HUMAN_INPUT. Stopping agent network loop for human interaction."
-            )
-            // nextAgent remains undefined to stop
-            break
-
-          default: {
-            // This should now be truly exhaustive with the IDLE case handled
-            // If the type system still complains, it might be a Zod/TS inference issue
-            // const _exhaustiveCheck: never = currentStatus; // Keep commented for now
-            log(
-              "error",
-              "ROUTER_UNKNOWN_STATUS",
-              `Unknown or unhandled status: ${currentStatus}. Stopping.`,
-              { status: currentStatus }
-            )
-            // nextAgent remains undefined to stop
-            break
-          }
-        }
+      const agents: Agents = {
+        teamLead: teamLeadAgent as Agent<TddNetworkState>,
+        tester: testerAgent as Agent<TddNetworkState>,
+        coder: codingAgent as Agent<TddNetworkState>,
+        critic: criticAgent as Agent<TddNetworkState>,
+        tooling: toolingAgent as Agent<TddNetworkState>,
       }
-      // Log the chosen agent (or undefined if stopping)
-      log(
-        "info",
-        "ROUTER_END",
-        `Chosen agent: ${nextAgent?.name || "None (Stopping Loop)"}`,
-        { chosenAgent: nextAgent?.name || "None (Stopping Loop)" }
-      )
-      return nextAgent // Return the chosen agent or undefined
+      const nextAgent = chooseNextAgent(state, agents)
+
+      saveStateToKv(network, state)
+
+      const routerIterationEnd = Date.now() // Timestamp for iteration end
+      log("info", "ROUTER_ITERATION_END", "Router iteration finished.", {
+        chosenAgent: nextAgent?.name || "None (Stopping)",
+        finalStatusInIteration: state?.status,
+        durationMs: routerIterationEnd - routerIterationStart,
+        sandboxId: currentSandboxId, // Include sandboxId in final log
+      })
+
+      return nextAgent // Return the chosen agent (or undefined to stop)
     },
   })
+
+  // --- Remove agent tools check log ---
+  // console.log("[createDevOpsNetwork] Checking tools on created agents:", {
+  // });
+  // ------------------------------------
+
   return network
 }
 

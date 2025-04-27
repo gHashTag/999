@@ -1,201 +1,162 @@
-import { describe, it, expect, beforeAll, vi, beforeEach } from "vitest"
-import { NetworkStatus, TddNetworkState } from "@/types/network"
-import fs from "fs/promises" // To read logs
-import path from "path" // To construct log path
-import { inngest } from "@/inngest/index" // Corrected import name/path
-import { createTeamLeadAgent } from "@/agents/teamlead/logic/createTeamLeadAgent"
-// Import AgentResult and NetworkRun from the correct package
-import type { AgentResult, NetworkRun } from "@inngest/agent-kit"
-import type { AgentDependencies, AnyTool, HandlerLogger } from "@/types/agents"
-import EventEmitter from "events"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+// import { Inngest } from "inngest"
+// import { serving } from "inngest/test"
+import { createDevOpsNetwork } from "@/network/network"
+import {
+  createTeamLeadAgent,
+  createTesterAgent,
+  createCodingAgent,
+  createCriticAgent,
+  createToolingAgent,
+} from "@/agents"
+import {
+  // NetworkStatus, // Removed unused import
+  type TddNetworkState,
+} from "@/types/network"
+import {
+  type AgentDependencies,
+  type AnyTool,
+  // Removed unused imports
+} from "@/types/agents"
+import { systemEvents } from "@/utils/logic/systemEvents"
+import { HandlerLogger } from "@/types/agents"
+import type { Message, AgentResult, NetworkRun } from "@inngest/agent-kit" // Import NetworkRun & AgentResult
+import { NetworkStatus } from "@/types/network"
 
-// Mock implementation that matches AgentResult structure
-function createMockAgentResult(overrides: {
-  agentName: string
-  test_requirements?: string
-  error?: string
-}): AgentResult {
-  return {
-    agentName: overrides.agentName,
-    test_requirements: overrides.test_requirements,
-    output: [],
-    toolCalls: [],
-    error: overrides.error,
-    createdAt: new Date(),
-    export: vi.fn(),
-    checksum: "mock-checksum",
-    // Private fields
-    ["#private"]: {
-      model: "mock-model",
-      network: {} as NetworkRun<TddNetworkState>,
-      state: {},
-    },
-  } as unknown as AgentResult
-}
-// Mock Inngest
-vi.mock("@/inngest", () => ({
-  Inngest: vi.fn().mockImplementation(() => ({
-    createFunction: vi.fn(),
-    send: vi.fn(),
-  })),
-  HandlerLogger: vi.fn().mockImplementation(() => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  })),
-}))
-
-// Log file path
-const logFilePath = path.resolve(process.cwd(), "node-app.log")
-
-// Mock logger to avoid console statements
-const mockLogger = {
+// Mock logger
+const mockLog = {
+  info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-}
+  debug: vi.fn(),
+  log: vi.fn(),
+} as HandlerLogger
 
-// Mock Tools
-const mockTool: AnyTool = {
-  name: "mockTool",
-  description: "A mock tool",
-  handler: vi.fn(),
-}
+// Mock tools (empty for this test)
+const mockTools: AnyTool[] = []
 
-// Mock logger function with HandlerLogger interface
-const mockLog: HandlerLogger = {
-  info: vi.fn(() => {}),
-  warn: vi.fn(() => {}),
-  error: vi.fn(() => {}),
-  debug: vi.fn(() => {}),
-}
-
-// Mock Agent Dependencies using the correct logger mock
+// Mock dependencies
 const mockAgentDeps: AgentDependencies = {
-  allTools: [mockTool],
-  log: mockLog,
-  apiKey: "test-api-key",
+  allTools: mockTools,
+  log: mockLog, // Now properly satisfies AgentDependencies
+  apiKey: "test-key",
   modelName: "test-model",
-  systemEvents: new EventEmitter(),
+  systemEvents: systemEvents,
   sandbox: null,
 }
 
-// Describe the integration test suite
-describe("TeamLead Workflow Integration Test", () => {
-  beforeAll(async () => {
-    // Clear log file before test run
-    try {
-      await fs.writeFile(logFilePath, "")
-    } catch (error: unknown) {
-      mockLogger.warn(`Could not clear log file: ${logFilePath}`, error)
-    }
-  })
+// Mock Available Agents
+// Removed unused mockAvailableAgents array
 
-  it("should log initiation when receiving a coding-agent/run event", async () => {
-    const initialEvent = {
-      name: "coding-agent/run" as const,
-      data: {
-        input: "Create a simple add function",
-      },
-    }
+// Create agent instances using mocks
+const teamLead = createTeamLeadAgent(mockAgentDeps)
+const tester = createTesterAgent(mockAgentDeps)
+const coder = createCodingAgent(mockAgentDeps)
+const critic = createCriticAgent(mockAgentDeps)
+const tooling = createToolingAgent(mockAgentDeps)
 
-    // Send the event to trigger the function
-    await inngest.send(initialEvent)
-
-    // Wait a moment for the function to potentially execute and log
-    await new Promise<void>(resolve => setTimeout(resolve, 2000))
-
-    // Read the log file
-    let logs = ""
-    try {
-      logs = await fs.readFile(logFilePath, "utf-8")
-      // Check for expected logs
-      expect(logs).toContain("Received event: coding-agent/run")
-      expect(logs).toContain("Executing agent: AGENT_TeamLead")
-      expect(logs).toContain("Network status transition:")
-      expect(logs).toContain(
-        `status: ${NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE}`
-      )
-    } catch (error: unknown) {
-      mockLogger.error(`Could not read log file: ${logFilePath}`, error)
-      // Fail the test if logs cannot be read
-      expect(error).toBeUndefined()
-    }
-  })
-})
-
-describe("TeamLead Agent Integration Tests", () => {
+describe("TeamLead Workflow Integration", () => {
   beforeEach(() => {
+    // Reset mocks before each test if needed
     vi.clearAllMocks()
   })
 
-  it("should correctly create requirements for a simple task", async () => {
-    const teamLeadAgent = createTeamLeadAgent(mockAgentDeps)
-    const task = "Create a function to add two numbers."
-    // Agent run returns AgentResult
-    const result: AgentResult = await teamLeadAgent.run(task)
-
-    // Check if the result includes requirements (using 'as any')
-    expect(result).toHaveProperty("test_requirements")
-    const typedResult = result as AgentResult & { test_requirements?: string }
-    expect(typedResult.test_requirements).toBeTruthy()
-    expect(typeof typedResult.test_requirements).toBe("string")
-    expect(typedResult.test_requirements?.length).toBeGreaterThan(0)
-    // Optionally, check for specific keywords if possible
-    expect(typedResult.test_requirements?.toLowerCase()).toContain("add")
-    expect(typedResult.test_requirements?.toLowerCase()).toContain("numbers")
-
-    // Verify logger was called
-    expect(mockLog).toHaveBeenCalled()
+  afterEach(() => {
+    // Clean up after each test if needed
   })
 
-  it("should handle errors gracefully if the underlying LLM call fails", async () => {
-    // Simulate LLM call failure
-    const failingLogMock: HandlerLogger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
+  it("should progress from IDLE to NEEDS_REQUIREMENTS_CRITIQUE with TeamLead", async () => {
+    // Initial state
+    const initialState: TddNetworkState = {
+      task: "Create a simple add function.",
+      status: "IDLE",
+      sandboxId: "mock-sandbox-integration",
     }
-    const failingDeps: AgentDependencies = {
-      ...mockAgentDeps,
-      log: failingLogMock,
-      // Need a way to make the agent's internal LLM call fail
-      // This might require mocking the LLM client used internally or
-      // adjusting the agent's structure for better testability.
-      // For now, we assume the agent catches internal errors and returns an error indicator.
+
+    // Mock the TeamLead agent's run method to return AgentResult structure
+    const mockAgentResult: Partial<AgentResult> = {
+      agentName: "Team Lead Agent",
+      output: [
+        {
+          type: "text",
+          role: "assistant",
+          content: "* Requirement 1: Add two numbers.",
+        },
+      ] as Message[],
+      toolCalls: [],
+      createdAt: new Date(),
     }
+    // FIX: Return a structure matching AgentResult
+    vi.spyOn(teamLead, "run").mockResolvedValue(mockAgentResult as AgentResult)
+
+    // Create the network with mocked agents
+    const network = createDevOpsNetwork(
+      teamLead,
+      tester,
+      coder,
+      critic,
+      tooling
+    )
+
+    // Run the network
+    const result: NetworkRun<TddNetworkState> = await network.run(
+      initialState.task,
+      {
+        state: initialState,
+      }
+    )
+
+    // Assertions
+    expect(result).toBeDefined()
+    expect(result.state).toBeDefined()
+    const finalState = result.state.kv.get("network_state") as TddNetworkState
+
+    expect(finalState).toBeDefined()
+    expect(finalState.status).toBe("NEEDS_REQUIREMENTS_CRITIQUE")
+    expect(finalState.test_requirements).toContain("Requirement 1")
+    // Verify the mock was called
+    expect(teamLead.run).toHaveBeenCalled()
+  })
+
+  it("should handle agent failure gracefully", async () => {
+    // Initial state
+    const initialState: TddNetworkState = {
+      task: "Create a failing task.",
+      status: "IDLE",
+      sandboxId: "mock-sandbox-fail",
+    }
+
+    vi.spyOn(teamLead, "run").mockRejectedValue(new Error("Agent failed!"))
+
+    // Create the network with mocked agents
+    const failingDeps = { ...mockAgentDeps } // Create separate deps if needed
     const teamLeadAgent = createTeamLeadAgent(failingDeps)
-    const task = "Simulate error task."
+    const network = createDevOpsNetwork(
+      teamLeadAgent,
+      tester,
+      coder,
+      critic,
+      tooling
+    )
 
-    // Mock the agent's run method
-    vi.spyOn(teamLeadAgent, "run").mockImplementation(async () => {
-      // Correctly call the logger method
-      failingLogMock.error("LLM_CALL_FAIL: Simulated LLM error.", { task })
-      // Return a properly typed mock AgentResult with error
-      return createMockAgentResult({
-        agentName: teamLeadAgent.name,
-        error: "Simulated LLM call failure",
-      })
-    })
+    // Run the network
+    const result: NetworkRun<TddNetworkState> = await network.run(
+      initialState.task,
+      {
+        state: initialState,
+      }
+    )
 
-    try {
-      // Agent run returns AgentResult
-      const result: AgentResult = await teamLeadAgent.run(task)
-      // Check if the result indicates an error (using 'as any')
-      expect(result).toHaveProperty("error")
-      const typedResult = result as AgentResult & { error?: string }
-      expect(typedResult.error).toBe("Simulated LLM call failure")
-      // Check logger method was called
-      expect(failingLogMock.error).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Object)
-      )
-    } catch (error: unknown) {
-      // If the agent re-throws, catch it here
-      expect(error).toBeInstanceOf(Error)
-    }
+    // Assertions for failure
+    expect(result).toBeDefined()
+    // FIX: Remove checks for result.error as it doesn't exist on NetworkRun
+    // expect(result.error).toBeDefined()
+    // expect(result.error?.message).toContain("Agent failed!")
+
+    // Check final state in KV store (should likely be FAILED)
+    const finalState = result.state?.kv.get("network_state") as TddNetworkState
+    expect(finalState).toBeDefined()
+    // Expect the router to set the status to FAILED upon agent error
+    expect(finalState.status).toBe(NetworkStatus.Enum.FAILED) // Use Enum
   })
-
-  // Add more integration tests as needed
 })

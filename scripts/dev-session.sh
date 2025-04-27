@@ -1,33 +1,37 @@
 #!/bin/bash
+# Создает и настраивает сессию tmux для разработки
 
-SESSION_NAME="999"
+SESSION_NAME="agentdev"
 
-# Проверяем, существует ли уже сессия
+# Проверяем, существует ли сессия
 tmux has-session -t $SESSION_NAME 2>/dev/null
 
 if [ $? != 0 ]; then
-  echo "Creating new tmux session with panes: $SESSION_NAME"
+  echo "🚀 Creating new tmux session: ${SESSION_NAME}"
+  # Создаем новую сессию и первое окно (Main)
+  # Запускаем компилятор в первом окне
+  tmux new-session -d -s $SESSION_NAME -n Main 'bun run build:watch'
 
-  # Создаем новую сессию и запускаем первый процесс (build:watch) в первой панели
-  tmux new-session -d -s $SESSION_NAME -n Main 'pnpm run build:watch'
+  # Создаем второе окно (Servers)
+  tmux new-window -t $SESSION_NAME:1 -n Servers
+  # Разделяем второе окно на две панели
+  tmux split-window -h -t $SESSION_NAME:1
 
-  # Разделяем окно горизонтально и запускаем второй процесс (dev:serve) в новой панели
-  tmux split-window -t $SESSION_NAME:0 -h
-  tmux send-keys -t $SESSION_NAME:0.1 'pnpm run dev:serve' C-m
+  # Запускаем Inngest Dev Server в левой панели второго окна
+  tmux send-keys -t $SESSION_NAME:1.0 'bun run dev:serve' C-m
 
-  # Выбираем верхнюю панель (0.0) и разделяем ее вертикально
+  # Возвращаемся в первое окно (Main) и разделяем его
+  tmux select-window -t $SESSION_NAME:0
+  tmux split-window -v -t $SESSION_NAME:0
+
+  # Запускаем основной сервер в нижней панели первого окна
+  tmux send-keys -t $SESSION_NAME:0.1 'bun run dev:start' C-m
+
+  # Переключаемся обратно на верхнюю панель первого окна для работы
   tmux select-pane -t $SESSION_NAME:0.0
-  tmux split-window -t $SESSION_NAME:0 -v
-  tmux send-keys -t $SESSION_NAME:0.0 'pnpm run dev:start' C-m
-
-  # Выбираем основную панель (теперь это build:watch в 0.1)
-  tmux select-pane -t $SESSION_NAME:0.1
-
-  echo "Session $SESSION_NAME created with panes for build:watch, dev:serve, dev:start."
-  echo "Attach to it using: tmux attach -t $SESSION_NAME"
 else
-  echo "Session $SESSION_NAME already exists."
-  echo "Attach to it using: tmux attach -t $SESSION_NAME"
+  echo "✅ Attaching to existing tmux session: ${SESSION_NAME}"
 fi
 
-# НЕ ПЫТАЕМСЯ автоматически присоединиться 
+# Подключаемся к сессии
+tmux attach-session -t $SESSION_NAME 

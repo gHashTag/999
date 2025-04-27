@@ -1,35 +1,50 @@
-import { createAgent } from "@inngest/agent-kit"
+import {
+  Agent,
+  // createAgent, // Removed unused import
+} from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies, AnyTool } from "@/types/agents"
+import type {
+  AgentDependencies,
+  AnyTool,
+  // AvailableAgent // Removed import
+} from "@/types/agents" // Correct path
 import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
+// import type { TddNetworkState } from '@/types/network.types' // Likely unused
 
-export function createToolingAgent({
-  allTools,
-  apiKey,
-  modelName,
-}: AgentDependencies) {
+/**
+ * Creates the Tooling agent.
+ * @param dependencies - The dependencies for the agent.
+ * @returns The Tooling agent instance.
+ */
+export const createToolingAgent = (
+  dependencies: AgentDependencies
+  // availableAgents: AvailableAgent[] // Removed parameter
+): Agent<any> => {
+  const { apiKey, modelName, allTools, log } = dependencies // Destructure needed deps
+
   const systemPrompt = readAgentInstructions("Tooling")
 
-  return createAgent({
+  // Use allTools directly, filtering logic remains
+  const toolsToUse = allTools.filter((tool: AnyTool) =>
+    [
+      "run_terminal_cmd",
+      "read_file",
+      "edit_file",
+      "delete_file",
+      "list_dir",
+      "file_search",
+      "updateTaskState",
+    ].includes(tool.name)
+  )
+
+  log?.info("Creating Tooling Agent", { toolCount: toolsToUse.length }) // Optional logging
+
+  return new Agent({
+    // Use new Agent()
     name: "Tooling Agent",
     description: "Выполняет команды, скрипты и взаимодействует с окружением.",
     system: systemPrompt,
-    // Use deepseek directly
     model: deepseek({ apiKey, model: modelName }),
-    // Этому агенту нужны все инструменты для взаимодействия с ФС и терминалом
-    // Note: Consider if Critic/Coder should call this agent or use tools directly via Gemini
-    tools: allTools.filter((tool: AnyTool) =>
-      [
-        // Core file system and execution tools
-        "run_terminal_cmd",
-        "read_file",
-        "edit_file",
-        "delete_file",
-        "list_dir",
-        "file_search",
-        // Potentially others depending on how interaction is designed
-        // (e.g., specific script execution tools if added later)
-      ].includes(tool.name)
-    ),
+    tools: toolsToUse, // Use the determined tools
   })
 }

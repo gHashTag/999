@@ -23,13 +23,9 @@ export function createCodingAgent({
     }),
     // Coder needs web search, codebase search, and file/terminal tools
     tools: allTools.filter((tool: AnyTool) =>
-      [
-        "web_search",
-        "codebase_search",
-        "grep_search",
-        "edit_file",
-        "read_file",
-      ].includes(tool.name)
+      ["codebase_search", "grep_search", "edit_file", "read_file"].includes(
+        tool.name
+      )
     ),
   })
 }

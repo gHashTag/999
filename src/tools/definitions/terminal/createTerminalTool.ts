@@ -1,17 +1,19 @@
-// import { z } from "zod"
+// import { z } from "zod" // Removed unused import
 import { createTool } from "@inngest/agent-kit"
-// import type { LoggerFunc } from "@/utils/logic/logger"; // WRONG import
-// import type { LoggerFunc } from "@/types/agents" // CORRECT import
-import type { HandlerLogger } from "@/types/agents" // Import HandlerLogger instead
-import type { GetSandboxFunc } from "@/inngest/logic/utils" // CORRECT type alias import
+// import type { LoggerFunc } from "@/types/agents"
+import type { HandlerLogger } from "@/types/agents"
+// Corrected import path
+import { getSandbox } from "@/inngest/utils/sandboxUtils"
 import { terminalParamsSchema } from "@/tools/schemas"
 
-// Импортируем схему из общего файла (пока он еще существует)
-// import { terminalParamsSchema } from "../../toolDefinitions"
+// Define a type for the Sandbox function expected by the tool
+// It should accept a sandbox ID and return a Promise resolving to a Sandbox instance or null
+// This matches the signature of getSandbox imported above
+// type GetSandboxFunc = (sandboxId: string) => Promise<Sandbox | null>; // Removed, using imported getSandbox directly
 
 export function createTerminalTool(
-  log: HandlerLogger, // Use HandlerLogger type
-  getSandboxFunc: GetSandboxFunc, // Use the imported type alias
+  log: HandlerLogger,
+  getSandboxFunc: typeof getSandbox, // Use the type of the imported function
   eventId: string,
   sandboxId: string | null
 ) {

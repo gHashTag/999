@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /* eslint-env node */
 import http from "http"
+import chalk from "chalk"
 
 // --- Configuration ---
 const DEV_SERVER_URL = "http://localhost:8288"
@@ -23,17 +24,33 @@ const eventPayload = {
 // Allow overriding input via command line argument
 if (process.argv[2]) {
   try {
-    // Attempt to parse as JSON first
-    const argData = JSON.parse(process.argv[2])
-    eventPayload.data = argData
-    console.log("Using event data from command line argument (parsed as JSON).")
-  } catch /* (e) */ {
-    // Fallback to treating as a simple string input
-    eventPayload.data.input = process.argv[2]
-    console.log("Using event input string from command line argument.")
+    // Use the command line argument directly as the input string
+    // eventData = JSON.parse(process.argv[2]); // Don't parse if we expect input: string
+    // We expect the schema { input: string, currentState?: any }
+    // Construct the object correctly
+    eventPayload.data = { input: process.argv[2] }
+    console.log("Using event data from command line argument.")
+    // console.log("Using event data from command line argument (parsed as JSON).");
+  } catch (error) {
+    console.error(
+      "Failed to parse command line argument as JSON. Using default data.",
+      error
+    )
+    // Construct the default object correctly
+    eventPayload.data = { input: "Default task from script" }
   }
 } else {
-  console.log("Using default test event data.")
+  console.log("No command line argument provided. Using default event data.")
+  // Construct the default object correctly
+  eventPayload.data = { input: "Default task from script" }
+}
+
+// Ensure eventData always has the 'input' key expected by the schema
+if (typeof eventPayload.data.input !== "string") {
+  console.warn(
+    "Event data does not have a valid 'input' string. Using default."
+  )
+  eventPayload.data = { input: "Default fallback task" }
 }
 
 const postData = JSON.stringify(eventPayload)
@@ -47,6 +64,7 @@ const options = {
 }
 
 console.log(`Sending event '${eventPayload.name}' to ${TARGET_URL}...`)
+console.log("Event data:", eventPayload.data) // Log the actual data being sent
 
 const req = http.request(TARGET_URL, options, res => {
   console.log(`STATUS: ${res.statusCode}`)
@@ -69,7 +87,11 @@ req.on("error", e => {
   console.error(`Problem with request: ${e.message}`)
   if (e.code === "ECONNREFUSED") {
     console.error(
-      `\n>>> Is the Inngest Dev Server (pnpm run dev) running at ${DEV_SERVER_URL} ? <<<\n`
+      chalk.red.bold("Error:"),
+      chalk.red(e.message),
+      chalk.yellow(
+        `\n>>> Is the Inngest Dev Server (bun run dev:serve) running at ${DEV_SERVER_URL} ? <<<\n`
+      )
     )
   }
   process.exit(1) // Exit with error code

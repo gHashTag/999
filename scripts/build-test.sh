@@ -1,13 +1,14 @@
 #!/bin/bash
-# Build and test script
+# Строгая проверка ошибок
+set -eo pipefail
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
+echo "🏗️ Building project..."
+# Запускаем сборку
+bun run build
 
-echo "🏗️ Building the project..."
-pnpm run build
+echo "🧪 Running tests..."
+# Запускаем тесты с помощью Vitest
+# VITEST_E2E=true pnpm run test
+VITEST_E2E=true bun run test
 
-echo "�� Running tests..."
-VITEST_E2E=true pnpm run test
-
-echo "🎉 Build and tests completed successfully!" 
+echo "✅ Build and test complete." 

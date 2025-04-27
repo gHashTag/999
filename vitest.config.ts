@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     globals: true, // Use globals like describe, it, expect without importing
     environment: "node", // Set the test environment to Node.js
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: ["./src/__tests__/setup.ts"],
     coverage: {
       provider: "v8", // Use v8 for coverage
       reporter: ["text", "json", "html"], // Report formats - already includes html

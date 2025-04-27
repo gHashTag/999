@@ -6,11 +6,11 @@ set -e
 
 echo "🔧 Setting up development environment..."
 
-echo "📦 Installing dependencies with pnpm..."
-pnpm install
+echo "📦 Installing dependencies with bun..."
+bun install
 
 echo "🎣 Preparing Husky hooks..."
-# Usually pnpm install runs the prepare script, but run it explicitly just in case.
-pnpm run prepare
+# Usually bun install runs the prepare script, but run it explicitly just in case.
+bun run prepare
 
 echo "✨ Development environment setup complete!" 

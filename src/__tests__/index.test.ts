@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 // FIX: Remove unused import
 // import { Inngest } from "inngest"
 // FIX: Import codingAgentFunction and inngest from the correct file
-import { inngest, runCodingAgent } from "../inngest/index"
+import { inngest, runCodingAgent } from "@/inngest/index"
 
 // Define mock data for the event
 const testEventData = { input: "Write a function to add two numbers." }

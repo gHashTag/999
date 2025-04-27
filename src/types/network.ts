@@ -16,6 +16,7 @@ export const NetworkStatus = z.enum([
   "NEEDS_COMMAND_VERIFICATION", // Critic needs to verify the result of the command
   "NEEDS_IMPLEMENTATION_CRITIQUE", // Critic needs to review the implementation
   "NEEDS_IMPLEMENTATION_REVISION", // Tester needs to generate a *new* command to revise implementation
+  "NEEDS_TYPE_CHECK", // Added state for type checking before running tests
   // "READY_FOR_FINAL_TEST", // We might not have this distinct step now
   // "READY_FOR_COMPLETION", // Critic signals completion
   "COMPLETED", // Final success state
@@ -24,22 +25,37 @@ export const NetworkStatus = z.enum([
 ])
 export type NetworkStatus = z.infer<typeof NetworkStatus>
 
-// Define the structure of the state KV store
+// Type for the state object managed by the Agent Network
+/* // Remove duplicate interface definition
+export interface TddNetworkState {
+  task: string
+  status: z.infer<typeof NetworkStatus>
+  test_requirements?: string
+  test_code?: string
+  implementation_code?: string
+  implementation_critique?: string
+  sandboxId?: string | null
+  first_failing_test?: string | null
+  last_command_output?: string | null
+  last_error?: string | null
+}
+*/
+
+// Remove the isE2eTest field from the Zod schema as well
 export const tddNetworkStateSchema = z.object({
   task: z.string(),
   status: NetworkStatus,
-  sandboxId: z.string().optional(), // Keep sandboxId in state
-  test_requirements: z.string().optional(), // Требования от TeamLead
-  command_to_execute: z.string().optional(), // Команда от Tester
-  test_code: z.string().optional(), // <<<--- ADDED: Actual test code (if available)
-  implementation_code: z.string().optional(), // <<<--- ADDED: Actual implementation code
-  requirements_critique: z.string().optional(), // Критика требований
-  test_critique: z.string().optional(), // Feedback on tests/command from critic
-  implementation_critique: z.string().optional(), // Feedback on implementation
-  last_command_output: z.string().optional(), // Store output from run_terminal_cmd
-  first_failing_test: z.string().optional(), // Информация о первом упавшем тесте
-  // Removed fields: current_code, test_code (handled externally by open-codex)
-  // Removed fields: critique (split into specific critiques)
+  sandboxId: z.string().optional(),
+  test_requirements: z.string().optional(),
+  command_to_execute: z.string().optional(),
+  test_code: z.string().optional(),
+  implementation_code: z.string().optional(),
+  requirements_critique: z.string().optional(),
+  test_critique: z.string().optional(),
+  implementation_critique: z.string().optional(),
+  last_command_output: z.string().optional(),
+  first_failing_test: z.string().optional(),
+  // isE2eTest: z.boolean().optional(), // REMOVE this flag
 })
 
 // Export the inferred type

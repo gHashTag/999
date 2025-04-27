@@ -177,3 +177,15 @@ ecosystem.config.js
 # Test snapshots and reports (adjust as needed)
 # __snapshots__/
 # test-report.xml
+
+snapshots/
+
+# IDE/Editor specific
+.idea
+.vscode
+
+# PNPM
+# pnpm-lock.yaml # Заменено на bun.lockb
+
+# Bun
+bun.lockb
