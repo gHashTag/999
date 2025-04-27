@@ -1,4 +1,4 @@
-import type { Tool as AgentKitTool, Agent } from "@inngest/agent-kit"
+import type { Tool, Agent } from "@inngest/agent-kit"
 import { z } from "zod"
 import { type Sandbox } from "e2b"
 import type { EventPayload, Context } from "inngest"
@@ -19,25 +19,17 @@ export type HandlerLogger = {
   log: (...args: unknown[]) => void
 }
 
-// FIX: Use Tool<any> for broad compatibility
-export type AnyTool = AgentKitTool<any>
-
 // Dependencies needed for agent creation
 export interface AgentDependencies {
-  allTools: AnyTool[]
+  allTools: Tool<any>[]
   log: HandlerLogger
   apiKey: string
   modelName: string
   systemEvents: typeof systemEvents
   sandbox: Sandbox | null
-  eventId?: string
-  agents?: {
-    teamLead: Agent<TddNetworkState>
-    tester: Agent<TddNetworkState>
-    coder: Agent<TddNetworkState>
-    critic: Agent<TddNetworkState>
-    tooling: Agent<TddNetworkState>
-  }
+  eventId: string
+  agents?: Record<string, Agent<any>>
+  model: any
 }
 
 // Helper type for critique data extraction
@@ -72,5 +64,11 @@ export interface Agents {
 export interface AvailableAgent {
   name: string
   instructionPath: string
-  tools: AnyTool[] // Agents available for selection might have tools
+  tools: Tool<any>[] // Agents available for selection might have tools
+}
+
+// Properties specifically needed during agent *creation*
+// (Separated to avoid passing instructions into AgentDependencies where it might not belong)
+export interface AgentCreationProps {
+  instructions: string
 }

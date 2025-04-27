@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { createNetwork, Agent, type NetworkRun } from "@inngest/agent-kit"
-import { deepseek } from "@inngest/ai/models"
-import { TddNetworkState } from "@/types/network" // ADD import
+// import { deepseek } from "@inngest/ai/models"
+import { TddNetworkState } from "@/types/network" // Remove unused NetworkStatus
 import { log } from "@/utils/logic/logger" // Corrected import to 'log'
 // Import router logic functions
 import {
@@ -11,6 +11,7 @@ import {
   saveStateToKv,
 } from "./routerLogic"
 import { type Agents } from "@/types/agents" // Import Agents type
+import { defaultRouter } from "./routerLogic" // Correct path
 
 // Define the Network States for TDD flow with Critique Loop
 /*
@@ -40,14 +41,17 @@ interface NetworkState {
 }
 */
 
-// FIX: Use Agent type for function parameters
+// FIX: Use Agent type for function parameters and add defaultModel
 export function createDevOpsNetwork(
   teamLeadAgent: Agent<any>,
   testerAgent: Agent<any>,
   codingAgent: Agent<any>,
   criticAgent: Agent<any>,
-  toolingAgent: Agent<any>
+  toolingAgent: Agent<any>,
+  defaultModel: any // Use any for ModelAdapter
 ) {
+  const router: any = defaultRouter // Use imported defaultRouter
+
   const network = createNetwork<TddNetworkState>({
     name: "TeamLead TDD DevOps Network",
     agents: [
@@ -57,10 +61,12 @@ export function createDevOpsNetwork(
       criticAgent,
       toolingAgent,
     ],
-    defaultModel: deepseek({
-      apiKey: process.env.DEEPSEEK_API_KEY!,
-      model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
-    }),
+    // defaultModel: deepseek({
+    //   apiKey: process.env.DEEPSEEK_API_KEY!,
+    //   model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
+    // }),
+    defaultModel: defaultModel, // Pass the model
+    router: router, // Pass the router
     maxIter: 25,
     defaultRouter: async ({ network }) => {
       const routerIterationStart = Date.now() // Timestamp for iteration start

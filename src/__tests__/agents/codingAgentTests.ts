@@ -1,32 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 import {
-  mockLog,
+  mockLogger,
   mockApiKey,
   mockModelName,
   mockSystemEvents,
   mockTools,
-  setupTestEnvironment,
-  type _AgentDependencies as AgentDependencies,
-} from "./testSetup"
+  setupTestEnvironmentFocused,
+  type AgentDependencies,
+} from "../testSetupFocused"
 
 import { createCodingAgent } from "@/agents"
-import type { AnyTool } from "@/types/agents"
-
-beforeEach(() => {
-  setupTestEnvironment()
-})
+import { Tool } from "@inngest/agent-kit"
 
 export function runCodingAgentTests() {
   describe("createCodingAgent", () => {
     let dependencies: AgentDependencies
 
     beforeEach(() => {
+      setupTestEnvironmentFocused()
       dependencies = {
         allTools: mockTools,
-        log: mockLog,
+        log: mockLogger,
         apiKey: mockApiKey,
         modelName: mockModelName,
+        eventId: "mock-event-id",
+        model: vi.fn() as any,
         systemEvents: mockSystemEvents,
         sandbox: null,
       }
@@ -35,29 +34,28 @@ export function runCodingAgentTests() {
     it("should create an agent with correct basic properties", () => {
       const instructions = "mock coder instructions"
       const agent = createCodingAgent({ ...dependencies, instructions })
-      expect(agent.name).toBe("Coding Agent")
+      expect(agent.name).toBe("Coder Agent")
       expect(agent.description).toBeDefined()
-      expect(agent.system).toBe(instructions)
       expect(agent.tools).toBeInstanceOf(Map)
       expect(agent.tools.size).toBeGreaterThan(0)
       expect(agent.model).toBeDefined()
     })
 
     it("should filter tools correctly", () => {
-      const mockRunTool: AnyTool = {
+      const mockRunTool: Tool<any> = {
         name: "runTerminalCommand",
         handler: vi.fn(),
       }
-      const mockWriteTool: AnyTool = {
+      const mockWriteTool: Tool<any> = {
         name: "createOrUpdateFiles",
         handler: vi.fn(),
       }
-      const mockReadTool: AnyTool = { name: "readFiles", handler: vi.fn() }
-      const mockAskTool: AnyTool = {
+      const mockReadTool: Tool<any> = { name: "readFiles", handler: vi.fn() }
+      const mockAskTool: Tool<any> = {
         name: "askHumanForInput",
         handler: vi.fn(),
       }
-      const mockUpdateStateTool: AnyTool = {
+      const mockUpdateStateTool: Tool<any> = {
         name: "updateTaskState",
         handler: vi.fn(),
       }

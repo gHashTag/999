@@ -6,6 +6,9 @@ set -eo pipefail
 echo "🔄 Запуск проверки типов..."
 pnpm exec tsc --noEmit
 
+echo "🔍 Проверка структуры проекта..."
+./validate-structure.sh
+
 echo "🔍 Проверка расположения type-файлов..."
 ./type-location-checker.sh
 

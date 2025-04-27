@@ -92,6 +92,7 @@ export async function codingAgentHandler({
     // 4. Create Dependencies (Agents, Tools)
     const agentDeps = await createAgentDependencies(logger, sandboxId, eventId)
     const agents = agentDeps.agents // Extract agents
+    const defaultModel = agentDeps.model // Get model from agentDeps directly
 
     // Add a check to satisfy TypeScript's potential undefined concern
     if (
@@ -104,6 +105,9 @@ export async function codingAgentHandler({
     ) {
       throw new Error("Failed to create one or more core agents.")
     }
+    if (!defaultModel) {
+      throw new Error("Failed to create the default language model adapter.")
+    }
 
     // 5. Create and Run Network - Pass agents individually
     const devOpsNetwork: Network<TddNetworkState> = createDevOpsNetwork(
@@ -111,7 +115,8 @@ export async function codingAgentHandler({
       agents.tester,
       agents.coder,
       agents.critic,
-      agents.tooling
+      agents.tooling,
+      defaultModel // Pass defaultModel as the 6th argument
     )
 
     logger.info(

@@ -7,13 +7,14 @@ import {
 } from "@/agents"
 import { type AgentDependencies, type Agents } from "@/types/agents"
 import { getAllTools } from "@/tools/toolDefinitions"
-import { getSandbox } from "@/inngest/utils/sandboxUtils"
+import { GetSandboxFunc, getSandbox } from "@/inngest/utils/sandboxUtils"
 import { systemEvents } from "@/utils/logic/systemEvents"
 import type { HandlerLogger } from "@/types/agents"
 import { HandlerStepName } from "@/types/handlerSteps"
 import { TddNetworkState } from "@/types/network"
 import { Agent } from "@inngest/agent-kit"
 import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
+import { deepseek } from "@inngest/ai/models"
 
 /**
  * Creates all agent dependencies, including loading instructions
@@ -42,13 +43,25 @@ export async function createAgentDependencies(
   })
 
   // 2. Create Base Dependencies
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  const modelName = process.env.DEEPSEEK_MODEL || "deepseek-coder"
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY environment variable is not set.")
+  }
+
+  const model = deepseek.completion({ apiKey, model: modelName })
+
+  const sandbox = await getSandbox(sandboxId)
+
   const baseDeps: Omit<AgentDependencies, "agents"> = {
     allTools,
     log: logger,
-    apiKey: process.env.DEEPSEEK_API_KEY!,
-    modelName: process.env.DEEPSEEK_MODEL || "deepseek-coder",
+    apiKey,
+    modelName,
+    model,
     systemEvents,
-    sandbox: await getSandbox(sandboxId),
+    sandbox,
+    eventId,
   }
 
   // 3. Load All Agent Instructions Concurrently
@@ -95,7 +108,7 @@ export async function createAgentDependencies(
   // 6. Combine Base Dependencies and Agents
   const fullAgentDeps: AgentDependencies = {
     ...baseDeps,
-    agents,
+    agents: agents as unknown as Record<string, Agent<any>>,
   }
 
   logger.info(

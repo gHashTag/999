@@ -1,6 +1,6 @@
-import { Agent } from "@inngest/agent-kit"
+import { Agent, type Tool } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies, AnyTool } from "@/types/agents"
+import { type AgentDependencies } from "@/types/agents"
 
 export const createCodingAgent = ({
   instructions,
@@ -9,7 +9,7 @@ export const createCodingAgent = ({
   const { apiKey, modelName, allTools, log } = dependencies
 
   // Filter tools specifically needed by Coder
-  const toolsToUse = allTools.filter((tool: AnyTool) =>
+  const toolsToUse = allTools.filter((tool: Tool<any>) =>
     ["runTerminalCommand", "createOrUpdateFiles", "readFiles"].includes(
       tool.name
     )

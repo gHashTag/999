@@ -4,13 +4,18 @@ import { createTesterAgent } from "@/agents/tester/logic/createTesterAgent"
 import { createTeamLeadAgent } from "@/agents/teamlead/logic/createTeamLeadAgent" // Correct casing
 import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"
 import { getAllTools } from "@/tools/toolDefinitions"
-import { type AgentDependencies, type HandlerLogger } from "@/types/agents" // Import HandlerLogger
+import { type AgentDependencies, type HandlerLogger } from "../../types/agents" // Correct
 import { log as appLog } from "@/utils/logic/logger"
 import { systemEvents } from "@/utils/logic/systemEvents"
 import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 import { getSandbox } from "@/inngest/utils/sandboxUtils"
-import { Agent } from "@inngest/agent-kit"
-import { TddNetworkState } from "@/types/network"
+import { Agent, Tool } from "@inngest/agent-kit"
+import { TddNetworkState } from "../../types/network" // Correct
+import { EventEmitter } from "events"
+import { SystemEventEmitter } from "../../types/systemEvents" // Correct
+import { createMockLogger } from "../../utils/logic/mockLogger" // Correct
+import { mockDeepseekModel } from "../../utils/logic/mockDeepseekModel" // Correct
+import { Sandbox } from "e2b"
 
 // Define the structure for the CLI agents object
 export interface CliAgents {
@@ -63,12 +68,22 @@ export async function createCliAgents(): Promise<CliAgents> {
   ])
   log.info("CLI_AGENTS_INSTR_LOADED", "Instructions loaded for CLI agents.")
 
+  const mockSystemEvents = new EventEmitter() as SystemEventEmitter
+  const mockLogger = createMockLogger("CLI") // Use mock logger
+
+  // Create base dependencies, including the mock logger
   const baseDependencies: Omit<AgentDependencies, "agents"> = {
-    apiKey,
-    modelName,
-    allTools,
-    log, // Use the compatible logger
-    systemEvents,
+    apiKey: process.env.DEEPSEEK_API_KEY || "mock-api-key",
+    modelName: process.env.DEEPSEEK_MODEL || "deepseek-coder",
+    model: mockDeepseekModel, // Add mock model
+    allTools: getAllTools(
+      mockLogger,
+      async () => sandbox,
+      eventId,
+      null // Pass null for sandboxId
+    ),
+    log: mockLogger,
+    systemEvents: mockSystemEvents,
     sandbox,
     eventId,
   }

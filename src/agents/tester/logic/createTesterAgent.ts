@@ -1,9 +1,9 @@
-import { Agent } from "@inngest/agent-kit"
+import { Agent, type Tool } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 import type {
   AgentDependencies,
-  AnyTool,
-  // StateData,
+  // Removed unused AgentCreationProps
+  // Removed unused HandlerLogger
 } from "@/types/agents"
 // import type { TddNetworkState } from '@/types/network.types'
 
@@ -27,9 +27,9 @@ export const createTesterAgent = ({
   // } = dependencies
 
   // Filter tools specifically needed by Tester
-  const toolsToUse = allTools.filter((tool: AnyTool) =>
+  const toolsToUse = allTools.filter((tool: Tool<any>) =>
     [
-      "runCommand", // Example: If Tester needs to run commands
+      "runTerminalCommand", // Corrected tool name
       "readFile",
       "updateTaskState",
       // Add other tool names as needed

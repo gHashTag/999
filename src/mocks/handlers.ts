@@ -34,10 +34,14 @@ export const handlers = [
 
   // Mock the DeepSeek API endpoint (Keep this one)
   http.post("https://api.deepseek.com/v1/chat/completions", () => {
-    log("info", "MSW_DEEPSEEK", "[MSW] Intercepted DeepSeek API call")
-    // Return a generic successful response for LLM calls
+    log(
+      "info",
+      "MSW_DEEPSEEK",
+      "[MSW] Intercepted DeepSeek API call - Returning TOOL CALL"
+    )
+    // Return a response that simulates a tool call to updateTaskState
     return HttpResponse.json({
-      id: "chatcmpl-mock-id",
+      id: "chatcmpl-mock-tool-call-id",
       object: "chat.completion",
       created: Date.now(),
       model: "deepseek-coder",
@@ -46,16 +50,29 @@ export const handlers = [
           index: 0,
           message: {
             role: "assistant",
-            content:
-              '```json\n{"approved": true, "critique": "MSW Mock Response: LGTM!", "refactored_code": null}\n```', // Example mock response
+            content: null, // Content can be null when tool calls are present
+            tool_calls: [
+              {
+                id: "mock_tool_call_123", // ID for the tool call
+                type: "function",
+                function: {
+                  name: "updateTaskState", // Tool name
+                  // Arguments as a JSON string
+                  arguments: JSON.stringify({
+                    newStatus: NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE,
+                    test_requirements: "* Req 1 (MSW API)\n* Req 2 (MSW API)",
+                  }),
+                },
+              },
+            ],
           },
-          finish_reason: "stop",
+          finish_reason: "tool_calls", // Important: indicates tool call
         },
       ],
       usage: {
-        prompt_tokens: 10,
-        completion_tokens: 20,
-        total_tokens: 30,
+        prompt_tokens: 15, // Dummy usage
+        completion_tokens: 30,
+        total_tokens: 45,
       },
     })
   }),

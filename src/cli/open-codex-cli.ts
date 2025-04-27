@@ -14,9 +14,21 @@ import { Command } from "commander"
 import fs from "fs/promises"
 import ora from "ora"
 import readline from "readline/promises"
+import { EventEmitter } from "events"
+import { createMockLogger } from "../utils/logic/mockLogger.js"
+import { SystemEventEmitter } from "../types/systemEvents.js"
+import { mockDeepseekModel } from "../utils/logic/mockDeepseekModel.js"
+import { getAllTools as getAllToolsRelative } from "../tools/toolDefinitions.js"
+import { AgentDependencies as AgentDependenciesRelative } from "../types/agents.js"
+import {
+  createCoderAgent,
+  createCriticAgent as createCriticAgentRelative,
+} from "../agents/index.js"
+import { Sandbox } from "e2b"
+import { GetSandboxFunc } from "../inngest/utils/sandboxUtils.js"
 
 // Use the imported appLog as the logger for this CLI
-const log: HandlerLogger = appLog as any
+const log: HandlerLogger = createMockLogger("OpenCodexCLI")
 
 // Define a simple logger for cases where HandlerLogger might not be fully compatible
 // or for direct console output if needed during debugging.
@@ -43,7 +55,7 @@ async function main() {
 
   const sandbox = await getSandbox("")
   const eventId = "codex-cli-event-main"
-  const allTools = getAllTools(
+  const allTools = getAllToolsRelative(
     log,
     getSandbox,
     eventId,
@@ -66,19 +78,23 @@ async function main() {
   ])
   log.info("Instructions loaded for Open Codex CLI agents.")
 
-  const baseDeps: Omit<AgentDependencies, "agents"> = {
-    apiKey,
-    modelName,
-    allTools,
-    log,
-    systemEvents,
+  const mockSystemEvents = new EventEmitter() as SystemEventEmitter
+  const mockLogger = createMockLogger("OpenCodexCLI")
+
+  const baseDeps: Omit<AgentDependenciesRelative, "agents"> = {
+    apiKey: process.env.DEEPSEEK_API_KEY || "mock-api-key",
+    modelName: process.env.OPEN_CODEX_MODEL || "deepseek-coder",
+    model: mockDeepseekModel,
+    allTools: getAllToolsRelative(log, async () => sandbox, eventId, null),
+    log: log,
+    systemEvents: new EventEmitter() as SystemEventEmitter,
     sandbox,
     eventId,
   }
 
   const agents = {
     coder: createCodingAgent({ ...baseDeps, instructions: coderInstructions }),
-    critic: createCriticAgent({
+    critic: createCriticAgentRelative({
       ...baseDeps,
       instructions: criticInstructions,
     }),

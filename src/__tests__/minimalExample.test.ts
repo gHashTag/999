@@ -1,9 +1,15 @@
-import { describe, it, expect, beforeAll } from "vitest"
+import { describe, it, expect, beforeAll, beforeEach } from "./testSetupFocused" // Import from focused setup
 import { InngestTestEngine } from "@inngest/test"
 import { minimalFunction } from "@/inngest/minimalExample" // Используем alias для импорта
+import { setupTestEnvironmentFocused } from "./testSetupFocused" // Import setup function
 
 describe("Minimal Function Test", () => {
   let t: InngestTestEngine
+
+  // Add beforeEach to reset mocks (good practice even if not strictly needed here)
+  beforeEach(() => {
+    setupTestEnvironmentFocused()
+  })
 
   beforeAll(() => {
     // Передаем реальную функцию в конструктор

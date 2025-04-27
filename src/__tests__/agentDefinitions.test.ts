@@ -5,8 +5,8 @@ import { describe, beforeEach, it, expect, vi } from "vitest"
 import { createOpenCodexAgent } from "@/agents/open-codex/logic/createOpenCodexAgent"
 // import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"; // Placeholder
 
-// Import the setup function
-import { setupTestEnvironment } from "./agents/testSetup"
+// Import the centralized setup function
+import { setupTestEnvironmentFocused } from "./testSetupFocused" // <-- CORRECTED
 
 // Import the test runner functions
 import { runTesterAgentTests } from "./agents/testerAgentTests"
@@ -15,18 +15,40 @@ import { runCodingAgentTests } from "./agents/codingAgentTests"
 // import { runToolingAgentTests } from "./agents/toolingAgentTests" // Removed import for non-existent file
 // import { runCriticAgentTests } from "./agents/criticAgentTests"
 
-// import type { AgentDependencies } from "@/types/agents" // REMOVED
-
 // Minimal mock dependencies for definition tests -- REMOVED
 // const mockAgentDepsMinimal: AgentDependencies = { /* ... */ };
 
 // Minimal mock for available agents (empty array)
 // const mockAvailableAgents: AvailableAgent[] = [] // Remove unused variable
 
+// REMOVED: Unused imports for agent creation functions and Agent type
+// import {
+//   createTeamLeadAgent,
+//   createTesterAgent,
+//   createCoderAgent, // <-- WRONG NAME
+//   createCriticAgent,
+//   createToolingAgent,
+// } from "@/agents"
+// import { Agent } from "@inngest/agent-kit"
+
+// Import common dependencies from the centralized test setup
+// REMOVED: Unused imports
+// import {
+//   createBaseMockDependencies,
+//   getMockTools,
+// } from "./testSetupFocused"
+// import { type AgentDependencies } from "@/types/agents"
+
+// REMOVED: Unused variable
+// const mockInstructions = {
+//   teamLead: "Mock TL instructions",
+// }
+
 describe("Agent Definitions", () => {
   // Setup mocks before each test suite defined below
   beforeEach(() => {
-    setupTestEnvironment()
+    // Use the corrected setup function
+    setupTestEnvironmentFocused()
   })
 
   // --- Run Tests for createTesterAgent ---
@@ -36,6 +58,7 @@ describe("Agent Definitions", () => {
 
   // --- Run Tests for createCodingAgent ---
   describe("createCodingAgent", () => {
+    // <-- CORRECTED NAME
     // FIX: Pass minimal mock deps directly to creation function if needed
     // Or define mocks inside the test if they differ
     runCodingAgentTests() // Call the imported function

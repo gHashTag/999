@@ -1,6 +1,6 @@
 import { vi } from "vitest"
 import { EventEmitter } from "events"
-import { type AnyTool, type HandlerLogger } from "@/types/agents"
+import { type AgentDependencies, type HandlerLogger } from "@/types/agents"
 import { type AgentDependencies as _AgentDependencies } from "@/types/agents"
 import { deepseek } from "@inngest/ai/models"
 import type {
@@ -10,6 +10,7 @@ import type {
   Agent,
 } from "@inngest/agent-kit"
 import { type TddNetworkState } from "@/types/network"
+import { mockDeepseekModel } from "@/utils/logic/mockDeepseekModel"
 
 // Mock logger
 export const mockLog: HandlerLogger = {
@@ -26,7 +27,7 @@ export const mockModelName = "test-model"
 export const mockSystemEvents = new EventEmitter()
 
 // Mock tools array
-export const mockTools: AnyTool[] = [
+export const mockTools: Tool<any>[] = [
   {
     name: "createOrUpdateFiles",
     description: "mock",
@@ -78,13 +79,15 @@ export const mockTools: AnyTool[] = [
 ]
 
 // Mock AgentDependencies
-export const dependencies: _AgentDependencies = {
+export const dependencies: AgentDependencies = {
   allTools: mockTools,
   log: mockLog,
   apiKey: mockApiKey,
   modelName: mockModelName,
+  model: mockDeepseekModel,
   sandbox: null, // Assuming sandbox can be null for these tests
   systemEvents: mockSystemEvents,
+  eventId: "mock-event-id-backup",
 }
 
 // Mock Tool Options Helper
@@ -127,7 +130,7 @@ export {
   beforeAll,
   afterAll,
 } from "vitest"
-export { type _AgentDependencies, type AnyTool, type HandlerLogger }
+export { type _AgentDependencies, type Tool as AnyTool, type HandlerLogger }
 export { type AgentResult, type _NetworkRun, type Tool, type Agent }
 export { EventEmitter }
 export { type TddNetworkState }

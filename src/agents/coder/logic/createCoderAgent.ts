@@ -1,6 +1,6 @@
-import { Agent } from "@inngest/agent-kit"
+import { Agent, type Tool } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type { AgentDependencies, AnyTool } from "@/types/agents"
+import type { AgentDependencies } from "@/types/agents"
 // import type { TddNetworkState } from '@/types/network.types'
 
 /**
@@ -17,13 +17,14 @@ export const createCoderAgent = ({
   // log, systemEvents are unused for now
 
   // Use allTools directly, filtering logic remains
-  const toolsToUse = allTools.filter((tool: AnyTool) =>
+  const toolsToUse = allTools.filter((tool: Tool<any>) =>
     [
       "readFile",
-      "editFile",
+      "createOrUpdateFiles",
+      "runTerminalCommand",
+      "edit_file",
       "codebase_search",
       "grep_search",
-      "updateTaskState",
     ].includes(tool.name)
   )
 

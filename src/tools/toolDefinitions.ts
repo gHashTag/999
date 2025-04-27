@@ -1,7 +1,9 @@
 // src/tools/toolDefinitions.ts
 import { z } from "zod"
 import { type GetSandboxFunc } from "@/inngest/utils/sandboxUtils"
-import type { AnyTool, HandlerLogger } from "@/types/agents"
+import type { HandlerLogger } from "@/types/agents"
+import { createAskHumanForInputTool } from "./definitions/askHumanForInput"
+import { type Tool } from "@inngest/agent-kit"
 // import { createTool } from "@inngest/agent-kit"; // Removed - createTool comes from definitions now
 
 // --- Tool Schema Definitions (Kept Here For Now) --- //
@@ -29,7 +31,6 @@ import { createCreateOrUpdateFilesTool } from "./definitions/createOrUpdateFiles
 import { createReadFilesTool } from "./definitions/readFiles"
 import { createRunCodeTool } from "./definitions/runCode"
 import { createProcessArtifactTool } from "./definitions/processArtifact"
-import { createAskHumanForInputTool } from "./definitions/askHumanForInput"
 import { createUpdateTaskStateTool } from "./definitions/updateTaskStateTool"
 
 // --- Mock Web Search Tool - REMOVED --- //
@@ -48,7 +49,7 @@ export function getAllTools(
   getSandbox: GetSandboxFunc,
   eventId: string,
   sandboxId: string | null
-): AnyTool[] {
+): Tool<any>[] {
   // Define tools using their respective creation functions
   const terminalTool = createTerminalTool(log, getSandbox, eventId, sandboxId)
   const askHumanTool = createAskHumanForInputTool(log, eventId)

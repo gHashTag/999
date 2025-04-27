@@ -1,14 +1,14 @@
-import { Agent } from "@inngest/agent-kit"
+import { Agent /* type Tool - unused */ } from "@inngest/agent-kit"
 // import { type AgentDependencies } from "@/types/agents" // Correct import path below
 // import { createAgent } from "@inngest/agent-kit" // Use new Agent()
-import { deepseek } from "@inngest/ai/models"
-import type {
-  AgentDependencies,
-  AnyTool,
-  // StateData,
+// import { deepseek } from "@inngest/ai/models" // REMOVE THIS IMPORT
+import {
+  type AgentDependencies,
+  // Removed unused AgentCreationProps
+  // Removed unused HandlerLogger
 } from "@/types/agents"
-// Import the creator function, not the instance directly
-import { createUpdateTaskStateTool } from "@/tools/definitions/updateTaskStateTool"
+// import { createUpdateTaskStateTool } from "@/tools/definitions/updateTaskStateTool" // Unused
+// import { filterTeamLeadTools } from "./filterTools" // Unused
 // import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 // import type { TddNetworkState } from '@/types/network.types'
 
@@ -22,28 +22,14 @@ export const createTeamLeadAgent = ({
   instructions,
   ...dependencies
 }: { instructions: string } & AgentDependencies): Agent<any> => {
-  const { apiKey, modelName, allTools, log, eventId } = dependencies // Use eventId from dependencies
+  // Extract ONLY used dependencies
+  const { log, model, allTools } = dependencies // Extract allTools
 
-  // Create the specific tool instance needed
-  const updateTaskStateToolInstance = createUpdateTaskStateTool(
-    log,
-    eventId || "placeholder-event-id-createTeamLeadAgent" // Use eventId or placeholder
+  // Restore tool filtering logic
+  const requiredToolNames = ["updateTaskState", "web_search"]
+  const toolsToUse = allTools.filter(tool =>
+    requiredToolNames.includes(tool.name)
   )
-
-  // Ensure updateTaskStateTool is always included for TeamLead
-  let toolsToUse: AnyTool[] = [
-    updateTaskStateToolInstance, // Add the created tool instance
-    ...allTools.filter(
-      (tool: AnyTool) => tool.name !== "updateTaskState" // Avoid duplication if already present
-    ),
-  ]
-
-  // Filter tools specifically needed by TeamLead (add others if needed)
-  toolsToUse = toolsToUse.filter((tool: AnyTool) =>
-    ["web_search", "updateTaskState"].includes(tool.name)
-  )
-
-  // Removed: const systemPrompt = readAgentInstructions("TeamLead")
 
   log?.info("Creating TeamLead Agent", { toolCount: toolsToUse.length })
 
@@ -51,8 +37,8 @@ export const createTeamLeadAgent = ({
     name: "TeamLead Agent",
     description:
       "Анализирует задачу, декомпозирует ее и формулирует требования для TDD.",
-    system: instructions, // Use passed instructions
-    model: deepseek({ apiKey, model: modelName }),
+    system: instructions,
+    model: model, // Pass the extracted model
     tools: toolsToUse,
   })
 }

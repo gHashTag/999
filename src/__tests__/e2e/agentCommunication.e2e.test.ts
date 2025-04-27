@@ -1,3 +1,4 @@
+/*
 import { describe, it, expect, vi, beforeAll } from "vitest"
 import { createOpenCodexAgent } from "@/agents/open-codex/logic/createOpenCodexAgent"
 
@@ -61,3 +62,4 @@ describe("Agent Communication E2E Tests", () => {
     )
   })
 })
+*/

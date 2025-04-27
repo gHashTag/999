@@ -1,54 +1,45 @@
-import fs from "node:fs"
-import path from "node:path"
-import { fileURLToPath } from "node:url"
-import chalk from "chalk" // Import chalk
+import fs from "fs"
+import path from "path"
+import chalk from "chalk"
 
-// Determine the project root relative to the current file using import.meta.url
-const __filename = fileURLToPath(import.meta.url)
-// ESM compatible way to get directory name:
-const currentDir = path.dirname(__filename)
-// Resolve project root assuming logger.ts is in src/utils/logic/
-const projectRoot = path.resolve(currentDir, "../../../")
+// Determine log file path (relative to project root)
+const logDirectory = path.join(__dirname, "../../src/logs") // Go up two levels from dist/utils/logic
+const logFilePath = path.join(logDirectory, "node-app.log")
 
-const logFilePath = path.join(projectRoot, "node-app.log")
-// Remove E2E log file path
-// const e2eLogFilePath = path.join(projectRoot, "src/logs/e2e-test-run.log")
+// Ensure log directory exists
+try {
+  if (!fs.existsSync(logDirectory)) {
+    fs.mkdirSync(logDirectory, { recursive: true })
+  }
+} catch (err) {
+  console.error(
+    chalk.red.bold(
+      `[LOGGER INIT CRITICAL ERROR] Failed to create log directory ${logDirectory}:`
+    ),
+    err
+  )
+}
 
-// Ensure the main logs directory exists (project root)
-// const logsDir = path.dirname(e2eLogFilePath) // No longer needed
-// if (!fs.existsSync(logsDir)) { // No longer needed
-//   fs.mkdirSync(logsDir, { recursive: true }) // No longer needed
-// }
-
-// FIX: Remove problematic import
-// import { sandboxId } from "../index.js"; // Assuming sandboxId is accessible globally or passed differently
-
-// TODO: Improve how sandboxId is accessed. Maybe pass it to the log function?
-
-// Define a type for the optional data payload
-// interface LogData {
-//   sandboxId?: string | null;
-//   [key: string]: unknown; // Allow other properties
-// }
-
-// Define color mapping for levels
+// Define colors for console output
 const levelColors = {
   info: chalk.blue,
   warn: chalk.yellow,
   error: chalk.red,
 }
 
+// Define valid log levels
+export type LogLevel = "info" | "warn" | "error"
+
 /**
  * Simple file logger.
  * Writes structured logs to node-app.log.
  */
 export const log = (
-  level: "info" | "warn" | "error",
+  level: LogLevel,
   stepName: string,
   message: string,
-  data: Record<string, any> = {} // Keep data flexible
+  data: Record<string, any> = {}
 ) => {
-  // Remove isE2ETestContext logic
   const currentSandboxId = data?.sandboxId || null
 
   const logEntry = {
@@ -56,15 +47,12 @@ export const log = (
     level,
     step: stepName,
     sandboxId: currentSandboxId,
-    // Remove isE2ETestContext field
     message,
     ...data,
   }
 
-  // Stringify once for the file log
   const logStringForFile = JSON.stringify(logEntry, null, 2)
 
-  // Log to console with colors
   const color = levelColors[level] || chalk.white
   const consoleTimestamp = chalk.gray(`[${logEntry.timestamp}]`)
   const consoleLevel = color.bold(`[${level.toUpperCase()}]`)
@@ -73,17 +61,13 @@ export const log = (
     ? chalk.magenta(`[Sandbox: ${logEntry.sandboxId}]`)
     : ""
   const consoleMessage = color(message)
-  // Optionally log data to console in a simplified way or keep it out
-  // const consoleData = Object.keys(data).length > 0 ? chalk.dim(` ${JSON.stringify(data)}`) : '';
   console.log(
     `${consoleTimestamp} ${consoleLevel} ${consoleStep}${consoleSandbox} ${consoleMessage}`
-  ) // Removed consoleData for cleaner output
+  )
 
-  // Append to main log file ONLY
   try {
     fs.appendFileSync(logFilePath, logStringForFile + "\n", "utf-8")
   } catch (err) {
-    // Use chalk for the critical error message in console too
     console.error(
       chalk.red.bold(
         `[LOGGER CRITICAL ERROR] Failed to write to MAIN log file ${logFilePath}:`
@@ -91,6 +75,4 @@ export const log = (
       err
     )
   }
-
-  // Remove conditional E2E log writing block
 }

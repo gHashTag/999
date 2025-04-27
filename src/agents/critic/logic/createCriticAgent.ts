@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Agent } from "@inngest/agent-kit"
+import { Agent, type Tool } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-import type {
-  AgentDependencies,
-  AnyTool,
-  // StateData,
+import {
+  type AgentDependencies,
+  // Removed unused AgentCreationProps
+  // Removed unused HandlerLogger
 } from "@/types/agents"
+// import { getAllTools } from "@/tools/toolDefinitions" // Remove unused import
 // Removed unused imports:
 // import { NetworkStatus, type TddNetworkState } from "@/types/network"
 // import { NetworkRun } from '@inngest/agent-kit'
@@ -23,7 +24,7 @@ export const createCriticAgent = ({
   const { apiKey, modelName, allTools, log } = dependencies
 
   // Filter tools specifically needed by Critic
-  const toolsToUse = allTools.filter((tool: AnyTool) =>
+  const toolsToUse = allTools.filter((tool: Tool<any>) =>
     [
       "readFile",
       "web_search", // Critic might need to check best practices

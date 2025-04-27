@@ -1,22 +1,25 @@
 import { type Sandbox } from "e2b"
-import { systemEvents } from "../../utils/logic/systemEvents" // Adjusted path
+import { systemEvents as importedSystemEvents } from "../../utils/logic/systemEvents" // Alias import
 // Import unified HandlerLogger and AgentDependencies
-import {
-  AgentDependencies,
-  HandlerLogger,
-  type AnyTool,
-} from "../../types/agents" // Adjusted path
+import { AgentDependencies, HandlerLogger } from "../../types/agents" // Adjusted path
 import { vi } from "vitest" // ADD import for vi
+// import { EventEmitter } from "events" // Unused
+import type { Tool } from "@inngest/agent-kit" // Import Tool type
+import { mockDeepseekModel } from "../../utils/logic/mockDeepseekModel" // Import mock model
 
 // Mock dependencies for PoC
 // FIX: Add handler field to mock tools to match AnyTool type
-const mockTools: AnyTool[] = [
+const mockTools: Tool<any>[] = [
   {
     name: "askHumanForInput",
     description: "Mock tool",
     parameters: {}, // Add empty parameters if needed by Tool type
     // run: async () => ({ output: ["mock response"] }), // Keep run if used elsewhere?
     handler: vi.fn().mockResolvedValue({ output: ["mock response"] }), // ADD handler
+  },
+  {
+    name: "readFile",
+    handler: vi.fn().mockResolvedValue("Mock file content"),
   },
 ]
 
@@ -30,21 +33,25 @@ const mockLogger: HandlerLogger = {
 }
 
 // Consider providing a more complete mock if needed by agents
-const mockSandbox: Sandbox | null = null // Simplified to null as per original baseDeps usage
+// const mockSandbox: Sandbox | null = null // Removed, sandbox comes from args
 
 /**
  * Creates mock dependencies for the CLI PoC.
  * @returns An object containing mock AgentDependencies.
  */
-export function createMockDependencies(): AgentDependencies {
+export const createMockDependencies = (
+  sandbox: Sandbox | null,
+  eventId: string
+): AgentDependencies => {
   const baseDeps: AgentDependencies = {
-    systemEvents,
+    systemEvents: importedSystemEvents, // Use aliased import
     allTools: mockTools,
     log: mockLogger,
-    apiKey: "mock-api-key", // Use placeholder or env var if needed
-    modelName: "gpt-4", // Use placeholder or env var if needed
-    sandbox: mockSandbox,
-    // agents property will be populated later if needed by the calling context
+    apiKey: process.env.DEEPSEEK_API_KEY || "mock-api-key",
+    modelName: "deepseek-coder",
+    model: mockDeepseekModel,
+    eventId: eventId,
+    sandbox: sandbox,
   }
   return baseDeps
 }

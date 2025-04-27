@@ -13,12 +13,19 @@ const mockLog: HandlerLogger = {
   log: vi.fn(),
 }
 
+// Helper to create a basic mock KV store (get/set only)
+const createSimpleMockKv = (initialState: TddNetworkState | undefined) => ({
+  get: vi.fn().mockReturnValue(initialState),
+  set: vi.fn(),
+  // Remove delete, has, all for simplification
+})
+
 describe("createUpdateTaskStateTool", () => {
   const eventId = "test-event-123"
 
   it("should create a tool with the correct name and description", () => {
     const tool = createUpdateTaskStateTool(mockLog, eventId)
-    expect(tool.name).toBe("updateTaskState")
+    expect(tool.name).toBe("update_task_state")
     expect(tool.description).toContain("Updates the current state")
     expect(tool.parameters).toBeDefined()
   })
@@ -30,19 +37,12 @@ describe("createUpdateTaskStateTool", () => {
       status: NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE,
       sandboxId: "sandbox-1",
     }
-    const mockKv = {
-      get: vi.fn().mockReturnValue(initialState),
-      set: vi.fn(),
-    }
+    const mockKv = createSimpleMockKv(initialState)
     const mockOpts: any = {
-      // Use any to avoid complex type issues with Options
       network: {
-        state: {
-          kv: mockKv,
-        },
-        agent: { id: "mockAgent" }, // Add mock agent
+        state: { kv: mockKv },
+        agent: { id: "mockAgent" },
       },
-      // Add other necessary mock properties if needed by the tool
     }
 
     const params = { newStatus: NetworkStatus.Enum.NEEDS_TEST }
@@ -51,7 +51,7 @@ describe("createUpdateTaskStateTool", () => {
     expect(mockKv.set).toHaveBeenCalledTimes(1)
     const finalState = mockKv.set.mock.calls[0][1] as TddNetworkState
     expect(finalState.status).toBe(NetworkStatus.Enum.NEEDS_TEST)
-    expect(finalState.task).toBe("initial task") // Ensure other fields are preserved
+    expect(finalState.task).toBe("initial task")
     expect(mockLog.info).toHaveBeenCalledWith(
       expect.objectContaining({ step: "TOOL_UPDATE_STATE_SUCCESS" }),
       expect.stringContaining("Network state updated successfully"),
@@ -61,38 +61,35 @@ describe("createUpdateTaskStateTool", () => {
 
   it("should update status and other provided fields", async () => {
     const tool = createUpdateTaskStateTool(mockLog, eventId)
+    const initialTask = "task two"
+    const initialRequirements = "Initial requirements"
     const initialState: TddNetworkState = {
-      task: "task two",
-      status: NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE,
+      task: initialTask,
+      status: NetworkStatus.Enum.IDLE,
+      test_requirements: initialRequirements,
       sandboxId: "sandbox-2",
     }
-    const mockKv = {
-      get: vi.fn().mockReturnValue(initialState),
-      set: vi.fn(),
-    }
-    const mockOpts: any = {
-      network: { state: { kv: mockKv }, agent: { id: "mockAgent" } },
-    }
+    const mockKv = createSimpleMockKv(initialState)
+    const newRequirements = "Generated requirements"
 
-    const params = {
-      newStatus: NetworkStatus.Enum.NEEDS_TEST,
-      test_requirements: "Generated requirements", // Update requirements
-    }
-    await tool.handler(params, mockOpts)
+    await tool.handler(
+      {
+        newStatus: NetworkStatus.Enum.NEEDS_TEST,
+        test_requirements: newRequirements,
+      },
+      { network: { state: { kv: mockKv } } }
+    )
 
     expect(mockKv.set).toHaveBeenCalledTimes(1)
     const finalState = mockKv.set.mock.calls[0][1] as TddNetworkState
     expect(finalState.status).toBe(NetworkStatus.Enum.NEEDS_TEST)
-    expect(finalState.test_requirements).toBe("Generated requirements")
-    expect(finalState.task).toBe("task two")
+    expect(finalState.test_requirements).toBe(newRequirements)
+    expect(finalState.task).toBe(initialTask)
   })
 
   it("should handle missing initial state defensively", async () => {
     const tool = createUpdateTaskStateTool(mockLog, eventId)
-    const mockKv = {
-      get: vi.fn().mockReturnValue(undefined), // Simulate missing state
-      set: vi.fn(),
-    }
+    const mockKv = createSimpleMockKv(undefined)
     const mockOpts: any = {
       network: { state: { kv: mockKv }, agent: { id: "mockAgent" } },
     }
@@ -107,11 +104,12 @@ describe("createUpdateTaskStateTool", () => {
     expect(finalState.status).toBe(
       NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION
     )
-    expect(finalState.task).toContain("unknown - state lost")
+    expect(finalState.task).toContain("unknown - state missing before update")
+    expect(mockLog.warn).toHaveBeenCalledTimes(1)
     expect(mockLog.warn).toHaveBeenCalledWith(
       expect.objectContaining({ step: "TOOL_UPDATE_STATE_WARN" }),
-      expect.stringContaining("Current state was missing"),
-      expect.anything()
+      "Initial state was missing in KV store when trying to update.",
+      { eventId, updateData: params }
     )
   })
 
@@ -119,7 +117,7 @@ describe("createUpdateTaskStateTool", () => {
     const tool = createUpdateTaskStateTool(mockLog, eventId)
     const mockOpts: any = {
       network: { state: { kv: undefined }, agent: { id: "mockAgent" } },
-    } // Simulate missing KV
+    }
 
     const params = { newStatus: NetworkStatus.Enum.COMPLETED }
     await expect(tool.handler(params, mockOpts)).rejects.toThrow(
