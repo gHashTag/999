@@ -1,15 +1,18 @@
 import { InngestTestEngine } from "@inngest/test"
 import { createTeamLeadAgent } from "@/agents/teamlead/logic/createTeamLeadAgent"
 import { describe, it, expect, beforeEach /*, mock*/ } from "bun:test" // Removed unused mock
-import type { AgentDependencies /*, HandlerLogger*/ } from "@/types/agents" // Removed unused HandlerLogger
+// import type { AgentDependencies /*, HandlerLogger*/ } from "@/types/agents" // Removed duplicate import
 // import { EventEmitter } from "events" // Removed unused import
 import { Inngest } from "inngest"
 import {
+  type AgentDependencies,
+  // Import setup helpers
+  // setupTestEnvironment, // Removed unused
   createBaseMockDependencies,
-  // mockLogger as centralMockLogger, // Removed unused import
   getMockTools,
-  // mockDeepseekModelAdapter, // Remove unused import
-} from "../testSetupFocused"
+  // findToolMock, // Removed unused
+  // mockLogger, // Assuming mockLogger is globally available or handled in setupTestEnvironment
+} from "../testSetup" // Corrected path
 import type { Tool } from "@inngest/agent-kit"
 
 // Create a dummy Inngest instance for testing
@@ -76,8 +79,7 @@ describe("Agent Definitions: TeamLead Agent", () => {
     // expect(agent.system).toBe(agentCreationProps.instructions)
   })
 
-  // Test the agent logic using the wrapper function and InngestTestEngine
-  // SKIP: Temporarily skip due to internal InngestTestEngine error 'options.function.createExecution'
+  // Skip this test due to @inngest/test internalEvents error
   it.skip("should generate requirements using InngestTestEngine", async () => {
     const engine = new InngestTestEngine({ function: teamLeadTestFunction })
 

@@ -2,18 +2,15 @@ import { describe, beforeEach, it, expect, mock } from "bun:test"
 
 // Import agent creation functions
 import { createOpenCodexAgent } from "@/agents/open-codex/logic/createOpenCodexAgent"
-import { setupTestEnvironmentFocused } from "./testSetupFocused" // Ensure this provides necessary mocks if needed
+import { setupTestEnvironment, mockLogger } from "./testSetup" // Import mockLogger
+
+// Setup test environment before each test
+setupTestEnvironment()
 
 // --- Tests for Open Codex Agent ---
 describe("createOpenCodexAgent", () => {
-  // Setup basic mocks if needed, e.g., logger
-  let mockLogger: { error: ReturnType<typeof mock> }
-
   beforeEach(() => {
-    setupTestEnvironmentFocused() // Reset mocks
-    mockLogger = {
-      error: mock(), // Correct usage of mock
-    }
+    setupTestEnvironment() // Reset mocks
   })
 
   it("should route question to existing agent", async () => {

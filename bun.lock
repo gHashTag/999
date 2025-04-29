@@ -17,7 +17,7 @@
         "e2b": "^1.2.5",
         "fastify": "^5.3.2",
         "hono": "^4.7.7",
-        "inngest": "^3.19.2",
+        "inngest": "latest",
         "inquirer": "^12.6.0",
         "open-codex": "file:/Users/playra/999/open-codex",
         "ora": "^8.2.0",
@@ -833,6 +833,8 @@
     "one-time": ["one-time@1.0.0", "", { "dependencies": { "fn.name": "1.x.x" } }, "sha512-5DXOiRKwuSEcQ/l0kGCF6Q3jcADFv5tSmRaJck/OqkVFcOzutB134KRSfF0xDrL39MNnqxbHBbUUcjZIhTgb2g=="],
 
     "onetime": ["onetime@6.0.0", "", { "dependencies": { "mimic-fn": "^4.0.0" } }, "sha512-1FlR+gjXK7X+AsAHso35MnyN5KqGwJRi/31ft6x0M194ht7S+rWAvd7PHss9xSKMzE0asv1pyIHaJYq+BbacAQ=="],
+
+    "open-codex": ["open-codex@file:open-codex", { "devDependencies": { "prettier": "^3.5.3" } }],
 
     "open-codex": ["open-codex@workspace:open-codex"],
 

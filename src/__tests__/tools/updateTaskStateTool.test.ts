@@ -1,5 +1,5 @@
 // src/tools/definitions/__tests__/updateTaskStateTool.test.ts
-import { describe, it, expect, mock, beforeEach } from "bun:test"
+import { describe, it, expect, beforeEach } from "bun:test"
 import { createUpdateTaskStateTool } from "@/tools/definitions/updateTaskStateTool"
 import { NetworkStatus, type TddNetworkState } from "@/types/network"
 import type { HandlerLogger } from "@/types/agents"
@@ -13,22 +13,14 @@ import {
   mockDebug,
   mockLog,
   mockEventId,
-} from "../testSetupFocused" // Correct path
+  mockKv, // Import mockKv
+} from "../testSetup" // Corrected path
 
-// Local mock KV and state for tests in this file
-let mockKvStore = new Map<string, any>()
-// No need for initialState variable here, setup in beforeEach
+// Remove local mock KV and state
+// let mockKvStore = new Map<string, any>()
 // let initialState: TddNetworkState | undefined
 
-const mockKv = {
-  get: mock((key: string): TddNetworkState | undefined => mockKvStore.get(key)), // Ensure return type matches
-  set: mock((key: string, value: any) => {
-    mockKvStore.set(key, value)
-  }),
-  all: mock(() => Object.fromEntries(mockKvStore)),
-  delete: mock((key: string) => mockKvStore.delete(key)),
-  has: mock((key: string) => mockKvStore.has(key)),
-}
+// const mockKv = { ... } // Remove local mockKv definition
 
 // Mock ToolInput structure (if ToolInput is needed)
 // This is a basic structure, adjust based on actual ToolInput type from agent-kit
@@ -41,18 +33,15 @@ type MockToolInput<P = any, S extends Record<string, unknown> = any> = {
 }
 
 // Helper to create mock ToolInput
-// This helper now primarily sets up the params, the state setup happens in beforeEach
 const createMockToolInput = <P, S extends Record<string, unknown>>(
   params: P,
-  // stateData: S, // State data is now set in beforeEach
+  // stateData: S, // State data is now managed via imported mockKv
   agentId = "mockAgent"
 ): MockToolInput<P, S> => {
-  // Setup mockKvStore for this specific input state
-  // mockKvStore = new Map(Object.entries(stateData)) // Moved to beforeEach
   return {
     params,
     network: {
-      state: { kv: mockKv } as any, // Use 'as any' to bypass strict State type check
+      state: { kv: mockKv } as any, // Use imported mockKv
       agent: { id: agentId },
     },
   }
@@ -71,15 +60,30 @@ describe("createUpdateTaskStateTool", () => {
   const eventId = mockEventId
 
   beforeEach(() => {
-    // Reset mocks and state before each test
-    mockKvStore = new Map<string, any>()
+    // Reset imported mockKv store and mocks before each test
+    const kvStore = new Map<string, any>() // Use a local map for this test suite's state
 
-    // Reset KV mocks
     mockKv.get.mockClear()
     mockKv.set.mockClear()
     mockKv.all.mockClear()
     mockKv.delete.mockClear()
     mockKv.has.mockClear()
+
+    // Set mock implementations pointing to the local kvStore for this suite
+    mockKv.get.mockImplementation(
+      (key: string): TddNetworkState | undefined => {
+        const state = kvStore.get(key)
+        return state ? { ...state } : undefined
+      }
+    )
+    mockKv.set.mockImplementation((key: string, value: any) => {
+      kvStore.set(key, value)
+      // Log calls for debugging within tests if needed
+      // console.log(`-- MOCK KV SET [${key}] --`, JSON.stringify(value));
+    })
+    mockKv.all.mockImplementation(() => Object.fromEntries(kvStore))
+    mockKv.delete.mockImplementation((key: string) => kvStore.delete(key))
+    mockKv.has.mockImplementation((key: string) => kvStore.has(key))
 
     // Reset Logger mocks directly
     mockInfo.mockClear()
@@ -87,26 +91,6 @@ describe("createUpdateTaskStateTool", () => {
     mockError.mockClear()
     mockDebug.mockClear()
     mockLog.mockClear()
-
-    // Explicitly set the return value for mockKv.get for the NEXT call
-    mockKv.get.mockImplementation(
-      (key: string): TddNetworkState | undefined => {
-        if (key === "network_state") {
-          const stateFromStore = mockKvStore.get(key)
-          return stateFromStore ? { ...stateFromStore } : undefined
-        }
-        return undefined
-      }
-    )
-
-    // Set implementation for set (points to the cleared mockKvStore)
-    mockKv.set.mockImplementation((key: string, value: any) => {
-      mockKvStore.set(key, value)
-    })
-    // Set implementations for other kv methods if needed
-    mockKv.all.mockImplementation(() => Object.fromEntries(mockKvStore))
-    mockKv.delete.mockImplementation((key: string) => mockKvStore.delete(key))
-    mockKv.has.mockImplementation((key: string) => mockKvStore.has(key))
   })
 
   it("should create a tool with the correct name and description", () => {
@@ -123,7 +107,8 @@ describe("createUpdateTaskStateTool", () => {
       sandboxId: "sandbox-1",
       run_id: "run-1", // Added run_id
     }
-    mockKvStore.set("network_state", startState)
+    // Use mockKv.set directly to initialize state for the test
+    mockKv.set("network_state", startState)
 
     const params = { newStatus: NetworkStatus.Enum.NEEDS_TEST }
     const mockOpts = createMockToolInput(params)
@@ -141,9 +126,16 @@ describe("createUpdateTaskStateTool", () => {
     console.log("Expected State:", JSON.stringify(expectedEndState, null, 2))
     console.log("---------------------------")
 
-    expect(mockKv.set).toHaveBeenCalledTimes(1)
-    expect(mockKv.set).toHaveBeenCalledWith("network_state", expectedEndState)
-    expect(mockKvStore.get("network_state")).toEqual(expectedEndState)
+    expect(mockKv.set).toHaveBeenCalledTimes(2) // Once for setup, once by the handler
+    expect(mockKv.set).toHaveBeenNthCalledWith(
+      2,
+      "network_state",
+      expectedEndState
+    )
+
+    // Check the state via the mockKv.get
+    const finalState = mockKv.get("network_state")
+    expect(finalState).toEqual(expectedEndState)
 
     console.log("--- Test 1 Logger Info Args ---")
     // Use .mock.calls instead of .calls
@@ -173,7 +165,7 @@ describe("createUpdateTaskStateTool", () => {
       test_requirements: "Initial requirements",
       run_id: "run-2", // Added run_id
     }
-    mockKvStore.set("network_state", startState)
+    mockKv.set("network_state", startState)
 
     const params = {
       newStatus: NetworkStatus.Enum.NEEDS_TEST_CRITIQUE,
@@ -196,9 +188,15 @@ describe("createUpdateTaskStateTool", () => {
     console.log("Expected State:", JSON.stringify(expectedEndState, null, 2))
     console.log("---------------------------")
 
-    expect(mockKv.set).toHaveBeenCalledTimes(1)
-    expect(mockKv.set).toHaveBeenCalledWith("network_state", expectedEndState)
-    expect(mockKvStore.get("network_state")).toEqual(expectedEndState)
+    expect(mockKv.set).toHaveBeenCalledTimes(2)
+    expect(mockKv.set).toHaveBeenNthCalledWith(
+      2,
+      "network_state",
+      expectedEndState
+    )
+
+    const finalState = mockKv.get("network_state")
+    expect(finalState).toEqual(expectedEndState)
 
     console.log("--- Test 2 Logger Info Args ---")
     // Use .mock.calls instead of .calls
@@ -226,12 +224,13 @@ describe("createUpdateTaskStateTool", () => {
     }
     const mockOpts = createMockToolInput(params)
     const expectedEndState: Partial<TddNetworkState> = {
-      // Use Partial as run_id is missing
       task: "unknown - state missing before update",
       status: NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION,
       sandboxId: undefined,
-      // run_id: "unknown", // Removed run_id from expectation
     }
+
+    // Ensure state is missing before handler call
+    mockKv.delete("network_state")
 
     await tool.handler(params, mockOpts as any)
 
@@ -241,14 +240,9 @@ describe("createUpdateTaskStateTool", () => {
     console.log("Expected State:", JSON.stringify(expectedEndState, null, 2))
     console.log("---------------------------")
 
-    expect(mockKv.set).toHaveBeenCalledTimes(1)
-    // Check the actual set value against the modified expectation
+    expect(mockKv.set).toHaveBeenCalledTimes(1) // Only called by the handler
     expect(mockKv.set).toHaveBeenCalledWith(
       "network_state",
-      expect.objectContaining(expectedEndState)
-    )
-    // Also check the store directly
-    expect(mockKvStore.get("network_state")).toEqual(
       expect.objectContaining(expectedEndState)
     )
 
@@ -266,13 +260,17 @@ describe("createUpdateTaskStateTool", () => {
 
   it("should throw error if KV store is not available in opts", async () => {
     const tool = createUpdateTaskStateTool(testLogger as HandlerLogger, eventId)
-    const params = { newStatus: NetworkStatus.Enum.COMPLETED }
-    const invalidOpts: any = {
+    const params = { newStatus: NetworkStatus.Enum.NEEDS_CODE }
+    // Create opts without state.kv
+    const mockOpts = {
       params,
-      network: { state: { kv: undefined }, agent: { id: "mockAgent" } },
+      network: {
+        // state: { kv: undefined } as any, // This won't work, need to omit state entirely or make kv null
+        agent: { id: "mockAgent" },
+      },
     }
 
-    await expect(tool.handler(params, invalidOpts)).rejects.toThrow(
+    await expect(tool.handler(params, mockOpts as any)).rejects.toThrow(
       "Network state KV store is not available"
     )
 

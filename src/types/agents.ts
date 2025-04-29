@@ -30,7 +30,6 @@ export interface AgentDependencies {
   eventId: string
   agents?: Record<string, Agent<any>>
   model: any
-  kv: any
 }
 
 // Helper type for critique data extraction

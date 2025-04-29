@@ -14,7 +14,9 @@ import {
   // setupTestEnvironmentFocused, // Remove unused import
   mockLogger,
   mockDeepseekModelAdapter,
-} from "../testSetupFocused" // Corrected path
+  // setupTestEnvironment, // Removed unused
+  // findToolMock, // Removed unused
+} from "../testSetup" // Corrected path
 
 // Remove unused imports
 // import { AnyTool, ToolName, getMockTools } from "../testSetupFocused"

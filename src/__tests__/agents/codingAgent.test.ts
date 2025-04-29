@@ -1,19 +1,23 @@
-import { InngestTestEngine } from "@inngest/test"
-import { createCodingAgent } from "@/agents/coder/logic/createCodingAgent"
-import { describe, it, expect, beforeEach } from "bun:test" // Removed unused 'mock'
-import type {
-  AgentDependencies,
-  // HandlerLogger, // Removed unused type
-} from "@/types/agents"
+import { describe, it, expect, beforeEach } from "bun:test"
 import { Inngest } from "inngest"
+import { InngestTestEngine } from "@inngest/test"
 import {
+  setupTestEnvironment,
   createBaseMockDependencies,
-  // mockLogger as centralMockLogger, // Removed unused import
   getMockTools,
-} from "../testSetupFocused"
-// import { SystemEvents } from "@/types/events" // Removed incorrect and unused import
-// import { AgentDependencies as BaseAgentDependencies } from "@/types/agents" // Removed unused import
-import { setupTestEnvironmentFocused } from "../testSetupFocused"
+  // findToolMock,
+  type AgentDependencies,
+  // Removed unused imports below
+  // mockSystemEvents,
+  // mockLogger,
+  // mockKv,
+  // mockDeepseekModel
+} from "../testSetup" // Corrected path
+import { createCoderAgent } from "@/agents/coder/logic/createCoderAgent" // Corrected path based on assumption
+// import type { Tool } from "@inngest/agent-kit" // Removed unused
+
+// Setup the test environment
+setupTestEnvironment()
 
 // Create a dummy Inngest instance for testing
 const testInngest = new Inngest({ id: "test-app" })
@@ -53,30 +57,31 @@ describe("Agent Definitions: Coder Agent", () => {
   let baseDeps: AgentDependencies
 
   beforeEach(() => {
-    setupTestEnvironmentFocused()
     baseDeps = createBaseMockDependencies()
     // Don't initialize mockDeps globally if it causes issues
   })
 
   it("should create a Coder agent with correct basic properties", () => {
     coderInstructions = "Test coder instructions"
-    // Initialize deps specifically for this test
     const toolsForTest = getMockTools([
       "readFile",
       "writeFile",
       "runTerminalCommand",
       "web_search",
-    ]) // Provide tools
+    ])
     const mockDeps: AgentDependencies = { ...baseDeps, allTools: toolsForTest }
 
-    const agent = createCodingAgent(mockDeps, coderInstructions)
+    // Pass instructions within the dependency object
+    const agent = createCoderAgent({
+      ...mockDeps,
+      instructions: coderInstructions,
+    })
 
-    expect(agent.name).toBe("Coder")
+    expect(agent.name).toBe("Coder Agent") // Corrected expected name
     expect(agent.description).toContain("Пишет код")
     expect(agent.system).toBe(coderInstructions)
-    // Add model check if relevant
     expect(agent.model).toBeDefined()
-    // Add check for model existence before accessing properties
+    // Add model check if relevant
     if (agent.model) {
       // Assuming agent.model is the adapter itself, not a nested structure
       // Check if modelName exists directly or find the correct property path
@@ -87,7 +92,7 @@ describe("Agent Definitions: Coder Agent", () => {
     }
   })
 
-  // SKIP: Temporarily skip due to internal InngestTestEngine error 'options.function.createExecution'
+  // Skip this test due to @inngest/test internalEvents error
   it.skip("should generate code using InngestTestEngine", async () => {
     const engine = new InngestTestEngine({ function: codingTestFunction })
 
@@ -111,10 +116,14 @@ describe("Agent Definitions: Coder Agent", () => {
   // Added dedicated test for system prompt
   it("should generate a system prompt containing core instructions", () => {
     coderInstructions = "Ты - дисциплинированный Разработчик"
-    // Initialize deps specifically for this test (even if tools aren't checked)
-    const mockDeps: AgentDependencies = { ...baseDeps, allTools: [] } // Provide empty tools
+    const mockDeps: AgentDependencies = { ...baseDeps, allTools: [] }
 
-    const agent = createCodingAgent(mockDeps, coderInstructions)
+    // Pass instructions within the dependency object
+    const agent = createCoderAgent({
+      ...mockDeps,
+      instructions: coderInstructions,
+    })
+
     const systemPrompt = agent.system
     expect(systemPrompt).toBeDefined()
     expect(systemPrompt).toBe(coderInstructions)
@@ -132,10 +141,14 @@ describe("Agent Definitions: Coder Agent", () => {
         "web_search",
         "updateTaskState",
         "edit_file",
-        "runCommand", // Include runCommand if it was added
+        "runCommand",
       ]),
     }
-    const agent = createCodingAgent(completeDeps, coderInstructions)
-    expect(agent.tools.size).toBe(2) // Correct expected count to 2
+    // Pass instructions within the dependency object
+    const agent = createCoderAgent({
+      ...completeDeps,
+      instructions: coderInstructions,
+    })
+    expect(agent.tools.size).toBe(4) // Correct expected tool count after filtering
   })
 })

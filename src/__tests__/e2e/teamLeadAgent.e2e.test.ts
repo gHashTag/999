@@ -49,6 +49,10 @@ mock.module("@/inngest/logic/resultUtils", () => ({
 
 // --- Test Suite ---
 
+// SKIP: This E2E test uses InngestTestEngine with step mocking, which is the correct approach.
+// However, it is skipped due to the same underlying issue with InngestTestEngine seen in other tests
+// (potentially related to internalEvents or createExecution errors).
+// Revisit after fixing the InngestTestEngine problems.
 describe.skip("TeamLead Agent Workflow (E2E using InngestTestEngine - Simplified)", () => {
   let t: InngestTestEngine
 

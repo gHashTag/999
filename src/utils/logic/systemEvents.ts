@@ -4,7 +4,7 @@ import { log } from "@/utils/logic/logger" // Import the logger
 /**
  * A simple singleton event emitter for system-wide events.
  */
-class SystemEventEmitter extends EventEmitter {}
+export class SystemEventEmitter extends EventEmitter {}
 
 // Создаем и экспортируем единственный экземпляр EventEmitter для всей системы
 export const systemEvents = new SystemEventEmitter()

@@ -65,7 +65,6 @@ export async function createAgentDependencies(
     systemEvents,
     sandbox,
     eventId,
-    kv: context.step.kv,
   }
 
   // 3. Load All Agent Instructions Concurrently - REMOVED

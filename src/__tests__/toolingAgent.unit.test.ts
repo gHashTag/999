@@ -1,14 +1,14 @@
 import { describe, expect, beforeEach, it } from "bun:test" // Import 'it' from bun:test
 import {
-  // setupTestEnvironmentFocused, // Remove unused import
-  // mockLogger, // Already included in baseDeps
   getMockTools,
   createBaseMockDependencies,
-  // mockDeepseekModelAdapter, // Already included in baseDeps
-} from "./testSetupFocused" // Keep other imports
-import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent" // Import the function to test
-import type { Tool } from "@inngest/agent-kit"
-import type { AgentDependencies /*, HandlerLogger*/ } from "@/types/agents" // Remove unused HandlerLogger
+  setupTestEnvironment,
+  // findToolMock, // Removed unused
+  type AgentDependencies,
+} from "../testSetup" // Combined imports
+import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent" // Correct path
+// import type { Tool } from "@inngest/agent-kit" // Removed unused
+// import type { AgentDependencies /*, HandlerLogger*/ } from "@/types/agents" // Removed duplicate import
 
 describe("createToolingAgent Unit Test (Focused)", () => {
   // Define common dependencies and instructions
@@ -100,3 +100,6 @@ describe("createToolingAgent Unit Test (Focused)", () => {
 
   // Add more tests if needed, e.g., testing specific logic within createToolingAgent
 })
+
+// Setup the test environment
+setupTestEnvironment()

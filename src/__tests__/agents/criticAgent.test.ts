@@ -5,15 +5,16 @@ import {
   // mockTools, // Removed direct import of all mock tools
   getMockTools, // Use helper to get specific tools
   createBaseMockDependencies, // Use base dependency creator
-  // AnyTool, // Removed old type
-  // setupTestEnvironmentFocused, // Remove unused import
-  // mockLogger, // Removed unused import
-  // mockDeepseekModelAdapter, // Removed unused import
-} from "../testSetupFocused"
+  type AgentDependencies, // Corrected import
+  // createCriticAgent, // Removed - using alias
+  // Import setup helpers
+  // setupTestEnvironment, // Removed unused
+  // findToolMock, // Removed unused
+} from "../testSetup" // Corrected path
+import { createCriticAgent as correctedAgentImport } from "@/agents/critic/logic/createCriticAgent" // Corrected agent import path based on assumption
 import { type Tool } from "@inngest/agent-kit" // Import correct Tool type
-import { createCriticAgent } from "@/agents/critic/logic/createCriticAgent"
 // import { Agent } from "@inngest/agent-kit" // Remove unused import
-import type { AgentDependencies /*, HandlerLogger*/ } from "@/types/agents" // Remove unused HandlerLogger
+// import type { AgentDependencies /*, HandlerLogger*/ } from "@/types/agents" // Removed duplicate import
 
 // Define required tools using the helper
 // const criticRequiredToolNames = ["updateTaskState", "web_search"] // Remove unused variable
@@ -34,7 +35,7 @@ describe("createCriticAgent Unit Tests", () => {
 
   it("should create a Critic Agent with default dependencies", () => {
     const completeDeps: AgentDependencies = { ...baseDeps, allTools: [] } // Provide empty tools for this check
-    const agent = createCriticAgent(completeDeps, criticInstructions)
+    const agent = correctedAgentImport(completeDeps, criticInstructions)
 
     expect(agent).toBeDefined()
     expect(agent.name).toBe("Critic") // Correct name
@@ -49,14 +50,14 @@ describe("createCriticAgent Unit Tests", () => {
       ...baseDeps,
       allTools: toolsForTest,
     }
-    const agent = createCriticAgent(completeDeps, criticInstructions)
+    const agent = correctedAgentImport(completeDeps, criticInstructions)
     expect(agent.tools.size).toBe(1)
     expect(agent.tools.has("web_search")).toBe(true)
   })
 
   it("should generate a system prompt containing core instructions", () => {
     const completeDeps: AgentDependencies = { ...baseDeps, allTools: [] }
-    const agent = createCriticAgent(completeDeps, criticInstructions)
+    const agent = correctedAgentImport(completeDeps, criticInstructions)
     const systemPrompt = agent.system
     expect(systemPrompt).toBeDefined()
     expect(systemPrompt).toBe(criticInstructions) // Check full prompt
