@@ -1,4 +1,4 @@
-import { beforeAll, afterEach, afterAll } from "vitest"
+import { beforeAll, afterEach, afterAll } from "bun:test" // Changed bun:test to bun:test
 import { setupServer } from "msw/node"
 import { handlers } from "../mocks/handlers"
 

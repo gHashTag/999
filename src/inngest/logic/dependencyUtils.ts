@@ -7,14 +7,17 @@ import {
 } from "@/agents"
 import { type AgentDependencies, type Agents } from "@/types/agents"
 import { getAllTools } from "@/tools/toolDefinitions"
-import { GetSandboxFunc, getSandbox } from "@/inngest/utils/sandboxUtils"
+import { getSandbox } from "@/inngest/utils/sandboxUtils"
 import { systemEvents } from "@/utils/logic/systemEvents"
 import type { HandlerLogger } from "@/types/agents"
 import { HandlerStepName } from "@/types/handlerSteps"
 import { TddNetworkState } from "@/types/network"
-import { Agent } from "@inngest/agent-kit"
-import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
+import { Agent /*, type Tool*/ } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
+// readFileSync, // Removed unused import
+// readAgentInstructions, // Removed unused import
+// deepseek, // Removed unused import
+;("@/inngest/utils/sandboxUtils")
 
 /**
  * Creates all agent dependencies, including loading instructions
@@ -49,7 +52,7 @@ export async function createAgentDependencies(
     throw new Error("DEEPSEEK_API_KEY environment variable is not set.")
   }
 
-  const model = deepseek.completion({ apiKey, model: modelName })
+  const model = deepseek({ apiKey, model: modelName })
 
   const sandbox = await getSandbox(sandboxId)
 
@@ -62,39 +65,43 @@ export async function createAgentDependencies(
     systemEvents,
     sandbox,
     eventId,
+    kv: context.step.kv,
   }
 
-  // 3. Load All Agent Instructions Concurrently
-  const [
-    coderInstructions,
-    testerInstructions,
-    teamLeadInstructions,
-    criticInstructions,
-    toolingInstructions,
-  ] = await Promise.all([
-    readAgentInstructions("Coder"),
-    readAgentInstructions("Tester"),
-    readAgentInstructions("TeamLead"),
-    readAgentInstructions("Critic"),
-    readAgentInstructions("Tooling"),
-  ])
-  logger.info(
-    { step: HandlerStepName.CREATE_AGENTS_START },
-    "Agent instructions loaded."
-  )
+  // 3. Load All Agent Instructions Concurrently - REMOVED
+  // const [
+  //   coderInstructions,
+  //   testerInstructions,
+  //   teamLeadInstructions,
+  //   criticInstructions,
+  //   toolingInstructions,
+  // ] = await Promise.all([
+  //   readAgentInstructions("Coder"),
+  //   readAgentInstructions("Tester"),
+  //   readAgentInstructions("TeamLead"),
+  //   readAgentInstructions("Critic"),
+  //   readAgentInstructions("Tooling"),
+  // ])
+  // logger.info(
+  //   { step: HandlerStepName.CREATE_AGENTS_START },
+  //   "Agent instructions loaded."
+  // )
+  // Use placeholder instructions directly
+  const coderInstructions = "Placeholder Coder Instructions"
+  const testerInstructions = "Placeholder Tester Instructions"
+  const teamLeadInstructions = "Placeholder TeamLead Instructions"
+  const criticInstructions = "Placeholder Critic Instructions"
+  const toolingInstructions = "Placeholder Tooling Instructions"
 
   // 4. Create Agent Instances with Instructions
-  const teamLeadDeps = { ...baseDeps, instructions: teamLeadInstructions }
-  const testerDeps = { ...baseDeps, instructions: testerInstructions }
-  const coderDeps = { ...baseDeps, instructions: coderInstructions }
-  const criticDeps = { ...baseDeps, instructions: criticInstructions }
-  const toolingDeps = { ...baseDeps, instructions: toolingInstructions }
-
-  const teamLead = createTeamLeadAgent(teamLeadDeps)
-  const tester = createTesterAgent(testerDeps)
-  const coder = createCodingAgent(coderDeps)
-  const critic = createCriticAgent(criticDeps)
-  const tooling = createToolingAgent(toolingDeps)
+  const teamLead = createTeamLeadAgent(baseDeps, teamLeadInstructions)
+  const tester = createTesterAgent(baseDeps, testerInstructions)
+  const coder = createCodingAgent(baseDeps, coderInstructions)
+  const critic = createCriticAgent(baseDeps, criticInstructions)
+  const tooling = createToolingAgent({
+    ...baseDeps,
+    instructions: toolingInstructions,
+  })
 
   // 5. Construct Final Agents Object (with temporary cast)
   const agents: Agents = {

@@ -1,4 +1,4 @@
-import { Agent /* type Tool - unused */ } from "@inngest/agent-kit"
+import { Agent, type Tool } from "@inngest/agent-kit"
 // import { type AgentDependencies } from "@/types/agents" // Correct import path below
 // import { createAgent } from "@inngest/agent-kit" // Use new Agent()
 // import { deepseek } from "@inngest/ai/models" // REMOVE THIS IMPORT
@@ -14,31 +14,31 @@ import {
 
 /**
  * Creates the TeamLead agent.
- * @param dependencies - The dependencies for the agent, including instructions.
+ * @param dependencies - The dependencies for the agent.
  * @param instructions - The system instructions for the agent.
  * @returns The TeamLead agent instance.
  */
-export const createTeamLeadAgent = ({
-  instructions,
-  ...dependencies
-}: { instructions: string } & AgentDependencies): Agent<any> => {
+export const createTeamLeadAgent = (
+  dependencies: AgentDependencies,
+  instructions: string
+): Agent<any> => {
   // Extract ONLY used dependencies
   const { log, model, allTools } = dependencies // Extract allTools
 
   // Restore tool filtering logic
   const requiredToolNames = ["updateTaskState", "web_search"]
-  const toolsToUse = allTools.filter(tool =>
+  const toolsToUse = allTools.filter((tool: Tool<any>) =>
     requiredToolNames.includes(tool.name)
   )
 
   log?.info("Creating TeamLead Agent", { toolCount: toolsToUse.length })
 
   return new Agent({
-    name: "TeamLead Agent",
+    name: "TeamLead",
     description:
       "Анализирует задачу, декомпозирует ее и формулирует требования для TDD.",
     system: instructions,
-    model: model, // Pass the extracted model
+    model: model,
     tools: toolsToUse,
   })
 }

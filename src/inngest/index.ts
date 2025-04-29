@@ -72,7 +72,7 @@ export async function codingAgentHandler({
     const eventId = event.id ?? "unknown-event-id" // Use actual or default event ID
 
     // 2. Ensure Sandbox ID
-    // Note: In test environment, ensureSandboxId is mocked via vi.mock
+    // Note: In test environment, ensureSandboxId is mocked via mock
     const sandboxId = await ensureSandboxId(
       validatedEventData.currentState,
       step,
@@ -109,15 +109,9 @@ export async function codingAgentHandler({
       throw new Error("Failed to create the default language model adapter.")
     }
 
-    // 5. Create and Run Network - Pass agents individually
-    const devOpsNetwork: Network<TddNetworkState> = createDevOpsNetwork(
-      agents.teamLead, // Pass individual agents
-      agents.tester,
-      agents.coder,
-      agents.critic,
-      agents.tooling,
-      defaultModel // Pass defaultModel as the 6th argument
-    )
+    // 5. Create and Run Network - Pass the single dependencies object
+    const devOpsNetwork: Network<TddNetworkState> =
+      createDevOpsNetwork(agentDeps)
 
     logger.info(
       { step: HandlerStepName.NETWORK_RUN_START },

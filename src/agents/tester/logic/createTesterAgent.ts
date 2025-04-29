@@ -11,14 +11,14 @@ import type {
 
 /**
  * Creates the Tester agent.
- * @param dependencies - The dependencies for the agent, including instructions.
+ * @param dependencies - The dependencies for the agent.
  * @param instructions - The system instructions for the agent.
  * @returns The Tester agent instance.
  */
-export const createTesterAgent = ({
-  instructions,
-  ...dependencies
-}: { instructions: string } & AgentDependencies): Agent<any> => {
+export const createTesterAgent = (
+  dependencies: AgentDependencies,
+  instructions: string
+): Agent<any> => {
   const { apiKey, modelName, allTools, log } = dependencies
   // const {
   //   allTools, // Destructure tools from dependencies
@@ -27,19 +27,15 @@ export const createTesterAgent = ({
   // } = dependencies
 
   // Filter tools specifically needed by Tester
+  const allowedToolNames = ["runTerminalCommand", "readFile", "updateTaskState"] // Correct list from tests
   const toolsToUse = allTools.filter((tool: Tool<any>) =>
-    [
-      "runTerminalCommand", // Corrected tool name
-      "readFile",
-      "updateTaskState",
-      // Add other tool names as needed
-    ].includes(tool.name)
+    allowedToolNames.includes(tool.name)
   )
 
   log?.info("Creating Tester Agent", { toolCount: toolsToUse.length }) // Optional logging
 
   return new Agent({
-    name: "Tester Agent",
+    name: "Tester", // Simplified name
     description:
       "Создает или выполняет команды для создания тестов, запускает тесты и анализирует результаты.",
     system: instructions, // Use passed instructions

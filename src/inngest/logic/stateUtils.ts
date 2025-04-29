@@ -41,6 +41,7 @@ export function initializeOrRestoreState(
       task: validatedEventData.input,
       status: NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE,
       sandboxId,
+      run_id: eventId,
     }
   }
 }

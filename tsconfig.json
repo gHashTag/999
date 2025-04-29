@@ -1,28 +1,34 @@
 {
   "compilerOptions": {
-    /* Base Options from Node.js 18 */
-    "lib": ["ESNext", "DOM", "WebWorker"],
-    "module": "ESNext",
+    /* Environment setup & latest features (Aligned with Bun recommendations) */
+    "lib": ["ESNext"],
     "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "jsx": "preserve", // Assuming JSX might be used in .tsx files not directly bundled by Bun initially
+    "allowJs": true,
+
+    /* Bundler mode (Aligned with Bun recommendations) */
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": false,      // Reverted to false temporarily to fix type import errors first
+    "noEmit": false, // Keep false because we need output for dist/
+
+    /* Paths (Keep existing) */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     },
+
+    /* Best practices (Aligned with Bun recommendations + Existing Strictness) */
     "strict": true,
+    "skipLibCheck": true,              // Recommended by Bun
+    "noFallthroughCasesInSwitch": true, // Recommended by Bun + Existing
+    "noUncheckedIndexedAccess": false,  // Existing preference (Bun recommends true, but let's keep it false for now to avoid potential errors)
     "esModuleInterop": true,
-    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
+    "allowSyntheticDefaultImports": true, // Often used with esModuleInterop
 
-    /* Source Map and Declaration Files */
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-
-    /* Type Checking */
+    /* Type Checking (Keep existing stricter flags) */
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
@@ -31,25 +37,28 @@
     "noImplicitThis": true,
     "useUnknownInCatchVariables": true,
     "alwaysStrict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": false,
+    "noUnusedLocals": true, // Stricter than Bun's default (false)
+    "noUnusedParameters": true, // Stricter than Bun's default (false)
+    "exactOptionalPropertyTypes": false, // Existing preference
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": false,
     "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": false,
+    "noPropertyAccessFromIndexSignature": false, // Existing preference (matches Bun's default)
 
-    /* Experimental Options */
-    // "experimentalDecorators": true,
-    // "emitDecoratorMetadata": true,
 
-    /* Advanced Options */
+    /* Output (Keep existing for dist/) */
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+
+    /* Advanced Options (Keep existing relevant options) */
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "types": ["node", "vitest"],
-    "typeRoots": ["./node_modules/@types", "./node_modules"]
+    "isolatedModules": true, // Good practice, usually requires verbatimModuleSyntax
+    "types": ["node", "bun"], // Keep existing
+    "typeRoots": ["./node_modules/@types", "./node_modules"] // Keep existing
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "coverage", "html"]
+  "include": ["src/**/*"], // Keep existing
+  "exclude": ["node_modules", "dist", "coverage", "html", "src/cli"] // Add src/cli here
 }

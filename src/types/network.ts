@@ -6,16 +6,17 @@ import { z } from "zod"
 // Define the Network Statuses
 export const NetworkStatus = z.enum([
   "IDLE", // Default state, maybe unused
+  "READY", // Added state after task description is set
   "NEEDS_REQUIREMENTS_CRITIQUE", // <<<--- НОВЫЙ СТАТУС: Критик проверяет требования
   "NEEDS_TEST", // Tester needs to write tests/command (после одобрения требований)
   "NEEDS_TEST_REVISION", // Tester needs to revise tests/command based on critique
-  // "NEEDS_CODE", // No longer directly needed, command execution handles this
+  "NEEDS_CODE", // Status for when Coder needs to write implementation
   // "NEEDS_CODE_REVISION", // Revision handled by re-running test generation
   "NEEDS_TEST_CRITIQUE", // Critic needs to review the generated test command/plan
   "NEEDS_COMMAND_EXECUTION", // Handler needs to execute the generated command
   "NEEDS_COMMAND_VERIFICATION", // Critic needs to verify the result of the command
   "NEEDS_IMPLEMENTATION_CRITIQUE", // Critic needs to review the implementation
-  "NEEDS_IMPLEMENTATION_REVISION", // Tester needs to generate a *new* command to revise implementation
+  "NEEDS_IMPLEMENTATION_REVISION", // Coder needs to revise implementation based on critique (not Tester)
   "NEEDS_TYPE_CHECK", // Added state for type checking before running tests
   // "READY_FOR_FINAL_TEST", // We might not have this distinct step now
   // "READY_FOR_COMPLETION", // Critic signals completion
@@ -26,25 +27,13 @@ export const NetworkStatus = z.enum([
 export type NetworkStatus = z.infer<typeof NetworkStatus>
 
 // Type for the state object managed by the Agent Network
-/* // Remove duplicate interface definition
-export interface TddNetworkState {
-  task: string
-  status: z.infer<typeof NetworkStatus>
-  test_requirements?: string
-  test_code?: string
-  implementation_code?: string
-  implementation_critique?: string
-  sandboxId?: string | null
-  first_failing_test?: string | null
-  last_command_output?: string | null
-  last_error?: string | null
-}
-*/
+// export interface TddNetworkState { ... }
 
-// Remove the isE2eTest field from the Zod schema as well
+// Update the Zod schema to include run_id and optional error
 export const tddNetworkStateSchema = z.object({
   task: z.string(),
   status: NetworkStatus,
+  run_id: z.string(), // Add run_id
   sandboxId: z.string().optional(),
   test_requirements: z.string().optional(),
   command_to_execute: z.string().optional(),
@@ -55,8 +44,8 @@ export const tddNetworkStateSchema = z.object({
   implementation_critique: z.string().optional(),
   last_command_output: z.string().optional(),
   first_failing_test: z.string().optional(),
-  // isE2eTest: z.boolean().optional(), // REMOVE this flag
+  error: z.string().optional(), // Add optional error field
 })
 
-// Export the inferred type
+// Export the inferred type - this is the single source of truth now
 export type TddNetworkState = z.infer<typeof tddNetworkStateSchema>

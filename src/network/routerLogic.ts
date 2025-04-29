@@ -1,26 +1,13 @@
-import { Agent, Network, type NetworkRun } from "@inngest/agent-kit"
+import { Agent, Network /*, type NetworkRun*/ } from "@inngest/agent-kit"
 import { TddNetworkState, NetworkStatus } from "@/types/network"
-import { type Agents } from "@/types/agents"
-import { HandlerLogger } from "@/types/agents"
-import { log } from "@/utils/logic/logger"
+import { type Agents, type HandlerLogger } from "@/types/agents"
+// Removed direct import of log, assuming it's passed via dependencies
+// import { log } from "@/utils/logic/logger"
 
 // Type definition for the agents structure passed to chooseNextAgent
-// FIX: Use the imported Agents type instead of defining AgentsMap
-// type AgentsMap = {
-//   teamLeadAgent: Agent<any>
-//   testerAgent: Agent<any>
-//   codingAgent: Agent<any>
-//   criticAgent: Agent<any>
-//   toolingAgent: Agent<any> // Assuming tooling agent might be needed in future routing
-// }
+// Removed unused type definition AgentsMap
 
-// interface RouteArgs { // Removed unused interface
-//   state: TddNetworkState
-//   log: HandlerLogger
-//   network: Network<TddNetworkState>
-//   agents: Agents // Use imported Agents type
-//   dependencies: AgentDependencies // Use imported AgentDependencies type
-// }
+// Removed unused interface RouteArgs
 
 /**
  * Parses the state from the network's KV store and initializes it if necessary.
@@ -30,55 +17,18 @@ import { log } from "@/utils/logic/logger"
 export function parseAndInitializeState(
   network: Network<TddNetworkState>
 ): TddNetworkState {
-  const rawStateFromKv = network?.state?.kv?.get("network_state")
-  const currentSandboxId = (rawStateFromKv as any)?.sandboxId || null
-
-  log("info", "ROUTER_RAW_STATE_VALUE", "Value directly from KV:", {
-    rawState: rawStateFromKv
-      ? JSON.stringify(rawStateFromKv)
-      : "undefined or null",
-    sandboxId: currentSandboxId,
-  })
-
-  let state: TddNetworkState | null = null
-  let parseError: string | null = null
-  try {
-    if (rawStateFromKv) {
-      // TODO: Add Zod parsing here for safety
-      state = rawStateFromKv as TddNetworkState
-    }
-  } catch (e) {
-    parseError = e instanceof Error ? e.message : String(e)
-  }
-
-  log(
-    "info",
-    "ROUTER_RAW_STATE",
-    `Raw state read from KV: ${parseError ? `PARSE ERROR: ${parseError}` : rawStateFromKv ? "OK" : "null"}`,
-    {
-      rawState: rawStateFromKv
-        ? JSON.stringify(rawStateFromKv)
-        : "undefined or null",
-      sandboxId: state?.sandboxId || currentSandboxId, // Use parsed state sandboxId if available
-    }
-  )
-
-  // Initialize state if it wasn't found or couldn't be parsed
-  if (!state) {
-    state = {
-      task: "unknown",
+  const state = network.state.kv.all()
+  // Ensure basic structure if state is empty
+  if (!state || Object.keys(state).length === 0) {
+    return {
       status: NetworkStatus.Enum.IDLE,
+      task: "Initial task description missing",
       sandboxId: undefined,
+      run_id: "unknown",
     }
-    log(
-      "warn",
-      "ROUTER_STATE_INIT_FALLBACK",
-      "State was null or invalid, using fallback.",
-      { sandboxId: state.sandboxId } // Log the sandboxId from the new fallback state
-    )
   }
-
-  return state
+  // Safer cast
+  return state as unknown as TddNetworkState
 }
 
 /**
@@ -91,123 +41,35 @@ export function parseAndInitializeState(
 export function chooseNextAgent(
   state: TddNetworkState,
   agents: Agents // Use imported Agents type
-): Agent<any> | undefined {
-  const currentStatus = state.status
-  const currentSandboxId = state.sandboxId || null
-
-  log("info", "ROUTER_START", `Status read from KV: ${currentStatus}`, {
-    status: currentStatus,
-    sandboxId: currentSandboxId,
-  })
-
-  let nextAgent: Agent<any> | undefined = undefined
-
-  if (!currentStatus || currentStatus === NetworkStatus.Enum.IDLE) {
-    log(
-      "info",
-      "ROUTER_NO_STATUS_OR_IDLE",
-      `Status is ${currentStatus || "undefined"}, routing to TeamLead Agent initially.`,
-      { sandboxId: currentSandboxId }
-    )
-    nextAgent = agents.teamLead
-  } else {
-    switch (currentStatus) {
-      case NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE:
-        log(
-          "info",
-          "ROUTER_TO_CRITIC_REQUIREMENTS",
-          `Status is ${currentStatus}. Routing to Critic Agent for requirements.`,
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        nextAgent = agents.critic
-        break
-
-      case NetworkStatus.Enum.NEEDS_TEST:
-      case NetworkStatus.Enum.NEEDS_TEST_REVISION:
-        log(
-          "info",
-          "ROUTER_TO_TESTER",
-          `Status is ${currentStatus}. Routing to Tester Agent.`,
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        nextAgent = agents.tester
-        break
-
-      case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION:
-        log(
-          "info",
-          "ROUTER_TO_CODER",
-          `Status is ${currentStatus}. Routing to Coding Agent.`,
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        nextAgent = agents.coder
-        break
-
-      case NetworkStatus.Enum.NEEDS_TEST_CRITIQUE:
-      case NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION:
-      case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE:
-        log(
-          "info",
-          "ROUTER_TO_CRITIC",
-          `Status is ${currentStatus}. Routing to Critic Agent.`,
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        nextAgent = agents.critic
-        break
-
-      // Stop network loop cases
-      case NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION:
-        log(
-          "info",
-          "ROUTER_STOP_FOR_COMMAND",
-          "Status is NEEDS_COMMAND_EXECUTION. Stopping agent network loop.",
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        // nextAgent remains undefined
-        break
-      case NetworkStatus.Enum.COMPLETED:
-      case NetworkStatus.Enum.FAILED:
-        log(
-          "info",
-          "ROUTER_STOP_COMPLETED_FAILED",
-          `Task already ended with status: ${currentStatus}. Stopping.`,
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        // nextAgent remains undefined
-        break
-      case NetworkStatus.Enum.NEEDS_HUMAN_INPUT:
-        log(
-          "info",
-          "ROUTER_STOP_FOR_HUMAN",
-          "Status is NEEDS_HUMAN_INPUT. Stopping agent network loop.",
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        // nextAgent remains undefined
-        break
-      default:
-        log(
-          "error",
-          "ROUTER_UNKNOWN_STATUS",
-          `Unknown or unhandled status: ${currentStatus}. Stopping.`,
-          { status: currentStatus, sandboxId: currentSandboxId }
-        )
-        // nextAgent remains undefined
-        break
-    }
+): Agent<TddNetworkState> | undefined {
+  switch (state.status) {
+    case NetworkStatus.Enum.IDLE:
+    case NetworkStatus.Enum.READY:
+      return agents.teamLead // Start with TeamLead
+    case NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE:
+      return agents.critic
+    case NetworkStatus.Enum.NEEDS_TEST:
+    case NetworkStatus.Enum.NEEDS_TEST_REVISION:
+      return agents.tester
+    case NetworkStatus.Enum.NEEDS_TEST_CRITIQUE:
+      return agents.critic
+    // FIX: Use NEEDS_CODE instead of non-existent NEEDS_IMPLEMENTATION
+    case NetworkStatus.Enum.NEEDS_CODE:
+    case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION:
+      return agents.coder
+    case NetworkStatus.Enum.NEEDS_TYPE_CHECK: // Added type check step
+    case NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION:
+      return agents.tooling // Tooling agent handles type checks and commands
+    case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE:
+      return agents.critic
+    case NetworkStatus.Enum.COMPLETED:
+    case NetworkStatus.Enum.FAILED:
+    case NetworkStatus.Enum.NEEDS_HUMAN_INPUT: // Added case for human input stop
+      return undefined // Stop the network
+    default:
+      console.error(`Unknown network status: ${state.status}`)
+      return undefined // Stop on unknown status
   }
-  // Log chosen agent
-  log(
-    "info",
-    "ROUTER_END",
-    `Chosen agent: ${nextAgent?.name || "None (Stopping)"}`,
-    {
-      chosenAgent: nextAgent?.name || null,
-      status: currentStatus,
-      sandboxId: currentSandboxId,
-    }
-  )
-
-  return nextAgent
 }
 
 /**
@@ -217,121 +79,100 @@ export function chooseNextAgent(
  */
 export function saveStateToKv(
   network: Network<TddNetworkState>,
-  state: TddNetworkState | null
+  state: TddNetworkState | null,
+  log: HandlerLogger // Pass logger for saving state logs
 ) {
   if (state) {
-    log(
-      "info",
-      "KV_SET_BEFORE_RETURN", // Reusing this log step name for now
+    log.info(
+      { step: "KV_SET_BEFORE_RETURN" }, // Using step identifier
       "Saving state to KV.",
       { status: state.status, sandboxId: state.sandboxId }
     )
     // Add detailed log of the state being saved
-    log("info", "KV_SET_VALUE", "State value being saved:", {
-      stateToSave: JSON.stringify(state),
+    log.info({ step: "KV_SET_VALUE" }, "State value being saved:", {
+      // Limit logged state for brevity if needed
+      stateToSave: JSON.stringify(state).substring(0, 500) + "...",
     })
     network?.state?.kv?.set("network_state", state)
   } else {
-    log("warn", "KV_SET_SKIP", "Skipping KV set because state is null.")
+    log.warn({ step: "KV_SET_SKIP" }, "Skipping KV set because state is null.")
   }
 }
 
-const shouldStop = (state: TddNetworkState | null): boolean => {
-  if (!state) return true // Stop if no state
-  // FIX: Check status equality explicitly to avoid TS2345
-  return (
-    state.status === NetworkStatus.Enum.COMPLETED ||
-    state.status === NetworkStatus.Enum.FAILED ||
-    state.status === NetworkStatus.Enum.NEEDS_HUMAN_INPUT
-  )
-  /* Original check causing TS2345:
-  return [
-    NetworkStatus.Enum.COMPLETED,
-    NetworkStatus.Enum.FAILED,
-    NetworkStatus.Enum.NEEDS_HUMAN_INPUT,
-  ].includes(state.status) // Error TS2345
-  */
-}
+// Removed unused shouldStop function
 
-export const defaultRouter = async (
-  run: NetworkRun<TddNetworkState>
-): Promise<{ nextAgent: Agent<TddNetworkState> | null }> => {
-  const log: HandlerLogger = (run as any).log ?? console
-
-  const currentState = run.state.kv.get(
-    "network_state"
-  ) as TddNetworkState | null
+// Updated defaultRouter to accept log
+export const defaultRouter = async ({
+  network,
+  log,
+}: {
+  network: Network<TddNetworkState>
+  log: HandlerLogger // Expect log to be passed in
+}): Promise<Agent<TddNetworkState> | undefined> => {
+  const routerIterationStart = Date.now() // Timestamp for iteration start
   log.info(
-    { step: "ROUTER_START", status: currentState?.status },
-    "Router evaluating state."
+    { step: "ROUTER_ITERATION_START" }, // Add step identifier
+    "Router iteration starting.",
+    {
+      iterationStart: routerIterationStart,
+      currentStatus: network.state.kv.get("status"), // Log status at start
+    }
   )
 
-  if (shouldStop(currentState)) {
-    log.info(
-      { step: "ROUTER_STOP", status: currentState?.status },
-      "Stopping network run."
+  const state = parseAndInitializeState(network)
+  const currentSandboxId = state.sandboxId || null
+
+  // FIX: Correctly reconstruct the Agents object from the network.agents Map
+  const agentsMap = new Map(network.agents.entries())
+  const agents: Agents = {
+    teamLead: agentsMap.get("agent-teamlead") as Agent<TddNetworkState>,
+    tester: agentsMap.get("agent-tester") as Agent<TddNetworkState>,
+    coder: agentsMap.get("agent-coder") as Agent<TddNetworkState>,
+    critic: agentsMap.get("agent-critic") as Agent<TddNetworkState>,
+    tooling: agentsMap.get("agent-tooling") as Agent<TddNetworkState>,
+  }
+
+  // Ensure all agents were found in the map
+  if (Object.values(agents).some(agent => !agent)) {
+    log.error(
+      { step: "ROUTER_AGENT_MISSING" },
+      "Could not find one or more required agents in network.agents map.",
+      {
+        foundAgents: Array.from(agentsMap.keys()),
+        expectedAgents: [
+          "agent-teamlead",
+          "agent-tester",
+          "agent-coder",
+          "agent-critic",
+          "agent-tooling",
+        ],
+      }
     )
-    // Ensure state is saved before stopping if needed (might already be saved by the agent)
-    if (currentState) {
-      run.state.kv.set("network_state", currentState)
-      log.info(
-        { step: "KV_SET_BEFORE_STOP" },
-        "Saved final state before stopping."
-      )
-    }
-    return { nextAgent: null }
+    // Potentially update state to FAILED here
+    state.status = NetworkStatus.Enum.FAILED
+    state.error = "Router setup error: Agent mapping failed."
+    saveStateToKv(network, state, log)
+    return undefined // Stop the network
   }
 
-  // FIX: Remove fetching agents from run.availableAgents()
-  // The agents object should be available from the context where router is called
-  // or passed explicitly if this router function were used directly.
-  // const agents = (await run.availableAgents()) as Agents // REMOVED
+  const nextAgent = chooseNextAgent(state, agents)
 
-  // Placeholder/Error: Cannot determine agents from run object directly in this standalone function.
-  // This router logic is now primarily invoked within createDevOpsNetwork where agents are defined.
-  // If used elsewhere, agents must be provided.
-  log.error(
-    { step: "ROUTER_AGENT_FETCH_ERROR" },
-    "Cannot fetch agents directly inside defaultRouter function anymore."
-  )
-  // Throw an error or return null to indicate failure
-  // return { nextAgent: null };
-  throw new Error(
-    "defaultRouter cannot fetch agents; agents must be provided by caller."
-  )
+  // Save state regardless of whether an agent is chosen (might have been modified)
+  // Pass the logger to saveStateToKv
+  saveStateToKv(network, state, log)
 
-  /* --- REMOVED/REPLACED Logic --- */
-  /*
-  let chosenAgent: Agent<TddNetworkState> | null = null
-  let chosenAgentName = "None"
-
-  // FIX: Use NetworkStatus.Enum.VALUE for all switch cases
-  switch (currentState?.status) {
-      // ... cases ...
-      default:
-        log.error(
-          { step: "ROUTER_UNKNOWN_STATUS", status: currentState?.status },
-          "Unknown network status for routing."
-        )
-        if (currentState) {
-          run.state.kv.set("network_state", {
-            ...currentState,
-            status: NetworkStatus.Enum.FAILED,
-          })
-          log.info(
-            { step: "KV_SET_BEFORE_STOP_UNKNOWN" },
-            "Saved FAILED state before stopping due to unknown status."
-          )
-        }
-        return { nextAgent: null } // Stop on unknown status
-    }
-
+  const routerIterationEnd = Date.now() // Timestamp for iteration end
   log.info(
-    { step: "ROUTER_END", status: currentState?.status },
-    `Routing to: ${chosenAgentName}`,
-    { chosenAgentName }
+    { step: "ROUTER_ITERATION_END" }, // Add step identifier
+    "Router iteration finished.",
+    {
+      // FIX: Use nextAgent?.name instead of nextAgent?.id
+      chosenAgent: nextAgent?.name || "None (Stopping)", // Log agent name
+      finalStatusInIteration: state?.status,
+      durationMs: routerIterationEnd - routerIterationStart,
+      sandboxId: currentSandboxId, // Include sandboxId in final log
+    }
   )
 
-  return { nextAgent: chosenAgent }
-  */
+  return nextAgent // Return the chosen agent (or undefined to stop)
 }

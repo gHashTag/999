@@ -1,17 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { createNetwork, Agent, type NetworkRun } from "@inngest/agent-kit"
+import { createNetwork, /*Agent,*/ type NetworkRun } from "@inngest/agent-kit"
 // import { deepseek } from "@inngest/ai/models"
 import { TddNetworkState } from "@/types/network" // Remove unused NetworkStatus
-import { log } from "@/utils/logic/logger" // Corrected import to 'log'
+// Remove direct import of log
+// import { log as defaultLog } from "@/utils/logic/logger"
 // Import router logic functions
+// Remove unused imports from routerLogic
 import {
-  parseAndInitializeState,
-  chooseNextAgent,
-  saveStateToKv,
+  // parseAndInitializeState,
+  // chooseNextAgent,
+  // saveStateToKv,
+  defaultRouter, // Import the defaultRouter function itself
 } from "./routerLogic"
-import { type Agents } from "@/types/agents" // Import Agents type
-import { defaultRouter } from "./routerLogic" // Correct path
+// Remove unused Agents import
+import { /*type Agents,*/ type AgentDependencies } from "@/types/agents" // Import Agents and AgentDependencies
 
 // Define the Network States for TDD flow with Critique Loop
 /*
@@ -41,63 +44,42 @@ interface NetworkState {
 }
 */
 
-// FIX: Use Agent type for function parameters and add defaultModel
-export function createDevOpsNetwork(
-  teamLeadAgent: Agent<any>,
-  testerAgent: Agent<any>,
-  codingAgent: Agent<any>,
-  criticAgent: Agent<any>,
-  toolingAgent: Agent<any>,
-  defaultModel: any // Use any for ModelAdapter
-) {
-  const router: any = defaultRouter // Use imported defaultRouter
+// Updated createDevOpsNetwork to accept dependencies
+export function createDevOpsNetwork(dependencies: AgentDependencies) {
+  const { agents, model: defaultModel, log } = dependencies // Destructure dependencies
+
+  // Ensure all required agents are present by checking the input 'agents' object
+  if (
+    !agents?.teamLead ||
+    !agents?.tester ||
+    !agents?.coder ||
+    !agents?.critic ||
+    !agents?.tooling
+  ) {
+    throw new Error(
+      "Missing one or more required agents (teamLead, tester, coder, critic, tooling) in dependencies.agents object."
+    )
+  }
 
   const network = createNetwork<TddNetworkState>({
     name: "TeamLead TDD DevOps Network",
+    // Pass agents from the 'agents' object in dependencies as an array
     agents: [
-      teamLeadAgent,
-      testerAgent,
-      codingAgent,
-      criticAgent,
-      toolingAgent,
+      agents.teamLead,
+      agents.tester,
+      agents.coder,
+      agents.critic,
+      agents.tooling,
     ],
-    // defaultModel: deepseek({
-    //   apiKey: process.env.DEEPSEEK_API_KEY!,
-    //   model: process.env.DEEPSEEK_MODEL || "deepseek-coder",
-    // }),
-    defaultModel: defaultModel, // Pass the model
-    router: router, // Pass the router
-    maxIter: 25,
-    defaultRouter: async ({ network }) => {
-      const routerIterationStart = Date.now() // Timestamp for iteration start
-      log("info", "ROUTER_ITERATION_START", "Router iteration starting.", {
-        iterationStart: routerIterationStart,
-      })
-
-      const state = parseAndInitializeState(network)
-      const currentSandboxId = state.sandboxId || null
-
-      const agents: Agents = {
-        teamLead: teamLeadAgent as Agent<TddNetworkState>,
-        tester: testerAgent as Agent<TddNetworkState>,
-        coder: codingAgent as Agent<TddNetworkState>,
-        critic: criticAgent as Agent<TddNetworkState>,
-        tooling: toolingAgent as Agent<TddNetworkState>,
-      }
-      const nextAgent = chooseNextAgent(state, agents)
-
-      saveStateToKv(network, state)
-
-      const routerIterationEnd = Date.now() // Timestamp for iteration end
-      log("info", "ROUTER_ITERATION_END", "Router iteration finished.", {
-        chosenAgent: nextAgent?.name || "None (Stopping)",
-        finalStatusInIteration: state?.status,
-        durationMs: routerIterationEnd - routerIterationStart,
-        sandboxId: currentSandboxId, // Include sandboxId in final log
-      })
-
-      return nextAgent // Return the chosen agent (or undefined to stop)
+    defaultModel: defaultModel, // Pass the model from dependencies
+    // Pass the router function, wrapping it to inject the logger
+    router: async ({ network }) => {
+      // Call the imported defaultRouter, passing the logger from dependencies
+      return defaultRouter({ network, log })
     },
+    maxIter: 25,
+    // defaultRouter property is removed as router is now provided
+    // defaultRouter: async ({ network }) => { ... } // Original inline router removed
   })
 
   // --- Remove agent tools check log ---

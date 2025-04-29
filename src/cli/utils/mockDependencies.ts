@@ -2,7 +2,7 @@ import { type Sandbox } from "e2b"
 import { systemEvents as importedSystemEvents } from "../../utils/logic/systemEvents" // Alias import
 // Import unified HandlerLogger and AgentDependencies
 import { AgentDependencies, HandlerLogger } from "../../types/agents" // Adjusted path
-import { vi } from "vitest" // ADD import for vi
+import { mock } from "bun:test" // ADD import for mock
 // import { EventEmitter } from "events" // Unused
 import type { Tool } from "@inngest/agent-kit" // Import Tool type
 import { mockDeepseekModel } from "../../utils/logic/mockDeepseekModel" // Import mock model
@@ -15,11 +15,11 @@ const mockTools: Tool<any>[] = [
     description: "Mock tool",
     parameters: {}, // Add empty parameters if needed by Tool type
     // run: async () => ({ output: ["mock response"] }), // Keep run if used elsewhere?
-    handler: vi.fn().mockResolvedValue({ output: ["mock response"] }), // ADD handler
+    handler: mock().mockResolvedValue({ output: ["mock response"] }), // ADD handler
   },
   {
     name: "readFile",
-    handler: vi.fn().mockResolvedValue("Mock file content"),
+    handler: mock().mockResolvedValue("Mock file content"),
   },
 ]
 

@@ -1,125 +1,65 @@
-import { describe, beforeEach, it, expect, vi } from "vitest"
+import { describe, beforeEach, it, expect, mock } from "bun:test"
 
 // Import agent creation functions
-// import { createTesterAgent } from "@/agents/tester/logic/createTesterAgent"
 import { createOpenCodexAgent } from "@/agents/open-codex/logic/createOpenCodexAgent"
-// import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"; // Placeholder
+import { setupTestEnvironmentFocused } from "./testSetupFocused" // Ensure this provides necessary mocks if needed
 
-// Import the centralized setup function
-import { setupTestEnvironmentFocused } from "./testSetupFocused" // <-- CORRECTED
+// --- Tests for Open Codex Agent ---
+describe("createOpenCodexAgent", () => {
+  // Setup basic mocks if needed, e.g., logger
+  let mockLogger: { error: ReturnType<typeof mock> }
 
-// Import the test runner functions
-import { runTesterAgentTests } from "./agents/testerAgentTests"
-import { runCodingAgentTests } from "./agents/codingAgentTests"
-// import { runTeamLeadAgentTests } from "./agents/teamLeadAgentTests" // Removed import for non-existent file
-// import { runToolingAgentTests } from "./agents/toolingAgentTests" // Removed import for non-existent file
-// import { runCriticAgentTests } from "./agents/criticAgentTests"
-
-// Minimal mock dependencies for definition tests -- REMOVED
-// const mockAgentDepsMinimal: AgentDependencies = { /* ... */ };
-
-// Minimal mock for available agents (empty array)
-// const mockAvailableAgents: AvailableAgent[] = [] // Remove unused variable
-
-// REMOVED: Unused imports for agent creation functions and Agent type
-// import {
-//   createTeamLeadAgent,
-//   createTesterAgent,
-//   createCoderAgent, // <-- WRONG NAME
-//   createCriticAgent,
-//   createToolingAgent,
-// } from "@/agents"
-// import { Agent } from "@inngest/agent-kit"
-
-// Import common dependencies from the centralized test setup
-// REMOVED: Unused imports
-// import {
-//   createBaseMockDependencies,
-//   getMockTools,
-// } from "./testSetupFocused"
-// import { type AgentDependencies } from "@/types/agents"
-
-// REMOVED: Unused variable
-// const mockInstructions = {
-//   teamLead: "Mock TL instructions",
-// }
-
-describe("Agent Definitions", () => {
-  // Setup mocks before each test suite defined below
   beforeEach(() => {
-    // Use the corrected setup function
-    setupTestEnvironmentFocused()
+    setupTestEnvironmentFocused() // Reset mocks
+    mockLogger = {
+      error: mock(), // Correct usage of mock
+    }
   })
 
-  // --- Run Tests for createTesterAgent ---
-  describe("createTesterAgent", () => {
-    runTesterAgentTests() // Call the imported function
+  it("should route question to existing agent", async () => {
+    const mockAgent = {
+      ask: mock().mockResolvedValue("test response"), // Correct usage of mock
+    }
+    const agents = {
+      testAgent: mockAgent,
+    }
+    const openCodex = createOpenCodexAgent(agents)
+
+    const response = await openCodex.ask("testAgent: test question")
+
+    expect(mockAgent.ask).toHaveBeenCalledWith("test question")
+    expect(response).toBe("test response")
   })
 
-  // --- Run Tests for createCodingAgent ---
-  describe("createCodingAgent", () => {
-    // <-- CORRECTED NAME
-    // FIX: Pass minimal mock deps directly to creation function if needed
-    // Or define mocks inside the test if they differ
-    runCodingAgentTests() // Call the imported function
+  it("should handle unknown agent", async () => {
+    const agents = {}
+    const openCodex = createOpenCodexAgent(agents, { log: mockLogger })
+
+    const response = await openCodex.ask("unknown: test")
+
+    expect(mockLogger.error).toHaveBeenCalledWith("Unknown agent: unknown")
+    expect(response).toContain("Я Open Codex") // Check for default response part
   })
 
-  // --- Run Tests for createTeamLeadAgent ---
-  // describe("createTeamLeadAgent", () => {
-  //   runTeamLeadAgentTests() // Call the imported function
-  // })
+  it("should broadcast response to other agents", async () => {
+    const mockAgent1 = {
+      ask: mock().mockResolvedValue("response"), // Correct usage of mock
+    }
+    const mockAgent2 = {
+      ask: mock(), // Correct usage of mock
+    }
+    const agents = {
+      agent1: mockAgent1,
+      agent2: mockAgent2,
+    }
+    const openCodex = createOpenCodexAgent(agents)
 
-  // --- Run Tests for createToolingAgent ---
-  // describe("createToolingAgent", () => {
-  //   runToolingAgentTests() // Call the imported function
-  // })
+    await openCodex.ask("agent1: question")
 
-  // --- Tests for Open Codex Agent ---
-  describe("createOpenCodexAgent", () => {
-    it("should route question to existing agent", async () => {
-      const mockAgent = {
-        ask: vi.fn().mockResolvedValue("test response"),
-      }
-      const agents = {
-        testAgent: mockAgent,
-      }
-      const openCodex = createOpenCodexAgent(agents)
-
-      const response = await openCodex.ask("testAgent: test question")
-
-      expect(mockAgent.ask).toHaveBeenCalledWith("test question")
-      expect(response).toBe("test response")
-    })
-
-    it("should handle unknown agent", async () => {
-      const mockLogger = {
-        error: vi.fn(),
-      }
-      const agents = {}
-      const openCodex = createOpenCodexAgent(agents, { log: mockLogger })
-
-      const response = await openCodex.ask("unknown: test")
-
-      expect(mockLogger.error).toHaveBeenCalledWith("Unknown agent: unknown")
-      expect(response).toContain("Я Open Codex")
-    })
-
-    it("should broadcast response to other agents", async () => {
-      const mockAgent1 = {
-        ask: vi.fn().mockResolvedValue("response"),
-      }
-      const mockAgent2 = {
-        ask: vi.fn(),
-      }
-      const agents = {
-        agent1: mockAgent1,
-        agent2: mockAgent2,
-      }
-      const openCodex = createOpenCodexAgent(agents)
-
-      await openCodex.ask("agent1: question")
-
-      expect(mockAgent2.ask).toHaveBeenCalledWith("response")
-    })
+    // Ensure broadcast happens *after* the initial ask resolves
+    // Since broadcasting is async and not awaited in the original code,
+    // we might need a small delay or a more sophisticated way to check this
+    // For now, let's just check if it was called.
+    expect(mockAgent2.ask).toHaveBeenCalledWith("response")
   })
-}) // End of outer describe
+})

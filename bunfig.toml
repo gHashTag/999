@@ -1,0 +1,3 @@
+[test]
+root = "./src"
+exclude = ["./dist", "./src/__tests_backup__"] # Explicitly exclude dist and backup 

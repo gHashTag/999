@@ -118,13 +118,14 @@ alwaysApply: true
     Остановите все текущие процессы (`pm2 delete all`) и запустите необходимые:
     ```bash
     # Компилятор TypeScript в режиме наблюдения
-    pm2 start pnpm --name tsc-watch -- run dev:watch
+    # Компилятор TypeScript в режиме наблюдения
+    pm2 start bun --name tsc-watch -- run build:watch
 
     # Inngest Dev Server (требуется для локальной разработки Inngest)
-    pm2 start pnpm --name inngest-dev -- run dev:inngest
+    pm2 start bun --name inngest-dev -- run dev:serve
 
-    # Основное приложение (Vite сервер)
-    pm2 start pnpm --name vite-app -- run dev:start
+    # Основное приложение (Сервер приложения)
+    pm2 start bun --name app-server -- run dev:start
     ```
 3.  **Проверка Статуса:**
     ```bash
@@ -163,7 +164,7 @@ alwaysApply: true
 1.  **Окно 1: Компиляция TypeScript (Watch Mode)**
 
     ```bash
-    pnpm run build:watch
+    bun run build:watch
     ```
 
     - **Назначение:** Запускает `tsc --watch --preserveWatchOutput`. Автоматически перекомпилирует `.ts` файлы в `dist/` при их изменении.
@@ -171,16 +172,16 @@ alwaysApply: true
 2.  **Окно 2: Inngest Dev Server**
 
     ```bash
-    pnpm run dev:serve
+    bun run dev:serve
     ```
 
     - **Назначение:** Запускает `inngest-cli dev`. Слушает события на `http://localhost:8288`, находит и запускает функции Inngest из работающего приложения (подключаясь к нему по URL, указанному в команде, обычно `http://localhost:8484/api/inngest`).
 
-3.  **Окно 3: Сервер Приложения (Vite)**
+3.  **Окно 3: Сервер Приложения**
     ```bash
-    pnpm run dev:start
+    bun run dev:start
     ```
-    - **Назначение:** Запускает `vite --port 8484`. Основной сервер, который обслуживает API для Inngest (`/api/inngest`) и выполняет код функций/агентов. Пытается использовать порт 8484.
+    - **Назначение:** Запускает основной сервер (ранее Vite, теперь может быть другой), который обслуживает API для Inngest (`/api/inngest`) и выполняет код функций/агентов. Пытается использовать порт 8484.
 
 **Перед началом работы с AI:** Убедитесь, что все три команды успешно запущены в отдельных окнах и работают без ошибок.
 

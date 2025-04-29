@@ -10,8 +10,8 @@ echo "📂 Using output file: ${OUTPUT_FILE}"
 
 # Run Vitest with specific parameters
 echo "🏃 Running Vitest E2E test..."
-# pnpm exec vitest run ${TEST_FILE} --no-watch --reporter=${REPORTER} --outputFile=${OUTPUT_FILE}
-bunx vitest run ${TEST_FILE} --no-watch --reporter=${REPORTER} --outputFile=${OUTPUT_FILE}
+# pnpm exec bun:test run ${TEST_FILE} --no-watch --reporter=${REPORTER} --outputFile=${OUTPUT_FILE}
+bunx bun:test run ${TEST_FILE} --no-watch --reporter=${REPORTER} --outputFile=${OUTPUT_FILE}
 
 EXIT_CODE=$?
 

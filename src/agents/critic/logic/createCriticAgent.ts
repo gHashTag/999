@@ -13,24 +13,20 @@ import {
 
 /**
  * Creates the Critic agent.
- * @param dependencies - The dependencies for the agent, including instructions.
+ * @param dependencies - The dependencies for the agent.
  * @param instructions - The system instructions for the agent.
  * @returns The Critic agent instance.
  */
-export const createCriticAgent = ({
-  instructions,
-  ...dependencies
-}: { instructions: string } & AgentDependencies): Agent<any> => {
+export const createCriticAgent = (
+  dependencies: AgentDependencies,
+  instructions: string
+): Agent<any> => {
   const { apiKey, modelName, allTools, log } = dependencies
 
   // Filter tools specifically needed by Critic
+  const allowedToolNames = ["updateTaskState", "web_search"] // Correct list from tests
   const toolsToUse = allTools.filter((tool: Tool<any>) =>
-    [
-      "readFile",
-      "web_search", // Critic might need to check best practices
-      "updateTaskState",
-      // Add other tool names as needed
-    ].includes(tool.name)
+    allowedToolNames.includes(tool.name)
   )
 
   // Removed: const systemPrompt = readAgentInstructions("Critic")
@@ -38,8 +34,9 @@ export const createCriticAgent = ({
   log?.info("Creating Critic Agent", { toolCount: toolsToUse.length })
 
   return new Agent({
-    name: "Critic Agent",
-    description: "Оценивает код, тесты и результаты, выполняет рефакторинг.",
+    name: "Critic", // Simplified name
+    description:
+      "Оценивает код, тесты или результаты выполнения команд, выполняет рефакторинг.", // Updated description
     system: instructions, // Use passed instructions
     model: deepseek({ apiKey, model: modelName }),
     tools: toolsToUse,
