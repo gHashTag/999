@@ -1,5 +1,5 @@
 import { type Context } from "inngest"
-import { Sandbox } from "e2b"
+import { Sandbox } from "@e2b/sdk"
 import { TddNetworkState } from "@/types/network"
 import { HandlerLogger } from "@/types/agents"
 import { HandlerStepName } from "@/types/handlerSteps"
@@ -11,63 +11,59 @@ export async function ensureSandboxId(
   eventId: string
 ): Promise<string> {
   let currentSandboxId: string | null | undefined = currentState?.sandboxId
-  logger.info(
-    { step: HandlerStepName.SANDBOX_CHECK_START },
-    "Checking for existing sandbox ID.",
-    { eventId }
-  )
+  logger.info("Checking sandbox status...", {
+    step: HandlerStepName.SANDBOX_CHECK_START,
+    sandboxId: currentSandboxId,
+    eventId,
+  })
 
   if (!currentSandboxId) {
-    logger.info(
-      { step: HandlerStepName.GET_SANDBOX_ID_START },
-      "No sandbox ID, creating new.",
-      { eventId }
-    )
-    const newSandboxId = await step.run("get-sandbox-id", async () => {
-      logger.info(
-        { step: HandlerStepName.CREATE_SANDBOX_STEP_START },
-        "Creating sandbox...",
-        { eventId }
-      )
-      // Убираем autoPause, т.к. вызывает ошибку типа
-      const sandbox = await Sandbox.create()
-      logger.info(
-        { step: HandlerStepName.CREATE_SANDBOX_STEP_END },
-        "Sandbox created.",
-        {
-          eventId,
-          newSandboxId: sandbox.sandboxId,
-        }
-      )
-      return sandbox.sandboxId
+    logger.info("No sandbox ID found, creating new sandbox step.", {
+      step: HandlerStepName.GET_SANDBOX_ID_START,
+      eventId,
     })
-    currentSandboxId = newSandboxId
-    logger.info(
-      { step: HandlerStepName.GET_SANDBOX_ID_END },
-      "Got new sandbox ID.",
-      {
-        eventId,
-        sandboxId: currentSandboxId,
+    const newSandboxId = await step.run(
+      HandlerStepName.CREATE_SANDBOX_STEP_END,
+      async () => {
+        logger.info("Creating new E2B sandbox...", {
+          step: HandlerStepName.CREATE_SANDBOX_STEP_START,
+        })
+        const sandbox = await Sandbox.create("base")
+        const createdId = sandbox.sandboxId
+        logger.info(`Sandbox created successfully with ID: ${createdId}`, {
+          step: HandlerStepName.CREATE_SANDBOX_STEP_END,
+          newSandboxId: createdId,
+        })
+        return createdId
       }
     )
-  } else {
-    logger.info(
-      { step: HandlerStepName.GET_SANDBOX_ID_SKIP },
-      "Reusing existing sandbox ID.",
-      { eventId, sandboxId: currentSandboxId }
-    )
-  }
-  logger.info(
-    { step: HandlerStepName.SANDBOX_CHECK_END },
-    "Finished sandbox ID check.",
-    {
+    currentSandboxId = newSandboxId
+    logger.info(`Retrieved new sandbox ID: ${currentSandboxId}`, {
+      step: HandlerStepName.GET_SANDBOX_ID_END,
       eventId,
       sandboxId: currentSandboxId,
-    }
-  )
+    })
+  } else {
+    logger.info(`Using existing sandbox ID: ${currentSandboxId}`, {
+      step: HandlerStepName.GET_SANDBOX_ID_END,
+      eventId,
+      sandboxId: currentSandboxId,
+    })
+  }
+  logger.info("Sandbox check complete.", {
+    step: HandlerStepName.SANDBOX_CHECK_END,
+    sandboxId: currentSandboxId,
+    eventId,
+  })
 
   if (!currentSandboxId) {
     throw new Error("Sandbox ID missing after creation attempt.")
   }
   return currentSandboxId
+}
+
+export const getSandbox = async (sandboxId: string): Promise<Sandbox> => {
+  const idToConnect = process.env.SANDBOX_ID ?? sandboxId
+  const sandbox = await Sandbox.connect(idToConnect)
+  return sandbox
 }

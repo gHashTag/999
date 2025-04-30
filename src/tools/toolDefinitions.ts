@@ -1,48 +1,29 @@
 // src/tools/toolDefinitions.ts
-import { z } from "zod"
-import { type GetSandboxFunc } from "@/inngest/utils/sandboxUtils"
+// FIX: Remove unused z import
+// import { z } from "zod"
+import type { GetSandboxFunc } from "@/inngest/utils/sandboxUtils"
 import type { HandlerLogger } from "@/types/agents"
-import { createAskHumanForInputTool } from "./definitions/askHumanForInput"
+// Remove unused createAskHumanForInputTool import
+// import { createAskHumanForInputTool } from "./definitions/askHumanForInput"
 import { type Tool } from "@inngest/agent-kit"
-// import { createTool } from "@inngest/agent-kit"; // Removed - createTool comes from definitions now
-
-// --- Tool Schema Definitions (Kept Here For Now) --- //
-// TODO: Consider moving schemas to a dedicated src/tools/schemas.ts file
-export const terminalParamsSchema = z.object({ command: z.string() })
-export const createOrUpdateFilesParamsSchema = z.object({
-  files: z.array(z.object({ path: z.string(), content: z.string() })),
-})
-export const readFilesParamsSchema = z.object({ files: z.array(z.string()) })
-export const runCodeParamsSchema = z.object({ code: z.string() })
-export const processArtifactParamsSchema = z.object({
-  artifactPath: z.string().describe("Local path to the .tar.gz artifact file"),
-  fileToRead: z
-    .string()
-    .describe("Path to the file to read inside the archive (e.g., 'test.js')"),
-})
-// Schema for askHumanForInput is defined within its own file now.
-
-// Define schema for the mock web_search tool - REMOVED
-// const webSearchParamsSchema = z.object({ ... });
 
 // --- Import Tool Creators Directly from Subdirectories --- //
-import { createTerminalTool } from "./definitions/terminal"
-import { createCreateOrUpdateFilesTool } from "./definitions/createOrUpdateFiles"
-import { createReadFilesTool } from "./definitions/readFiles"
-import { createRunCodeTool } from "./definitions/runCode"
-import { createProcessArtifactTool } from "./definitions/processArtifact"
+import { createTerminalTool } from "./definitions/terminal/createTerminalTool"
+// Remove unused createCreateOrUpdateFilesTool import
+// import { createCreateOrUpdateFilesTool } from "./definitions/createOrUpdateFiles"
+import { createReadFilesTool } from "./definitions/readFiles/createReadFilesTool"
+// Remove unused runCode and processArtifact imports
+// import { createRunCodeTool } from "./definitions/runCode"
+// import { createProcessArtifactTool } from "./definitions/processArtifact"
 import { createUpdateTaskStateTool } from "./definitions/updateTaskStateTool"
-
-// --- Mock Web Search Tool - REMOVED --- //
-// const createWebSearchMockTool = ( ... ) => { ... };
+// FIX: Remove imports for non-existent tools
+// import { createRunCommandTool } from "./definitions/runCommand/createRunCommandTool"
+// import { createWriteFilesTool } from "./definitions/writeFiles/createWriteFilesTool"
+// import { createWebSearchTool } from "./definitions/webSearch/createWebSearchTool"
+// import { createAskHumanTool } from "./definitions/askHuman/createAskHumanTool"
 
 /**
  * Function to get all defined tools.
- * @param log - The logging function.
- * @param getSandbox - Async function to get a sandbox instance.
- * @param eventId - The current event ID.
- * @param sandboxId - The current sandbox ID (can be null initially).
- * @returns An array of tools.
  */
 export function getAllTools(
   log: HandlerLogger,
@@ -52,25 +33,46 @@ export function getAllTools(
 ): Tool<any>[] {
   // Define tools using their respective creation functions
   const terminalTool = createTerminalTool(log, getSandbox, eventId, sandboxId)
-  const askHumanTool = createAskHumanForInputTool(log, eventId)
-  const fileTool = createCreateOrUpdateFilesTool(
-    log,
-    getSandbox,
-    eventId,
-    sandboxId
-  )
+  // FIX: Remove call for non-existent tool
+  // const askHumanTool = createAskHumanTool(log, eventId)
+  // Remove fileTool (createOrUpdateFiles)
+  // const fileTool = createCreateOrUpdateFilesTool(log, getSandbox, eventId, sandboxId)
   const readFileTool = createReadFilesTool(log, getSandbox, eventId, sandboxId)
-  const runCodeTool = createRunCodeTool(log, eventId, sandboxId)
-  const processArtifactTool = createProcessArtifactTool(log, eventId, sandboxId)
-  const updateStateTool = createUpdateTaskStateTool(log, eventId)
+  // Remove runCodeTool
+  // const runCodeTool = createRunCodeTool(log, eventId, sandboxId)
+  // Remove processArtifactTool
+  // const processArtifactTool = createProcessArtifactTool(log, eventId, sandboxId)
+  const updateStateTool = createUpdateTaskStateTool(log, undefined, eventId)
+  // FIX: Remove calls for non-existent tools
+  // const runCommandTool = createRunCommandTool(
+  //   log,
+  //   getSandbox,
+  //   eventId,
+  //   sandboxId
+  // )
+  // const writeFilesTool = createWriteFilesTool(
+  //   log,
+  //   getSandbox,
+  //   eventId,
+  //   sandboxId
+  // )
+  // const webSearchTool = createWebSearchTool(log, eventId)
 
-  return [
+  const tools: Tool<any>[] = [
     terminalTool,
-    askHumanTool,
-    fileTool,
+    // askHumanTool, // Removed
+    // fileTool, // Removed
     readFileTool,
-    runCodeTool,
-    processArtifactTool,
+    // runCodeTool, // Removed
+    // processArtifactTool, // Removed
     updateStateTool,
+    // runCommandTool, // Removed
+    // writeFilesTool, // Removed
+    // webSearchTool, // Removed
+
+    // Placeholder MCP Tools
+    // ...
   ]
+
+  return tools
 }

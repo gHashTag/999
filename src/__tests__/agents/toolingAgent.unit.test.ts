@@ -1,52 +1,68 @@
 import { describe, it, expect, beforeEach } from "bun:test"
-import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"
 import {
-  createBaseMockDependencies,
+  // createBaseMockDependencies, // Deprecated
+  createFullMockDependencies, // Use new factory
   getMockTools,
+  // mockDeepseekModelAdapter, // Tooling agent likely doesn't need model
 } from "../setup/testSetupFocused"
-import { type AgentDependencies } from "@/types/agents"
+import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"
+import type { AgentDependencies } from "@/types/agents"
 import type { Tool as AnyTool } from "@inngest/agent-kit"
 
-describe.skip("Tooling Agent Unit Tests (Implementation Pending)", () => {
-  let baseDeps: ReturnType<typeof createBaseMockDependencies>
-  let toolsForTest: AnyTool<any>[]
+describe("Tooling Agent Unit Tests", () => {
+  let baseDeps: AgentDependencies
 
   beforeEach(() => {
-    baseDeps = createBaseMockDependencies()
-    // Global setup hook handles mock reset
+    baseDeps = createFullMockDependencies() // Use new factory
   })
 
   it("should create a Tooling agent with default dependencies", () => {
-    const toolingAgent = createToolingAgent({
-      ...baseDeps,
-      instructions: "Test instructions",
-    })
+    // Tooling agent might not need instructions, or they are fixed
+    const toolingAgent = createToolingAgent({ ...baseDeps, instructions: "" })
     expect(toolingAgent).toBeDefined()
-    expect(toolingAgent.name).toBe("Tooling")
+    expect(toolingAgent.name).toBe("Tooling Agent")
   })
 
-  it("should filter tools correctly", () => {
-    const allMockToolsAvailable = getMockTools([
+  // Tooling agent might not use the standard model adapter
+  // it("should have access to the correct model adapter", () => {
+  //   const toolingAgent = createToolingAgent(baseDeps)
+  //   expect((toolingAgent as any).model).toBe(baseDeps.model)
+  // })
+
+  it("should filter tools correctly based on tooling requirements (likely all)", () => {
+    const allMockTools: AnyTool<any>[] = getMockTools([
       "readFile",
       "writeFile",
       "runTerminalCommand",
       "updateTaskState",
+      "web_search",
+      "mcp_cli-mcp-server_run_command",
+      "mcp_cli-mcp-server_show_security_rules",
     ])
-    toolsForTest = allMockToolsAvailable
-    const depsWithExtraTools: AgentDependencies = {
-      ...baseDeps,
-      allTools: toolsForTest,
-    }
+    const depsWithTools = createFullMockDependencies({ allTools: allMockTools })
+
+    // Pass full dependencies including instructions to the agent creation function
     const toolingAgent = createToolingAgent({
-      ...depsWithExtraTools,
-      instructions: "Test instructions",
+      ...depsWithTools,
+      instructions: "",
     })
-    expect(toolingAgent).toBeDefined()
 
-    const expectedToolName = "runTerminalCommand"
-    const expectedTool = getMockTools([expectedToolName])[0]
+    // Tooling agent likely needs access to *all* defined tools
+    const expectedToolNames = allMockTools.map(t => t.name).sort()
+    const actualToolNames = Array.from(toolingAgent.tools.keys()).sort()
 
-    expect(toolingAgent.tools.size).toBe(1)
-    expect(toolingAgent.tools.get(expectedToolName)).toBe(expectedTool)
+    expect(actualToolNames).toEqual(expectedToolNames)
+    expect(toolingAgent.tools.size).toBe(expectedToolNames.length)
+  })
+
+  it("should handle having no tools passed in dependencies", () => {
+    const depsWithoutTools = createFullMockDependencies({ allTools: [] })
+    // Pass instructions even when no tools
+    const toolingAgent = createToolingAgent({
+      ...depsWithoutTools,
+      instructions: "",
+    })
+    expect(toolingAgent.tools).toBeDefined()
+    expect(toolingAgent.tools.size).toBe(0)
   })
 })

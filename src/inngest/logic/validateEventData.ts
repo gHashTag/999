@@ -1,6 +1,6 @@
 import { type EventPayload } from "inngest"
 import {
-  CodingAgentEvent,
+  type CodingAgentEvent,
   codingAgentEventSchema,
   type CodingAgentEventData,
 } from "@/types/events"
@@ -22,21 +22,18 @@ export function validateEventData(
   // --- Skip Zod validation in test environment ---
   if (process.env.NODE_ENV === "test") {
     logger.info(
-      { step: "VALIDATE_DATA_SKIP_TEST" },
-      "Skipping Zod validation in test environment.",
+      "Skipping data validation for test event.", // String message
       {
+        step: "VALIDATE_DATA_SKIP_TEST",
         eventId: event?.id,
-        rawData: event?.data,
+        eventName: event?.name,
       }
     )
     // FIX: Access properties correctly via event.data
     if (!event || !event.data) {
       logger.warn(
-        { step: "VALIDATE_DATA_SKIP_TEST_NODATA" },
-        "Test environment provided null/undefined event or event data.",
-        {
-          eventId: event?.id,
-        }
+        "Test event has no data object.", // String message
+        { step: "VALIDATE_DATA_SKIP_TEST_NODATA", eventId: event?.id }
       )
       return { error: "Test environment provided no event or event data." }
     }
@@ -44,9 +41,9 @@ export function validateEventData(
     const eventData = event.data as unknown as CodingAgentEventData
     if (typeof eventData.input !== "string") {
       logger.error(
-        { step: "VALIDATE_DATA_SKIP_TEST_NOINPUT" },
-        "Test environment data is missing the mandatory 'input' field.",
+        "Test environment data is missing the mandatory 'input' field.", // String message
         {
+          step: "VALIDATE_DATA_SKIP_TEST_NOINPUT",
           eventId: event?.id,
           receivedData: eventData,
         }
@@ -69,15 +66,21 @@ export function validateEventData(
   // FIX: Parse event.data using the schema
   const validatedResult = codingAgentEventSchema.safeParse(event.data)
   if (!validatedResult.success) {
+    const errorMessage = "Invalid event data received."
+    const errorDetails = validatedResult.error.issues
+      .map(e => `${e.path.join(".")}: ${e.message}`)
+      .join("; ")
     logger.error(
-      { step: HandlerStepName.HANDLER_INVALID_DATA },
-      "Invalid event data received.",
+      `${errorMessage} Details: ${errorDetails}`, // String message
       {
+        step: HandlerStepName.HANDLER_INVALID_DATA,
         eventId: event?.id,
-        validationErrors: validatedResult.error.issues,
+        errors: validatedResult.error.flatten(), // Log structured errors
       }
     )
-    return { error: "Invalid event data." }
+    return {
+      error: `${errorMessage} ${errorDetails}`,
+    }
   }
   // FIX: Return validated data matching ValidatedData structure
   // The schema itself defines 'input' and 'currentState', so validatedResult.data conforms

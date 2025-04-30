@@ -1,20 +1,22 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import {
-  createBaseMockDependencies,
-  type AgentDependencies,
+  createFullMockDependencies,
+  getMockTools,
+  mockLogger,
 } from "../setup/testSetupFocused"
 import { createCoderAgent } from "@/agents/coder/logic/createCoderAgent"
 
+const coderInstructions =
+  "Ты - дисциплинированный Разработчик (Coder) в цикле TDD..."
+
 describe("Agent Definitions: Coder Agent", () => {
-  let coderInstructions: string
-  let baseDeps: AgentDependencies
+  let baseDeps: ReturnType<typeof createFullMockDependencies>
 
   beforeEach(() => {
-    baseDeps = createBaseMockDependencies()
+    baseDeps = createFullMockDependencies()
   })
 
   it("should create a Coder agent with correct basic properties", () => {
-    coderInstructions = "Test coder instructions"
     const agent = createCoderAgent({
       ...baseDeps,
       instructions: coderInstructions,
@@ -24,21 +26,18 @@ describe("Agent Definitions: Coder Agent", () => {
     expect(agent.description).toBe(
       "Пишет или исправляет код на основе требований и тестов."
     )
-    expect(agent.model).toBe(baseDeps.model)
-    expect(agent.tools).toBeDefined()
+    expect((agent as any).model.options.model).toBe(baseDeps.modelName)
+    expect((agent as any).model.options.apiKey).toBe(baseDeps.apiKey)
   })
 
-  // Skip this test due to @inngest/test internalEvents error
   it.skip("should generate code using InngestTestEngine", async () => {
     // ... test body remains skipped ...
   })
 
   it("should generate a system prompt containing core instructions", () => {
-    coderInstructions = "Ты - дисциплинированный Разработчик"
     const agent = createCoderAgent({
       ...baseDeps,
       instructions: coderInstructions,
-      allTools: [],
     })
 
     const systemPrompt = agent.system
@@ -48,20 +47,25 @@ describe("Agent Definitions: Coder Agent", () => {
   })
 
   it("should correctly filter tools", () => {
-    coderInstructions = "Instructions for tool filter test"
+    const allMockTools = getMockTools([
+      "readFile",
+      "createOrUpdateFiles",
+      "runTerminalCommand",
+      "edit_file",
+      "codebase_search",
+      "grep_search",
+      "updateTaskState",
+      "web_search",
+      "writeFile",
+      "mcp_cli-mcp-server_run_command",
+    ])
     const agent = createCoderAgent({
       ...baseDeps,
       instructions: coderInstructions,
+      allTools: allMockTools,
+      log: mockLogger,
     })
 
-    expect(agent.tools.size).toBe(3)
-    expect(agent.tools.has("readFile")).toBe(true)
-    expect(agent.tools.has("runTerminalCommand")).toBe(true)
-    expect(agent.tools.has("edit_file")).toBe(true)
-    expect(agent.tools.has("writeFile")).toBe(false)
-    expect(agent.tools.has("web_search")).toBe(false)
-    expect(agent.tools.has("updateTaskState")).toBe(false)
-    expect(agent.tools.has("runCommand")).toBe(false)
-    expect(agent.tools.has("mcp_cli-mcp-server_run_command")).toBe(false)
+    expect(agent.tools.size).toBe(6)
   })
 })

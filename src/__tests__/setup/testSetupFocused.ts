@@ -1,323 +1,300 @@
-import { mock, type Mock } from "bun:test"
-import { beforeEach } from "bun:test" // Import beforeEach for the hook
-import { createTool, type Tool as AgentKitTool } from "@inngest/agent-kit"
-import { Agent /*, type State */ } from "@inngest/agent-kit"
-import type {
-  HandlerLogger,
-  AgentDependencies as InternalAgentDependencies,
-} from "@/types/agents" // Keep internal AgentDependencies alias
-import { TddNetworkState, NetworkStatus } from "@/types/network"
-import { z } from "zod"
-import { systemEvents as realSystemEvents } from "@/utils/logic/systemEvents" // Import real systemEvents to get its type
+import { mock } from "bun:test"
+import { beforeEach } from "bun:test"
+import type { AgentDependencies as AgentDependenciesType } from "@/types/agents"
+import type { Tool as AnyTool } from "@inngest/agent-kit"
+import type { BaseLogger, KvStore, SystemEvents, Sandbox } from "@/types/agents"
 
 // --- Central Mock Definitions ---
 
 // Re-export the AgentDependencies type
-export type AgentDependencies = InternalAgentDependencies
+export type AgentDependencies = AgentDependenciesType
 
-// Mock Logger - Explicitly mock each method
-export const mockInfo = mock(() => {})
-export const mockWarn = mock(() => {})
-export const mockError = mock(() => {})
-export const mockDebug = mock(() => {})
-export const mockLog = mock(() => {})
-
-export const mockLogger: HandlerLogger = {
+// Mock Logger
+export const mockInfo = mock<(...args: unknown[]) => void>()
+export const mockError = mock<(...args: unknown[]) => void>()
+export const mockWarn = mock<(...args: unknown[]) => void>()
+export const mockDebug = mock<(...args: unknown[]) => void>()
+export const mockLogger: BaseLogger = {
   info: mockInfo,
-  warn: mockWarn,
   error: mockError,
+  warn: mockWarn,
   debug: mockDebug,
-  log: mockLog,
-} // Removed unnecessary cast
-
-// Mock KV Store (in-memory for tests)
-let mockKvStore = new Map<string, any>()
-export const mockKv = {
-  get: mock((key: string) => mockKvStore.get(key)),
-  set: mock((key: string, value: any) => {
-    mockKvStore.set(key, value)
-  }),
-  all: mock(() => Object.fromEntries(mockKvStore)),
-  delete: mock((key: string) => mockKvStore.delete(key)),
-  has: mock((key: string) => mockKvStore.has(key)),
+  fatal: mock<(...args: unknown[]) => void>(),
+  trace: mock<(...args: unknown[]) => void>(),
+  silent: mock<(...args: unknown[]) => void>(),
+  level: "info",
+  child: mock(() => mockLogger as any),
 }
 
-// Mock System Events Emitter
-export const mockSystemEvents = {
-  emit: mock(),
-  addListener: mock(), // Added mock for addListener if used by systemEvents type
-  removeAllListeners: mock(), // Added mock for removeAllListeners if used by systemEvents type
-} as unknown as typeof realSystemEvents // Keep cast for now
-
-// Mock Constants
-export let mockApiKey = "test-api-key" // Use let for potential reset in setup
-export let mockModelName = "test-model"
-export let mockEventId = "test-event-id"
-
-// Mock AI Model Adapter (Placeholder/Basic Mock)
-// Make it closer to AiAdapter.Any or use `as any` deliberately
-export const mockDeepseekModelAdapter = {
-  id: "mock-deepseek",
-  request: mock().mockResolvedValue({}), // Ensure request is a mock function
-  // Add dummy properties to resemble AiAdapter.Any or accept using `as any`
-  format: "testing-format",
-  options: {},
-  authKey: "test-auth",
-  "~types": {},
-} as any // Using 'as any' to bypass strict type checking for the mock
-
-// Real Deepseek Model Adapter (Placeholder/Stub for Integration Tests)
-// Requires environment variables DEEPSEEK_API_KEY and DEEPSEEK_MODEL
-export let realDeepseekApiKey =
-  process.env.DEEPSEEK_API_KEY || "dummy-key-for-test"
-export let realDeepseekModelName =
-  process.env.DEEPSEEK_MODEL || "deepseek-coder"
-export const realDeepseekModelAdapter = {
-  name: "real-deepseek-model-adapter",
-  id: "real-deepseek-model-adapter-id",
-  apiKey: realDeepseekApiKey,
-  model: realDeepseekModelName,
-  request: mock(() =>
-    Promise.resolve({
-      text: async () => "Real LLM Response Placeholder",
-      usage: { promptTokens: 10, completionTokens: 5 },
-      finishReason: "stop",
-      raw: {},
-    })
-  ),
-  config: {},
-  client: {},
-} as any // Use 'as any' for simplicity
-
-// --- Central Mock Tools ---
-
-// Define mock implementations for common tools
-const mockToolImplementations: {
-  [key: string]: (...args: any[]) => Promise<any>
-} = {
-  web_search: mock(() => Promise.resolve({ results: "Mock search results" })),
-  updateTaskState: mock(() => Promise.resolve({ success: true })),
-  readFile: mock(() => Promise.resolve({ content: "Mock file content" })),
-  writeFile: mock(() => Promise.resolve({ success: true })),
-  runTerminalCommand: mock(() =>
-    Promise.resolve({ output: "mock terminal output", exitCode: 0 })
-  ),
-  runCommand: mock(() =>
-    Promise.resolve({ output: "mock runCommand output", exitCode: 0 })
-  ),
-  edit_file: mock(() => Promise.resolve({ success: true })),
-  codebase_search: mock(() => Promise.resolve({ results: [] })),
-  grep_search: mock(() => Promise.resolve({ results: [] })),
-  // Add mock MCP tools for testing filtering
-  "mcp_cli-mcp-server_run_command": mock(() =>
-    Promise.resolve({ output: "mcp command output" })
-  ),
-  "mcp_cli-mcp-server_show_security_rules": mock(() =>
-    Promise.resolve({ rules: "mock security rules" })
-  ),
-}
-
-// Create mock tools using createTool
-export const mockTools: AgentKitTool<any>[] = Object.entries(
-  mockToolImplementations
-).map(([name, handler]) =>
-  createTool({
-    name,
-    description: `Mock tool for ${name}`,
-    parameters: z.object({}),
-    handler,
-  })
+// Mock KV Store
+export const mockKvStoreData: Record<string, unknown> = {}
+export const mockKvGet = mock(
+  <T = unknown>(key: string): Promise<T | undefined> =>
+    Promise.resolve(mockKvStoreData[key] as T | undefined)
+)
+export const mockKvSet = mock(
+  <T = unknown>(key: string, value: T): Promise<void> => {
+    console.log(`[DEBUG mockKvSet] Setting key: ${key}, value:`, value)
+    mockKvStoreData[key] = value
+    return Promise.resolve()
+  }
+)
+export const mockKvDelete = mock((key: string): Promise<boolean> => {
+  const exists = key in mockKvStoreData
+  delete mockKvStoreData[key]
+  return Promise.resolve(exists)
+})
+export const mockKvHas = mock((key: string): Promise<boolean> => {
+  return Promise.resolve(key in mockKvStoreData)
+})
+export const mockKvAll = mock(
+  (): Promise<Record<string, unknown>> =>
+    Promise.resolve({ ...mockKvStoreData })
 )
 
-// Helper function to add a tool dynamically if needed during tests
-// (Be careful with this, prefer defining all mocks upfront)
-export function addMockTool(
-  name: string,
-  handler: (...args: any[]) => Promise<any>
-) {
-  const existingTool = mockTools.find(tool => tool.name === name)
-  if (existingTool) {
-    console.warn(`Mock tool "${name}" already exists. Overwriting handler.`)
-    existingTool.handler = handler
-  } else {
-    mockTools.push(
-      createTool({
-        name,
-        description: `Dynamically added mock tool: ${name}`,
-        parameters: z.object({}), // Generic parameters
-        handler,
-      })
-    )
-  }
+export const mockKv: KvStore = {
+  get: mockKvGet as <T = unknown>(key: string) => Promise<T | undefined>,
+  set: mockKvSet,
+  delete: mockKvDelete,
+  has: mockKvHas,
+  all: mockKvAll,
 }
 
-// --- Test Environment Setup ---
-
-export function setupTestEnvironmentFocused() {
-  // Reset logger mocks
-  mockInfo.mockClear()
-  mockWarn.mockClear()
-  mockError.mockClear()
-  mockDebug.mockClear()
-  mockLog.mockClear()
-
-  // Reset KV mocks (implementation and calls)
-  mockKvStore = new Map<string, any>() // Clear the in-memory store
-  mockKv.get.mockClear()
-  mockKv.set.mockClear()
-  mockKv.all.mockClear()
-  mockKv.delete.mockClear()
-  mockKv.has.mockClear()
-  // Reset implementations to default (if they were changed in tests)
-  mockKv.get.mockImplementation((key: string) => mockKvStore.get(key))
-  mockKv.set.mockImplementation((key: string, value: any) => {
-    mockKvStore.set(key, value)
-  })
-  mockKv.all.mockImplementation(() => Object.fromEntries(mockKvStore))
-  mockKv.delete.mockImplementation((key: string) => mockKvStore.delete(key))
-  mockKv.has.mockImplementation((key: string) => mockKvStore.has(key))
-
-  // Reset system event mocks
-  if ((mockSystemEvents.emit as Mock<any>).mockClear) {
-    ;(mockSystemEvents.emit as Mock<any>).mockClear()
+// Mock SystemEvents
+export const mockEmit = mock(
+  (_event: string, _payload: Record<string, unknown>): Promise<void> => {
+    return Promise.resolve()
   }
-  if ((mockSystemEvents.addListener as Mock<any>).mockClear) {
-    ;(mockSystemEvents.addListener as Mock<any>).mockClear()
-  }
-  if ((mockSystemEvents.removeAllListeners as Mock<any>).mockClear) {
-    ;(mockSystemEvents.removeAllListeners as Mock<any>).mockClear()
-  }
-
-  // Reset tool mocks
-  mockTools.forEach(tool => {
-    if ((tool.handler as Mock<any>).mockClear) {
-      ;(tool.handler as Mock<any>).mockClear()
-      // Reset implementation if needed, e.g., back to default promise
-      if (mockToolImplementations[tool.name]) {
-        ;(tool.handler as Mock<any>).mockImplementation(
-          mockToolImplementations[tool.name]
-        )
-      }
-    }
-  })
-
-  // Reset AI model mocks
-  if (mockDeepseekModelAdapter.request.mockClear) {
-    mockDeepseekModelAdapter.request.mockClear()
-    // Reset implementation to default if needed
-    mockDeepseekModelAdapter.request.mockImplementation(() =>
-      Promise.resolve({})
-    )
-  }
-  if (realDeepseekModelAdapter.request.mockClear) {
-    realDeepseekModelAdapter.request.mockClear()
-    // Reset implementation to default placeholder if needed
-    realDeepseekModelAdapter.request.mockImplementation(() =>
-      Promise.resolve({
-        text: async () => "Real LLM Response Placeholder",
-        usage: { promptTokens: 10, completionTokens: 5 },
-        finishReason: "stop",
-        raw: {},
-      })
-    )
-  }
-
-  // Reset constants (if mutable)
-  mockApiKey = "test-api-key"
-  mockModelName = "test-model"
-  mockEventId = "test-event-id"
-  realDeepseekApiKey = process.env.DEEPSEEK_API_KEY || "dummy-key-for-test"
-  realDeepseekModelName = process.env.DEEPSEEK_MODEL || "deepseek-coder"
-  realDeepseekModelAdapter.apiKey = realDeepseekApiKey
-  realDeepseekModelAdapter.model = realDeepseekModelName
+)
+export const mockSystemEvents: SystemEvents = {
+  emit: mockEmit,
 }
 
-// Call setup before each test using bun's hook
-beforeEach(() => {
-  setupTestEnvironmentFocused()
-})
+// Mock Sandbox
+export const mockSandboxFilesRead = mock<(path: string) => Promise<string>>(
+  async path => `Mock content for ${path}`
+)
+export const mockSandboxFilesWrite = mock<
+  (path: string, content: string) => Promise<void>
+>(async () => {})
+export const mockSandboxFilesList = mock(async () => [])
+export const mockSandboxFilesRemove = mock(async () => {})
 
-// --- Helper Functions ---
+export const mockSandboxProcessStart = mock(async () => ({
+  exited: Promise.resolve(0),
+  output: { stdout: "", stderr: "" },
+  kill: mock(async () => {}),
+  sendStdin: mock(async () => {}),
+  onStdout: mock(() => () => {}),
+  onStderr: mock(() => () => {}),
+  onExit: mock(() => () => {}),
+}))
+export const mockSandboxProcessStartAndWait = mock(async () => ({
+  stdout: "",
+  stderr: "",
+  exitCode: 0,
+}))
 
-/**
- * Creates a *complete* base set of mock dependencies suitable for AgentDependencies type.
- * Tests can override specific fields if needed.
- */
-export const createBaseMockDependencies = (): AgentDependencies => {
+export const mockSandbox: Sandbox = {
+  filesystem: {
+    read: mockSandboxFilesRead,
+    write: mockSandboxFilesWrite,
+    list: mockSandboxFilesList,
+    remove: mockSandboxFilesRemove,
+  },
+  process: {
+    start: mockSandboxProcessStart,
+    startAndWait: mockSandboxProcessStartAndWait,
+  },
+  id: "mock-sandbox-id",
+} as unknown as Sandbox
+
+// Mock Model Adapter (DeepSeek)
+export const mockModelRequest = mock(
+  async (/*prompt: string, opts?: unknown*/) => ({
+    result: "Mock LLM response",
+  })
+)
+export const mockDeepseekModelAdapter = {
+  request: mockModelRequest,
+}
+
+// Default Mock Dependencies
+export const mockApiKey = "test-api-key"
+export const mockModelName = "test-model"
+export const mockEventId = "test-event-id"
+
+// Function to create full AgentDependencies with defaults
+export function createFullMockDependencies(
+  overrides: Partial<AgentDependencies> = {}
+): AgentDependencies {
   return {
-    allTools: mockTools, // Use the existing mockTools array
-    log: mockLogger, // Use the existing mockLogger
     apiKey: mockApiKey,
     modelName: mockModelName,
     systemEvents: mockSystemEvents,
-    sandbox: null, // Default sandbox to null for unit tests
+    sandbox: mockSandbox,
     eventId: mockEventId,
-    // agents: {}, // Agents are typically added per-test, not in base deps
-    model: mockDeepseekModelAdapter, // Use the mocked model adapter
-  }
-}
-
-/**
- * Finds a mock tool by name from the central mockTools array.
- * Uses tool.name for matching.
- * @param name The name of the tool to find.
- * @returns The mock handler function of the tool.
- * @throws Error if the tool is not found.
- */
-export function findToolMock(name: string): Mock<any> | undefined {
-  const tool = mockTools.find(t => t.name === name) // Use t.name
-  // Ensure the handler is actually a mock function
-  return tool?.handler as Mock<any> | undefined
-}
-
-/**
- * Gets a filtered list of mock tools by name.
- * Uses tool.name for matching.
- * @param names - An array of tool names to retrieve.
- * @returns An array of the requested mock tools.
- * @throws Error if any requested tool is not found.
- */
-export function getMockTools(names: string[]): AgentKitTool<any>[] {
-  return mockTools.filter(t => names.includes(t.name)) // Use t.name
-}
-
-/**
- * Creates a mock Agent object for testing purposes.
- */
-export function createMockAgent(name: string, description = ""): Agent<any> {
-  // Return an object that structurally resembles Agent<any> for mocking purposes
-  // Or use `as unknown as Agent<any>` if full mocking is complex
-  return {
-    name: name,
-    description: description || `Mock agent: ${name}`,
-    definition: {
-      // Add definition property expected by some tests
-      name: name,
-      description: description || `Mock agent: ${name}`,
-      id: name, // Use name as id for mock
-      tools: new Map(),
-      model: mockDeepseekModelAdapter,
-      system: `Mock system prompt for ${name}`,
-    },
+    log: mockLogger,
+    allTools: mockTools,
+    kv: mockKv,
     model: mockDeepseekModelAdapter,
-    system: `Mock system prompt for ${name}`,
-    tools: new Map(),
-    // Add other necessary Agent properties/methods as mocks if needed by tests
-    // e.g., send: mock(), if tests call agent.send()
-  } as unknown as Agent<any> // Cast to bypass strict type check for mock
-}
-
-/**
- * Creates a mock network state object.
- */
-export function createMockNetworkState(
-  initialData?: Partial<TddNetworkState>
-): TddNetworkState {
-  return {
-    status: NetworkStatus.Enum.IDLE,
-    task: "Mock Task",
-    sandboxId: "mock-sandbox-id",
-    run_id: "mock-run-id",
-    ...initialData,
+    agents: {},
+    ...overrides,
   }
 }
+
+// Mock Tools
+export const mockReadFileHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ files: [{ path: "mock.txt", content: "mock read content" }] }))
+export const mockWriteFileHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ success: true }))
+export const mockRunCommandHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ output: "mock command output" }))
+export const mockUpdateTaskStateHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ success: true }))
+export const mockWebSearchHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ results: ["mock search result"] }))
+export const mockMcpRunCommandHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ output: "mcp command output" }))
+export const mockMcpShowSecurityRulesHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ rules: "mock rules" }))
+
+// Add handlers for missing Coder tools
+export const mockCreateOrUpdateFilesHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ success: true }))
+export const mockEditFileHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ success: true }))
+export const mockCodebaseSearchHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ results: ["mock code snippet"] }))
+export const mockGrepSearchHandler = mock<
+  (...args: unknown[]) => Promise<unknown>
+>(async () => ({ results: ["mock grep line"] }))
+
+function createMockTool(
+  name: string,
+  description: string,
+  handler: (...args: unknown[]) => Promise<unknown>
+): AnyTool<any> {
+  return {
+    name,
+    description,
+    handler: mock(handler),
+  } as AnyTool<any>
+}
+
+export const mockTools: AnyTool<any>[] = [
+  createMockTool("readFile", "Reads files", mockReadFileHandler),
+  createMockTool("writeFile", "Writes files", mockWriteFileHandler),
+  createMockTool("runTerminalCommand", "Runs command", mockRunCommandHandler),
+  createMockTool(
+    "updateTaskState",
+    "Updates state",
+    mockUpdateTaskStateHandler
+  ),
+  createMockTool("web_search", "Searches web", mockWebSearchHandler),
+  createMockTool(
+    "mcp_cli-mcp-server_run_command",
+    "MCP run cmd",
+    mockMcpRunCommandHandler
+  ),
+  createMockTool(
+    "mcp_cli-mcp-server_show_security_rules",
+    "MCP show rules",
+    mockMcpShowSecurityRulesHandler
+  ),
+  // Add missing Coder tools to the array
+  createMockTool(
+    "createOrUpdateFiles",
+    "Creates/updates files",
+    mockCreateOrUpdateFilesHandler
+  ),
+  createMockTool("edit_file", "Edits a file", mockEditFileHandler),
+  createMockTool(
+    "codebase_search",
+    "Searches codebase",
+    mockCodebaseSearchHandler
+  ),
+  createMockTool("grep_search", "Performs grep search", mockGrepSearchHandler),
+]
+
+export function getMockTools(names: string[]): AnyTool<any>[] {
+  return mockTools.filter(tool => names.includes(tool.name))
+}
+
+export function findToolMock(name: string): AnyTool<any> | undefined {
+  return mockTools.find(tool => tool.name === name)
+}
+
+// Helper to create a basic mock agent
+export function createMockAgent(name: string, description: string) {
+  return {
+    name,
+    description,
+    tools: new Map(), // Mock tools map
+    model: mockDeepseekModelAdapter, // Use the mock model adapter
+    // Add a mock send method
+    send: mock(async (_message: unknown) => {
+      // console.log(`Mock agent ${name} received message:`, message)
+      return { success: true }
+    }),
+  }
+}
+
+export function setupTestEnvironmentFocused(): void {
+  // Clear specific mocks
+  mockInfo.mockClear()
+  mockError.mockClear()
+  mockWarn.mockClear()
+  mockDebug.mockClear()
+  mockEmit.mockClear()
+  mockKvGet.mockClear()
+  mockKvSet.mockClear() // Clear set calls
+  mockKvDelete.mockClear()
+  mockKvHas.mockClear()
+  mockKvAll.mockClear()
+  mockSandboxFilesRead.mockClear()
+  mockSandboxFilesWrite.mockClear()
+  mockSandboxFilesList.mockClear()
+  mockSandboxFilesRemove.mockClear()
+  mockSandboxProcessStart.mockClear()
+  mockSandboxProcessStartAndWait.mockClear()
+  mockModelRequest.mockClear()
+  mockUpdateTaskStateHandler.mockClear()
+  mockReadFileHandler.mockClear()
+  mockWriteFileHandler.mockClear()
+  mockRunCommandHandler.mockClear()
+  mockWebSearchHandler.mockClear()
+  mockMcpRunCommandHandler.mockClear()
+  mockMcpShowSecurityRulesHandler.mockClear()
+  // Add new handlers to clear
+  mockCreateOrUpdateFilesHandler.mockClear()
+  mockEditFileHandler.mockClear()
+  mockCodebaseSearchHandler.mockClear()
+  mockGrepSearchHandler.mockClear()
+
+  // Reset handlers on mock tools
+  mockTools.forEach(tool => {
+    if (tool.handler && (tool.handler as any).mockClear) {
+      ;(tool.handler as any).mockClear()
+    }
+  })
+
+  // Clear KV store data
+  Object.keys(mockKvStoreData).forEach(key => delete mockKvStoreData[key])
+}
+
+// --- Global Hooks ---
+// Automatically run setup before each test
+beforeEach(() => {
+  setupTestEnvironmentFocused()
+})

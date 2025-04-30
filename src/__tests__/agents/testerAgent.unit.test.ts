@@ -1,70 +1,60 @@
-import { describe, it, expect } from "bun:test" // Keep only used test functions
+import { describe, it, expect, beforeEach } from "bun:test"
 import {
-  createBaseMockDependencies,
+  createFullMockDependencies,
   getMockTools,
+  // mockDeepseekModelAdapter,
 } from "../setup/testSetupFocused"
 import { createTesterAgent } from "@/agents/tester/logic/createTesterAgent"
-import { type AgentDependencies } from "@/types/agents"
+import type { AgentDependencies } from "@/types/agents"
+import type { Tool } from "@inngest/agent-kit"
 
-// Global setup is handled by the hook in testSetupFocused.ts
+describe("Tester Agent Unit Tests", () => {
+  let baseDeps: AgentDependencies
 
-describe.skip("Tester Agent Unit Tests", () => {
-  // beforeEach is handled globally
+  beforeEach(() => {
+    baseDeps = createFullMockDependencies()
+  })
 
   it("should create a Tester agent with default dependencies", () => {
-    const baseDeps = createBaseMockDependencies()
     const testerAgent = createTesterAgent(baseDeps, "Test instructions")
-
     expect(testerAgent).toBeDefined()
     expect(testerAgent.name).toBe("Tester")
-    expect(testerAgent.description).toBeDefined()
   })
 
-  it("should create a Tester agent with specific tools provided in dependencies", () => {
-    const baseDeps = createBaseMockDependencies()
-    const specificTools = getMockTools(["readFile", "runTerminalCommand"])
-    const depsWithTools: AgentDependencies = {
-      ...baseDeps,
-      allTools: specificTools,
-    }
-    const testerAgent = createTesterAgent(depsWithTools, "Test instructions")
-
-    expect(testerAgent).toBeDefined()
-    expect(testerAgent.name).toBe("Tester")
-    expect(testerAgent.tools).toEqual(
-      new Map(specificTools.map(t => [t.name, t]))
-    )
-  })
-
-  it("should filter tools based on its needs if filtering logic exists", () => {
-    const baseDeps = createBaseMockDependencies()
-    const allMockToolsAvailable = getMockTools([
+  it("should filter tools correctly based on tester requirements", () => {
+    const allMockTools: Tool<any>[] = getMockTools([
       "readFile",
       "writeFile",
       "runTerminalCommand",
       "updateTaskState",
+      "web_search",
+      "mcp_cli-mcp-server_run_command",
+      "mcp_cli-mcp-server_show_security_rules",
     ])
-    const depsWithExtraTools: AgentDependencies = {
-      ...baseDeps,
-      allTools: allMockToolsAvailable,
-    }
-    const testerAgent = createTesterAgent(
-      depsWithExtraTools,
-      "Test instructions"
-    )
+    const depsWithTools: AgentDependencies = createFullMockDependencies({
+      allTools: allMockTools,
+    })
 
-    expect(testerAgent).toBeDefined()
-    const expectedToolNames = ["readFile", "runTerminalCommand"]
-    const expectedTools = getMockTools(expectedToolNames)
-    const sortByName = (a: { name: string }, b: { name: string }) =>
-      a.name.localeCompare(b.name)
+    const testerAgent = createTesterAgent(depsWithTools, "Test instructions")
 
-    const agentToolsSorted = Array.from(testerAgent.tools.values()).sort(
-      sortByName
-    )
-    expect(agentToolsSorted).toEqual(expectedTools.sort(sortByName))
+    const expectedToolNames = [
+      "runTerminalCommand",
+      "readFile",
+      "updateTaskState",
+    ].sort()
+
+    const actualToolNames = Array.from(testerAgent.tools.keys()).sort()
+
+    expect(actualToolNames).toEqual(expectedToolNames)
     expect(testerAgent.tools.size).toBe(expectedToolNames.length)
   })
 
-  // Add more specific tests for TesterAgent if needed
+  it("should handle having no tools passed in dependencies", () => {
+    const depsWithoutTools: AgentDependencies = createFullMockDependencies({
+      allTools: [],
+    })
+    const testerAgent = createTesterAgent(depsWithoutTools, "Test instructions")
+    expect(testerAgent.tools).toBeDefined()
+    expect(testerAgent.tools.size).toBe(0)
+  })
 })

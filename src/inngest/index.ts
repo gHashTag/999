@@ -1,18 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "dotenv/config"
 
-import { Inngest } from "inngest"
-import { type TddNetworkState } from "@/types/network"
+import { Inngest /*, type Context, type EventPayload*/ } from "inngest"
 import { CodingAgentHandlerArgs } from "@/types/inngest"
 import { validateEventData } from "@/inngest/logic/validateEventData"
 import { ensureSandboxId } from "@/inngest/logic/sandboxUtils"
-import { initializeOrRestoreState } from "@/inngest/logic/stateUtils"
+import { getCurrentState, logFinalResult } from "@/inngest/logic/stateUtils"
 import { createAgentDependencies } from "@/inngest/logic/dependencyUtils"
 import { processNetworkResult } from "@/inngest/logic/resultUtils"
 import { createDevOpsNetwork } from "@/network/network"
 import { HandlerStepName } from "@/types/handlerSteps"
-import { Network } from "@inngest/agent-kit"
 import { log } from "@/utils/logic/logger"
+// FIX: Remove unused NetworkRun and TddNetworkState imports
+// import type { NetworkRun } from "@inngest/agent-kit"
+// import { TddNetworkState } from "@/types/network"
 
 log(
   "info",
@@ -33,129 +34,115 @@ export const inngest = new Inngest({
 export const runCodingAgent = inngest.createFunction(
   { id: "run-coding-agent-network", name: "Run Coding Agent Network" },
   { event: "coding-agent/run" },
-  codingAgentHandler // Defined below
-)
-// --- Main Handler (Restored Full Logic) --- //
-export async function codingAgentHandler({
-  event,
-  step,
-  logger,
-}: CodingAgentHandlerArgs) {
-  // Log the full event object at the very beginning
-  logger.info(
-    { step: "HANDLER_DEBUG_FULL_EVENT" },
-    "Inspecting full event object received from @inngest/test:",
-    { fullEvent: event }
-  )
+  async ({ event, step, logger }: CodingAgentHandlerArgs) => {
+    const eventId = event.id ?? "unknown-event-id"
+    logger.info("Full event data:", {
+      step: "HANDLER_DEBUG_FULL_EVENT",
+      eventId,
+      event,
+    })
+    logger.info("Handler invoked.", {
+      step: HandlerStepName.HANDLER_ENTERED,
+      eventId,
+      functionId: "coding-agent/run",
+    })
 
-  const handlerStartTime = Date.now()
-  logger.info({ step: HandlerStepName.HANDLER_ENTERED }, "Handler invoked.", {
-    eventId: event?.id,
-    eventName: event?.name,
-    rawData: event?.data, // Log raw data for debugging
-  })
-
-  let finalState: TddNetworkState | null = null // Initialize finalState
-
-  try {
-    // 1. Validate Data
-    const validationResult = validateEventData(event, logger)
-    if (validationResult.error) {
-      // Return error consistent with the catch block format
-      return {
-        error: validationResult.error,
-        finalState: null,
-        executionTimeMs: Date.now() - handlerStartTime,
-      }
+    // 1. Validate Event Data
+    const validation = validateEventData(event, logger)
+    if (!validation.data) {
+      logger.error(`Invalid event data: ${validation.error}`, {
+        step: HandlerStepName.HANDLER_INVALID_DATA,
+        eventId,
+      })
+      return { success: false, error: validation.error }
     }
-    const validatedEventData = validationResult.data!
-    const eventId = event.id ?? "unknown-event-id" // Use actual or default event ID
+    const { input: task, currentState: initialStateFromEvent } = validation.data
 
     // 2. Ensure Sandbox ID
-    // Note: In test environment, ensureSandboxId is mocked via mock
     const sandboxId = await ensureSandboxId(
-      validatedEventData.currentState,
+      initialStateFromEvent,
+      step,
+      logger,
+      eventId
+    )
+    if (!sandboxId) {
+      return { success: false, error: "Failed to ensure sandbox ID." }
+    }
+
+    // 3. Create Dependencies
+    const agentDeps = await createAgentDependencies(logger, sandboxId, eventId)
+
+    // 4. Get Current State
+    const currentState = await getCurrentState(
+      logger,
+      agentDeps.kv,
+      task,
+      eventId
+    )
+    if (!currentState) {
+      return { success: false, error: "Failed to get or initialize state." }
+    }
+    if (currentState.sandboxId !== sandboxId) {
+      currentState.sandboxId = sandboxId
+      await agentDeps.kv?.set("sandboxId", sandboxId)
+    }
+
+    // 5. Run the Agent Network
+    logger.info(`Starting agent network run. Status: ${currentState.status}`, {
+      step: HandlerStepName.NETWORK_RUN_START,
+      eventId,
+      status: currentState.status,
+    })
+    const network = createDevOpsNetwork(agentDeps)
+    const result: any = await step.run("run-agent-network", async () => {
+      try {
+        const networkRunResult = await network.run(task, {
+          // Pass initialState option correctly
+          // initialState: currentState,
+        })
+        return networkRunResult
+      } catch (networkError) {
+        logger.error("Error during agent network run.", {
+          step: HandlerStepName.NETWORK_RUN_ERROR,
+          eventId,
+          error:
+            networkError instanceof Error
+              ? networkError.message
+              : String(networkError),
+          stack: networkError instanceof Error ? networkError.stack : undefined,
+        })
+        throw networkError
+      }
+    })
+    logger.info("Agent network run finished.", {
+      step: HandlerStepName.NETWORK_RUN_SUCCESS,
+      eventId,
+    })
+
+    // 6. Process Result
+    const processingResult = await processNetworkResult(
+      result,
       step,
       logger,
       eventId
     )
 
-    // 3. Initialize or Restore State
-    const currentState = initializeOrRestoreState(
-      validatedEventData,
-      sandboxId,
-      logger,
-      eventId
-    )
-    finalState = currentState // Update finalState after initialization/restore
+    // 7. Log Final State and Return
+    const finalState = processingResult?.finalState || currentState
+    logFinalResult(finalState, logger)
 
-    // 4. Create Dependencies (Agents, Tools)
-    const agentDeps = await createAgentDependencies(logger, sandboxId, eventId)
-    const agents = agentDeps.agents // Extract agents
-    const defaultModel = agentDeps.model // Get model from agentDeps directly
-
-    // Add a check to satisfy TypeScript's potential undefined concern
-    if (
-      !agents ||
-      !agents.teamLead ||
-      !agents.tester ||
-      !agents.coder ||
-      !agents.critic ||
-      !agents.tooling
-    ) {
-      throw new Error("Failed to create one or more core agents.")
-    }
-    if (!defaultModel) {
-      throw new Error("Failed to create the default language model adapter.")
-    }
-
-    // 5. Create and Run Network - Pass the single dependencies object
-    const devOpsNetwork: Network<TddNetworkState> =
-      createDevOpsNetwork(agentDeps)
-
-    logger.info(
-      { step: HandlerStepName.NETWORK_RUN_START },
-      "Starting agent network run.",
-      { eventId, initialState: currentState }
-    )
-    // Remove setting state before run
-    // devOpsNetwork.state.kv.set('network_state', currentState);
-    // FIX: Call network.run with the task description string
-    const result = await devOpsNetwork.run(currentState.task)
-
-    // Get final state from KV store (assuming router saves it under 'network_state')
-    // Reading the final state from result.state.kv should still be correct
-    finalState = (result.state.kv.get("network_state") ||
-      result.state.kv.all()) as TddNetworkState
-
-    logger.info(
-      { step: HandlerStepName.NETWORK_RUN_SUCCESS },
-      "Agent network run completed.",
-      {
+    if (processingResult) {
+      logger.info("Handler processing complete after action.", {
+        step: HandlerStepName.HANDLER_COMPLETED,
         eventId,
-        finalStatus: finalState?.status,
-      }
-    )
-
-    // 6. Process Result
-    return await processNetworkResult(result, step, logger, eventId)
-  } catch (error: any) {
-    const executionTimeMs = Date.now() - handlerStartTime
-    logger.error(
-      { step: HandlerStepName.HANDLER_ERROR },
-      "An error occurred in the handler.",
-      {
-        error: error.message,
-        stack: error.stack,
-        finalStateBeforeError: finalState, // Log the state before the error
-        executionTimeMs,
-      }
-    )
-    // Ensure consistent return format on error
-    return {
-      error: error.message || "Unknown handler error",
-      finalState: finalState, // Return the last known state
-      executionTimeMs,
+      })
+      return { success: true, ...processingResult }
     }
+
+    logger.info("Handler processing complete.", {
+      step: HandlerStepName.HANDLER_COMPLETED,
+      eventId,
+    })
+    return { success: true, finalStatus: finalState.status }
   }
-}
+)
