@@ -73,32 +73,47 @@ echo -e "${COLOR_BLUE}🕉️ Starting TDD Cycle for: $TEST_FILE ${COLOR_RESET}"
 
 # --- Phase 1: Red Test --- 
 echo -e "\n${COLOR_YELLOW}--- 🔴 Phase 1: Red Test ---${COLOR_RESET}"
-read -p "1. Have you written the failing test in '$TEST_FILE'? (Press Enter to continue)"
+# read -p "1. Have you written the failing test in '$TEST_FILE'? (Press Enter to continue)"
 
 run_type_check || exit 1
 run_test_check 1 "Red Test" || exit 1 # Expect fail (non-zero)
 
 # --- Phase 2: Green Test --- 
 echo -e "\n${COLOR_YELLOW}--- 🟢 Phase 2: Green Test ---${COLOR_RESET}"
+echo -e "   Assuming implementation is ready. Checking..."
 while true; do
-  read -p "2. Have you implemented the logic to make the test pass? (Press Enter to check)"
-  run_type_check || continue # If types fail, prompt again
+  # read -p "2. Have you implemented the logic to make the test pass? (Press Enter to check)"
+  run_type_check || {
+      echo -e "${COLOR_RED}   Type check failed during Green phase. Please fix and restart the script.${COLOR_RESET}"
+      exit 1
+  }
   run_test_check 0 "Green Test" && break # Expect pass (zero), break loop on success
-  echo -e "${COLOR_YELLOW}   Test still failing. Keep coding! Press Enter when ready to re-check.${COLOR_RESET}"
-  read -p "   (Press Enter to re-check, Ctrl+C to abort)"
+  echo -e "${COLOR_RED}   Test still failing in Green phase. Please fix the implementation and restart the script.${COLOR_RESET}"
+  # Removed loop prompt, script will now exit if Green test fails
+  exit 1
+  # read -p "   (Press Enter to re-check, Ctrl+C to abort)"
   # Loop continues
 done
 
 # --- Phase 3: Refactor --- 
 echo -e "\n${COLOR_YELLOW}--- ♻️ Phase 3: Refactor ---${COLOR_RESET}"
-while true; do
-  read -p "3. Refactor the code/test if needed. (Press Enter when ready to check)"
-  run_type_check || continue
-  run_test_check 0 "Refactor Check" && break
-  echo -e "${COLOR_YELLOW}   Test failing after refactor. Please fix. Press Enter when ready to re-check.${COLOR_RESET}"
-  read -p "   (Press Enter to re-check, Ctrl+C to abort)"
+echo -e "   Assuming refactoring is done (if any). Checking..."
+# Remove the loop for refactor as it doesn't make sense without interaction
+# while true; do
+  # read -p "3. Refactor the code/test if needed. (Press Enter when ready to check)"
+  run_type_check || {
+      echo -e "${COLOR_RED}   Type check failed after Refactor phase. Please fix and restart the script.${COLOR_RESET}"
+      exit 1
+  }
+  run_test_check 0 "Refactor Check" || {
+      echo -e "${COLOR_RED}   Test failed after Refactor phase. Please fix and restart the script.${COLOR_RESET}"
+      exit 1
+  }
+  # break
+  # echo -e "${COLOR_YELLOW}   Test failing after refactor. Please fix. Press Enter when ready to re-check.${COLOR_RESET}"
+  # read -p "   (Press Enter to re-check, Ctrl+C to abort)"
   # Loop continues
-done
+# done
 
 # --- Phase 4: Completion --- 
 echo -e "\n${COLOR_GREEN}🎉 TDD Cycle completed successfully for: $TEST_FILE ${COLOR_RESET}"
