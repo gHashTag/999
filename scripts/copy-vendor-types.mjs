@@ -25,10 +25,10 @@ function ensureDirSync(dirPath) {
   try {
     fs.mkdirSync(dirPath, { recursive: true })
     // console.log(`Directory created or already exists: ${dirPath}`);
-  } catch (err) {
-    if (err.code !== "EEXIST") {
-      console.error(`Error creating directory ${dirPath}:`, err)
-      throw err // Rethrow if it's not just "directory exists"
+  } catch (_err) {
+    if (_err.code !== "EEXIST") {
+      // console.error(`Error creating directory ${dirPath}:`, _err)
+      throw _err // Rethrow if it's not just "directory exists"
     }
   }
 }
@@ -43,9 +43,9 @@ function copyTypes(packageName, typesSubDir) {
   const targetPackageDir = path.join(targetVendorTypesDir, packageName)
   const targetTypesDir = path.join(targetPackageDir, typesSubDir) // Maintain subdirectory structure
 
-  console.log(`\nProcessing: ${packageName}`)
-  console.log(`  Source: ${sourceTypesDir}`)
-  console.log(`  Target: ${targetTypesDir}`)
+  // console.log(`\nProcessing: ${packageName}`)
+  // console.log(`  Source: ${sourceTypesDir}`)
+  // console.log(`  Target: ${targetTypesDir}`)
 
   if (fs.existsSync(sourceTypesDir)) {
     ensureDirSync(path.dirname(targetTypesDir)) // Ensure parent directories exist
@@ -56,23 +56,41 @@ function copyTypes(packageName, typesSubDir) {
         filter: src =>
           path.extname(src) === ".ts" || fs.statSync(src).isDirectory(), // Copy only .d.ts files and directories
       })
-      console.log(
-        `  ✅ Successfully copied types for ${packageName} to ${targetTypesDir}`
-      )
-    } catch (err) {
-      console.error(`  ❌ Error copying types for ${packageName}:`, err)
+      // console.log(
+      //   `  ✅ Successfully copied types for ${packageName} to ${targetTypesDir}`
+      // )
+    } catch (_err) {
+      // console.error(`  ❌ Error copying types for ${packageName}:`, _err)
     }
   } else {
-    console.warn(`  ⚠️ Source directory not found, skipping: ${sourceTypesDir}`)
+    // console.warn(`  ⚠️ Source directory not found, skipping: ${sourceTypesDir}`)
   }
 }
 
 // --- Main Execution ---
-console.log("Starting vendor type definition copy process...")
+// console.log("Starting vendor type definition copy process...")
 ensureDirSync(targetVendorTypesDir) // Ensure the main vendor-types directory exists
 
 packagesToCopy.forEach(pkg => {
   copyTypes(pkg.name, pkg.typesSubDir)
 })
 
-console.log("\nVendor type definition copy process finished.")
+// console.log("\nVendor type definition copy process finished.")
+
+async function main() {
+  const vendorDir = path.join(process.cwd(), "src", "vendor")
+  const destDir = path.join(process.cwd(), "src", "types", "vendor")
+
+  // console.log(`Source vendor directory: ${vendorDir}`)
+  // console.log(`Destination types directory: ${destDir}`)
+  // console.log("Scanning vendor directory...")
+
+  try {
+    const files = await fs.readdir(vendorDir)
+    // ... existing code ...
+  } catch (_copyError) {
+    // console.error(`Error copying file ${sourcePath}:`, _copyError)
+  }
+}
+
+main()

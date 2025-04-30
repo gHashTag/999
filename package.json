@@ -7,8 +7,8 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch --preserveWatchOutput",
-    "dev:serve": "bunx inngest-cli dev -u http://localhost:8484/api/inngest",
-    "dev:start": "vite --port 8484",
+    "dev:serve": "inngest-cli dev -u http://localhost:8484/api/inngest",
+    "dev:start": "bun run src/server/index.ts",
     "dev": "bash scripts/kill-ports.sh && concurrently --names \"INngest,App\" --raw \"bun run dev:serve\" \"bun run dev:start\"",
     "dev:test-report": "bunx vite preview --outDir html",
     "start": "node dist/index.js > node-app.log 2>&1",
@@ -16,14 +16,17 @@
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "test:e2e": "bun test src/__tests__/e2e/**/*.e2e.test.ts",
-    "lint": "eslint .",
+    "lint": "eslint . --ext .ts,.tsx --fix",
     "lint:fix": "eslint . --fix",
-    "format": "prettier . --write",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "format:check": "prettier . --check",
     "prepare": "husky",
     "start:tutorial": "tsx src/tutorial.ts",
     "serve:nodemon": "nodemon dist/index.js",
-    "open-codex": "tsx src/cli/open-codex-cli.ts"
+    "open-codex": "tsx src/cli/open-codex-cli.ts",
+    "typecheck": "bun exec tsc --noEmit",
+    "check": "bun run lint && bun run format && bun run typecheck",
+    "precommit": "lint-staged"
   },
   "keywords": [
     "inngest",
@@ -74,11 +77,6 @@
     "tsx": "^4.16.2",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.31.0",
-    "vite": "^6.3.3",
-    "vite-plugin-checker": "^0.9.1",
-    "vite-plugin-markdown": "^2.2.0",
-    "vite-plugin-node": "^5.0.1",
-    "vite-tsconfig-paths": "^5.1.4",
     "@types/bun": "latest"
   },
   "workspaces": [

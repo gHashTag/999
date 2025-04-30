@@ -2,6 +2,7 @@
 import prettyFactory from "pino-pretty"
 import readline from "readline"
 import { PassThrough } from "stream"
+import chalk from "chalk"
 
 // Define Emojis for levels
 const levelEmojis = {
@@ -17,11 +18,11 @@ const levelEmojis = {
 const defaultEmoji = "🪵"
 
 const prettyStream = prettyFactory({
-  colorize: true, // Let's still try to enable colors
-  ignore: "pid,hostname", // Ignore these fields
+  colorize: chalk.supportsColor,
+  ignore: "pid,hostname",
   translateTime: "HH:MM:ss.l", // Human-readable time format
   // Custom message format function
-  messageFormat: (log, messageKey, levelLabel, { colors }) => {
+  messageFormat: (log, messageKey, _levelLabel, _colors) => {
     const emoji = levelEmojis[log.level] || defaultEmoji
     const step = log.step ? `[${log.step}]` : ""
     const msg = log[messageKey] || ""

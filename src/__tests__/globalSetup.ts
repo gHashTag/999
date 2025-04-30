@@ -3,8 +3,8 @@ import process from "node:process"
 import net from "node:net"
 import http from "node:http"
 
-const INNGEST_PORT = 8288
-const VITE_PORT = 8484
+const APP_PORT = parseInt(process.env.APP_PORT || "8484", 10)
+const INNGEST_PORT = parseInt(process.env.INNGEST_PORT || "8288", 10)
 const REQUIRED_ENV_VARS = ["DEEPSEEK_API_KEY"] // Add more if needed
 
 // --- Helper Functions ---
@@ -108,15 +108,17 @@ export default async function setup() {
   }
   console.log(`      ✅ Port ${INNGEST_PORT} is listening.`)
 
-  // 3. Check Vite App Server Port
-  console.log(`   🔍 Checking Vite App Server port (${VITE_PORT})...`)
-  const isVitePortListening = await checkPort(VITE_PORT)
-  if (!isVitePortListening) {
-    throw new Error(
-      `❌ FAILED: Port ${VITE_PORT} (Vite App Server) is not listening. Ensure 'pnpm run dev:start' is running.`
+  // 3. Check App Server Port
+  console.log(`   🔍 Checking App Server port (${APP_PORT})...`)
+  const isAppPortListening = await checkPort(APP_PORT)
+  if (!isAppPortListening) {
+    console.error(
+      `❌ FAILED: Port ${APP_PORT} (App Server) is not listening. Ensure 'bun run dev:start' is running.`
     )
+    return false
+  } else {
+    console.log(`      ✅ Port ${APP_PORT} is listening.`)
   }
-  console.log(`      ✅ Port ${VITE_PORT} is listening.`)
 
   // 4. Check Inngest Dev Server URL
   const ingestUrl = `http://localhost:${INNGEST_PORT}/`
@@ -129,16 +131,18 @@ export default async function setup() {
   }
   console.log(`      ✅ Inngest Dev Server URL OK.`)
 
-  // 5. Check Vite App Server Inngest Endpoint
-  const viteIngestUrl = `http://localhost:${VITE_PORT}/api/inngest`
-  console.log(`   🔍 Checking Vite App Inngest Endpoint (${viteIngestUrl})...`)
-  const isViteIngestUrlAccessible = await checkUrl(viteIngestUrl)
-  if (!isViteIngestUrlAccessible) {
-    throw new Error(
-      `❌ FAILED: Cannot connect to Vite App Inngest Endpoint at ${viteIngestUrl}.`
+  // 5. Check App Server Inngest Endpoint
+  const appIngestUrl = `http://localhost:${APP_PORT}/api/inngest`
+  console.log(`   🔍 Checking App Inngest Endpoint (${appIngestUrl})...`)
+  const isAppIngestUrlAccessible = await checkUrl(appIngestUrl)
+  if (!isAppIngestUrlAccessible) {
+    console.error(
+      `❌ FAILED: Cannot connect to App Inngest Endpoint at ${appIngestUrl}.`
     )
+    return false
+  } else {
+    console.log(`      ✅ App Inngest Endpoint OK.`)
   }
-  console.log(`      ✅ Vite App Inngest Endpoint OK.`)
 
   console.log("✅ Global Test Setup Completed Successfully.\\n")
 

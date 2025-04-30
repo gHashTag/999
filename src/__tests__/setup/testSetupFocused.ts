@@ -34,7 +34,7 @@ export const mockKvGet = mock(
 )
 export const mockKvSet = mock(
   <T = unknown>(key: string, value: T): Promise<void> => {
-    console.log(`[DEBUG mockKvSet] Setting key: ${key}, value:`, value)
+    // console.log(`[DEBUG mockKvSet] Setting key: ${key}, value:`, value)
     mockKvStoreData[key] = value
     return Promise.resolve()
   }

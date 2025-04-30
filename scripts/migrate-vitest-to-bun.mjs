@@ -1,52 +1,56 @@
-import fs from "fs/promises"
+import fs from "fs"
 import path from "path"
-import { glob } from "glob"
-
-const __dirname = path.dirname(new URL(import.meta.url).pathname)
-const projectRoot = path.resolve(__dirname, "..")
-const testsDir = path.join(projectRoot, "src", "__tests__")
 
 async function migrateTests() {
-  console.log(`Searching for test files in: ${testsDir}`)
-  const testFiles = await glob("**/*.test.ts", {
-    cwd: testsDir,
-    absolute: true,
-  })
+  const testsDir = path.join(process.cwd(), "src", "__tests__")
+  // console.log(`Starting migration in: ${testsDir}`)
 
-  if (testFiles.length === 0) {
-    console.log("No test files found.")
-    return
-  }
+  const files = await findTestFiles(testsDir)
+  // console.log(`Found ${files.length} test files.`)
 
-  console.log(`Found ${testFiles.length} test files. Starting migration...`)
-
-  let modifiedCount = 0
-  for (const filePath of testFiles) {
+  for (const filePath of files) {
     try {
-      let content = await fs.readFile(filePath, "utf-8")
-      let originalContent = content
+      let originalContent = await fs.readFile(filePath, "utf-8")
 
       // Replace bun:test import with bun:test
       // Handles different import styles (e.g., with/without specific members)
-      content = content.replace(/from\s+['"]bun:test['"]/g, 'from "bun:test"')
+      let content = originalContent.replace(/from\s+['"]bun:test['"]/g, 'from "bun:test"')
 
       // Replace mock.* calls with mock.*
-      // Uses word boundary (\b) to avoid replacing parts of other words like 'visible'
-      content = content.replace(/\bvi\./g, "mock.")
+      // Handles cases like mock.fn(), mock.spyOn(), mock.resetAllMocks()
+      content = content.replace(/mock\./g, "mock.")
+
+      // Add other replacements as needed based on common patterns
+      // e.g., content = content.replace(/vi\.fn/g, "mock");
 
       if (content !== originalContent) {
         await fs.writeFile(filePath, content, "utf-8")
-        console.log(`Migrated: ${path.relative(projectRoot, filePath)}`)
-        modifiedCount++
-      } else {
-        // console.log(`No changes needed: ${path.relative(projectRoot, filePath)}`);
+        // console.log(`  Updated: ${filePath}`)
       }
-    } catch (error) {
-      console.error(`Error processing file ${filePath}:`, error)
+    } catch (_error) {
+      console.error(`Error processing file ${filePath}:`, _error)
     }
   }
 
-  console.log(`\nMigration complete. Modified ${modifiedCount} files.`)
+  // console.log("Migration attempt finished.")
 }
 
-migrateTests().catch(console.error)
+// Helper function to recursively find .test.ts and .spec.ts files
+async function findTestFiles(dir: string): Promise<string[]> {
+  let results: string[] = []
+  const list = await fs.readdir(dir)
+  for (const file of list) {
+    const filePath = path.join(dir, file)
+    const stat = await fs.stat(filePath)
+    if (stat && stat.isDirectory()) {
+      results = results.concat(await findTestFiles(filePath))
+    } else if (file.endsWith(".test.ts") || file.endsWith(".spec.ts")) {
+      results.push(filePath)
+    }
+  }
+  return results
+}
+
+migrateTests()
+
+

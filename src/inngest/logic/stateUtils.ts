@@ -70,8 +70,8 @@ export const getCurrentState = async (
   let state: TddNetworkState | null | undefined = null // Initialize state
   if (kvStore) {
     // FIX: Use non-null assertion again as TS struggles with async context
-    // FIX: Add @ts-ignore as a last resort for this specific TS limitation
-    // @ts-ignore
+    // FIX: Add @ts-expect-error as a last resort for this specific TS limitation
+    // @ts-expect-error KV check done earlier, TS struggles with async context
     state = (await kvStore!.all()) as TddNetworkState | null | undefined
   } else {
     logger.error(

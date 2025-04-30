@@ -2,6 +2,8 @@
 /* eslint-env node */
 import http from "http"
 import chalk from "chalk"
+import { program } from "commander"
+import fetch from "node-fetch"
 
 // --- Configuration ---
 const DEV_SERVER_URL = "http://localhost:8288"
@@ -100,3 +102,76 @@ req.on("error", e => {
 // Write data to request body
 req.write(postData)
 req.end()
+
+async function main() {
+  program
+    .option("-n, --eventName <name>", "Name of the event to send")
+    .option("-d, --data <json>", "JSON data to send with the event")
+    .option(
+      "-u, --url <url>",
+      "Inngest dev server URL",
+      "http://localhost:8288"
+    )
+    .parse(process.argv)
+
+  const args = program.opts()
+
+  const eventName = args.eventName || "app/dummy.event"
+  let eventData = {}
+
+  if (args.data) {
+    try {
+      eventData = JSON.parse(args.data)
+      // console.log("Parsed event data:", eventData)
+    } catch (e) {
+      console.error("Error parsing event data JSON:", e)
+      process.exit(1)
+    }
+  } else {
+    // console.log("No event data provided, sending empty object.")
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    // Add any other necessary headers, like Authorization if needed
+  }
+
+  const body = JSON.stringify({
+    name: eventName,
+    data: eventData,
+  })
+
+  const inngestUrl = `${args.url}/e/${eventName}`
+  // console.log(`Sending event '${eventName}' to ${inngestUrl}...`)
+
+  const options = {
+    method: "POST",
+    headers,
+    body,
+  }
+
+  try {
+    const response = await fetch(inngestUrl, options)
+
+    // console.log("Inngest response status:", response.status)
+    const responseBody = await response.text()
+    // console.log("Inngest response body:", responseBody)
+
+    if (!response.ok) {
+      console.error(
+        `Error sending event: ${response.status} ${response.statusText}`
+      )
+      console.error("Response body:", responseBody)
+      throw new Error(
+        `Failed to send event: ${response.status} ${response.statusText}`
+      )
+    } else {
+      // console.log(`Event '${eventName}' sent successfully!`)
+    }
+  } catch (error) {
+    console.error("Error sending event to Inngest:", error)
+    process.exit(1)
+  }
+}
+
+main()

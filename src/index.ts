@@ -1,6 +1,11 @@
-// This file might become the main entry point for the application,
-// but for now, vite-plugin-node uses src/server/index.ts directly.
-// We can keep this file minimal or remove it later if not needed.
+// This file is likely no longer needed as vite-plugin-node handled the entry.
+// If running with `bun run src/server/index.ts`, this file might be the entry point.
+// For now, keeping the comment.
+// import "./server/index"
+
+console.log(
+  "src/index.ts executed - this might indicate an issue if not intended as entry point."
+)
 
 // Optional: You could potentially import and run the server start function here
 // import { start } from '@/server';

@@ -53,5 +53,10 @@ export const createMockDependencies = (
     eventId: eventId,
     sandbox: sandbox,
   }
+  if (!sandbox?.process?.startAndWait) {
+    sandbox.process.startAndWait = async (/* command, opts */) => {
+      return { stdout: "mock stdout", stderr: "mock stderr", exitCode: 0 }
+    }
+  }
   return baseDeps
 }

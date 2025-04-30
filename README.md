@@ -1,4 +1,4 @@
-# 999 - Standalone NeuroCoder Agent
+# 🕉️ Проект 999: Армия Автономных НейроКодеров
 
 # 🕉️ Архитектура Агентов и Правила Проекта
 
@@ -202,318 +202,165 @@ bash scripts/config/save-snapshot.sh
 
 1.  **Клонируйте репозиторий:**
     ```bash
-    git clone <repository_url>
-    cd <repository_directory>
+    git clone https://github.com/gHashTag/999.git
+    cd 999
     ```
-2.  **(Опционально) Восстановите последнюю стабильную конфигурацию:**
-    - Найдите последний снимок в `snapshots/`.
-    - Выполните `bash scripts/config/restore-snapshot.sh snapshots/<имя_последнего_снимка>`.
-3.  **Установите зависимости:**
+2.  **Установить зависимости:**
     ```bash
     bun install
     ```
-4.  **Настройте переменные окружения:** Скопируйте `.env.example` в `.env` и заполните необходимые значения (например, API ключи).
-5.  **Запустите фоновые сервисы:** Используйте ручной режим (рекомендуется для разработки с AI) или PM2, как описано в разделе "Управление Окружением Разработки".
-6.  **Проверьте работоспособность:**
+3.  **Настроить окружение:**
+    *   Скопировать `.env.example` в `.env`.
+    *   Заполнить `.env` необходимыми ключами API (DeepSeek, E2B, Inngest).
+4.  **Запустить фоновые сервисы (в отдельных терминалах):**
     ```bash
-    bun run lint
-    bun test
-    # Попробуйте запустить тестовое событие
+    # Окно 1: Компиляция TypeScript
+    bun run build:watch
+    # Окно 2: Inngest Dev Server
+    bun run dev:serve
+    # Окно 3: Сервер Приложения
+    bun run dev:start
+    ```
+5.  **Отправить тестовое событие Inngest:**
+    ```bash
+    node scripts/send-test-event.mjs "Create a file hello.txt with content Hello World"
+    # Или:
+    # curl -X POST http://localhost:8288/e/<YOUR_INNGEST_EVENT_KEY> -d '{"name":"coding-agent/run", "data":{"input":"Your task here"}}'
+    ```
+6.  **Наблюдать за логами:**
+    ```bash
+    tail -f node-app.log | bun run scripts/pretty-logs.mjs
+    # Или
+    tail -f inngest-cli.log
     ```
 
----
+## ✅ Статус и Текущие Задачи
 
-# 999
+Состояние проекта, текущие задачи и roadmap отслеживаются в файле:
+[`.cursor/rules/current_task.mdc`](./.cursor/rules/current_task.mdc)
 
-# NeuroCoder TDD Orchestration Example
+## 🛠️ Технологический Стек
 
-This project demonstrates a standalone NeuroCoder agent using the Inngest Agent Kit, focusing on a Test-Driven Development (TDD) orchestration pattern with multiple agents (Tester, Coder, Critic).
+*   **Среда выполнения:** Bun
+*   **Язык:** TypeScript
+*   **Оркестрация задач:** Inngest
+*   **Оркестрация агентов:** AgentKit (`@inngest/agent-kit`)
+*   **Тестирование:** Bun Test (`bun test`)
+*   **Качество кода:** ESLint, Prettier
+*   **Форматирование логов:** `pino-pretty`
+*   **Модель ИИ:** DeepSeek Coder (или другая, настраивается через `.env`)
+*   **Песочница (опционально):** E2B Sandbox (`@e2b/sdk`)
 
-## Overview
-
-The goal is to create a system where a task is passed through a network of agents:
-
-1.  **Tester:** Writes tests for the task.
-2.  **Coder:** Writes implementation code based on the tests.
-3.  **Critic:** Reviews both tests and code, providing feedback or approving the result.
-
-This cycle utilizes E2B sandboxes for code execution and Inngest for managing the agent workflows and state.
-
-## Project Structure
+## 📁 Структура Проекта
 
 ```
-.
-├── src/                # Source code
-│   ├── agents/         # Agent definitions (prompts, tools, logic) (placeholder)
-│   ├── tools/          # Tool definitions for agents (placeholder)
-│   ├── index.ts        # Main Inngest function definition and Express server setup
-│   ├── network.ts      # Definition of the TDD agent network and router
-│   ├── agentDefinitions.ts # Functions to create agent instances
-│   ├── toolDefinitions.ts  # Functions to create tool instances
-│   ├── types.ts        # TypeScript types and interfaces
-│   └── inngest/        # Inngest specific utilities (e.g., sandbox management)
-├── scripts/            # Utility shell scripts
-├── dist/               # Compiled JavaScript output (from TypeScript)
-├── artifacts/          # Directory for downloaded E2B artifacts (.gitignore-d)
-├── html/               # Directory for Vitest HTML report output (.gitignore-d)
-├── .env.example        # Example environment variables
-├── package.json        # Project dependencies and scripts
-├── tsconfig.json       # TypeScript configuration
-├── vitest.config.ts    # Vitest configuration
-├── README.md           # This file
-└── ROADMAP.md          # Detailed plan and progress tracking
+├── .cursor/         # Конфигурация и правила для Cursor AI
+│   └── rules/       # Правила и контекст для AI (Дхарма Проекта)
+├── .husky/          # Git хуки (для pre-commit проверок)
+├── artifacts/       # Артефакты выполнения (логи, файлы из песочницы)
+├── coverage/        # Отчеты о покрытии кода тестами (удалено, Bun не генерирует html по умолчанию)
+├── html/            # Отчеты Bun Test (если настроено)
+├── node_modules/    # Зависимости
+├── scripts/         # Вспомогательные скрипты (сборка, тесты, деплой...)
+├── src/
+│   ├── adapters/    # Адаптеры для внешних сервисов (MCP, ...)
+│   ├── agents/      # Логика отдельных агентов (Coder, Critic, ...)
+│   ├── cli/         # Компоненты для CLI (open-codex-cli)
+│   ├── definitions/ # Определение агентов и инструментов для AgentKit
+│   ├── inngest/     # Функции и логика Inngest
+│   ├── mocks/       # Моки для MSW (тестирование API)
+│   ├── network/     # Логика сети агентов AgentKit (роутер, состояние)
+│   ├── server/      # Основной сервер приложения (Fastify)
+│   ├── tools/       # Определения и логика инструментов для агентов
+│   ├── types/       # Глобальные типы TypeScript
+│   ├── utils/       # Общие утилиты (логгер, обработка ошибок)
+│   └── vendor/      # Копии типов из vendor-библиотек (для стабильности)
+├── vendor-types/    # Скопированные `.d.ts` файлы из `node_modules`
+├── .env.example     # Пример файла переменных окружения
+├── .env             # Переменные окружения (в .gitignore)
+├── .eslintignore    # Файлы, игнорируемые ESLint (устарело)
+├── .eslintrc.cjs    # Конфигурация ESLint
+├── .gitignore       # Файлы, игнорируемые Git
+├── .prettierrc.json # Конфигурация Prettier
+├── bun.lockb        # Lock-файл Bun
+├── eslint.config.js # Новая конфигурация ESLint (приоритет над .eslintrc.cjs)
+├── package.json     # Зависимости и скрипты проекта
+├── tsconfig.json    # Конфигурация TypeScript
+└── README.md        # Этот файл
 ```
 
-## Правила синхронизации и обновления
+## 📜 Скрипты `package.json`
 
-### Механизмы синхронизации:
+*   `bun install`: Установка зависимостей.
+*   `bun run build`: Сборка проекта TypeScript (`tsc`).
+*   `bun run build:watch`: Сборка в режиме наблюдения.
+*   `bun run dev:serve`: Запуск Inngest Dev Server (`inngest-cli dev`).
+*   `bun run dev:start`: Запуск основного сервера приложения (`bun run src/server/index.ts`).
+*   `bun run dev`: Запуск `dev:serve` и `dev:start` параллельно с `concurrently`.
+*   `bun run lint`: Проверка кода с помощью ESLint.
+*   `bun run lint:fix`: Исправление ошибок ESLint.
+*   `bun run format`: Форматирование кода с помощью Prettier.
+*   `bun run format:check`: Проверка форматирования.
+*   `bun run typecheck`: Проверка типов TypeScript (`tsc --noEmit`).
+*   `bun run check`: Запуск `lint`, `format` и `typecheck` последовательно.
+*   `bun test`: Запуск всех тестов с помощью Bun Test Runner.
+*   `bun test:watch`: Запуск тестов в режиме наблюдения.
+*   `bun test:ui`: Запуск тестов с UI (может не работать с Bun Test).
+*   `bun test:coverage`: Запуск тестов с генерацией отчета о покрытии.
+*   `bun test:e2e`: Запуск E2E тестов.
+*   `bun run open-codex`: Запуск интерактивного CLI для общения с агентами.
 
-- **launchd**: Автоматический запуск скриптов обновления по расписанию
-- **rsync**: Синхронизация конфигурационных файлов между узлами
+## 🧪 Тестирование
 
-### Директории конфигурации:
+Проект использует **Bun Test Runner** для всех видов тестов.
 
-- `/Users/playra/999/.cursor/rules` - Основные правила проекта
-- `/Users/playra/999/scripts` - Скрипты обновления
+*   **Unit-тесты:** Проверяют отдельные модули/функции/агенты в изоляции. Находятся в `src/__tests__/...` (например, `src/__tests__/agents/coder.test.ts`).
+*   **Интеграционные тесты:** Проверяют взаимодействие нескольких компонентов (например, адаптер + мок-инструмент). Находятся в `src/__tests__/integration/`, `src/__tests__/adapters/`.
+*   **E2E-тесты:** Проверяют полный цикл работы системы, часто с использованием реальных или частично мокированных внешних зависимостей. Находятся в `src/__tests__/e2e/`.
+*   **Запуск:**
+    *   Все тесты: `bun test`
+    *   Тесты в режиме наблюдения: `bun test --watch`
+    *   Изолированный запуск файла: `bun test <путь_к_файлу> --isolate`
+    *   Запуск с покрытием: `bun test --coverage` (отчет в консоли)
 
-### Проверка статуса:
+## 🪵 Логирование
+
+Используется `pino` для структурированного логирования. Для удобного чтения логов в консоли используется `pino-pretty` через скрипт `scripts/pretty-logs.mjs`:
 
 ```bash
-launchctl list | grep 999
-rsync --dry-run -avn /Users/playra/999/.cursor/rules/ destination:/path/
+tail -f node-app.log | bun run scripts/pretty-logs.mjs
 ```
 
-### Обновление конфигурации:
+## 🤖 Архитектура Агентов
 
-```bash
-bash /Users/playra/999/scripts/update-config.sh
-```
+Высокоуровневое описание ролей агентов и принципов их взаимодействия находится в:
+[`.cursor/rules/README.mdc`](./.cursor/rules/README.mdc)
 
-## Setup
+Детальные инструкции для каждого агента находятся в соответствующих файлах `AGENT_*.mdc` в той же директории.
 
-1.  **Clone the repository:**
+## ⚙️ Управление Окружением Разработки (Ручной Режим)
+
+Для стабильной работы во время совместной разработки рекомендуется запускать необходимые фоновые сервисы вручную в отдельных окнах терминала:
+
+1.  **Окно 1: Компиляция TypeScript (`tsc --watch`)**
     ```bash
-    git clone <repository-url>
-    cd <repository-directory>
+    bun run build:watch
     ```
-2.  **Install dependencies:** Requires Node.js and pnpm.
+2.  **Окно 2: Inngest Dev Server (`inngest-cli dev`)**
     ```bash
-    pnpm install
+    bun run dev:serve
     ```
-3.  **Configure Environment Variables:**
-    - Copy `.env.example` to `.env`.
-    - Fill in your `E2B_API_KEY` and `DEEPSEEK_API_KEY`. You might need to adjust `DEEPSEEK_MODEL` if you prefer a different DeepSeek model.
+3.  **Окно 3: Сервер Приложения (`bun run ...`)**
     ```bash
-    cp .env.example .env
-    # Edit .env with your keys
-    ```
-4.  **Setup Git Hooks (Optional but Recommended):**
-    ```bash
-    pnpm prepare
-    # or directly: npx husky install
+    bun run dev:start
     ```
 
-## Development Environment
+**Перед началом работы:** Убедитесь, что все три команды успешно запущены.
 
-The primary command for local development is:
+## 🤝 Contributing
 
-```bash
-pnpm run dev
-```
+Пожалуйста, следуйте [Руководству по Коммитам](COMMIT_GUIDE.md).
 
-This command performs several actions using `concurrently`:
+## 📄 Лицензия
 
-1.  **Cleans Ports:** Runs `scripts/kill-ports.sh` to free up potentially conflicting ports (8288, 8289, 4173, 3000, 5000, 8484).
-2.  **Build Watch:** Runs `tsc --watch` to continuously compile TypeScript files into the `dist/` directory.
-3.  **Inngest Dev Server:** Runs `npx inngest-cli dev -u http://localhost:8484/api/inngest`. This is the core Inngest development server that listens for events and triggers function runs. It connects to the application server running on port 8484.
-4.  **Test Report Server:** Runs `npx vite preview --outDir html` to serve the Vitest HTML coverage report (usually accessible at `http://localhost:4173`).
-
-**Important Notes:**
-
-- The `dev` script **does not** run `node dist/index.js` directly anymore. The `inngest-cli dev` server handles the execution of Inngest functions defined in `dist/index.js`.
-- The `--raw` flag is passed to `concurrently` to preserve color output from the individual processes.
-
-**Troubleshooting:**
-
-- **Port Conflicts (`EADDRINUSE`):** If `pnpm run dev` fails due to port conflicts even after the `kill-ports.sh` script, some processes might not have terminated correctly. You can manually kill them using `pkill`. Open a separate terminal and run:
-  ```bash
-  # Stop all related dev processes forcefully
-  pkill -f 'pnpm run dev' && pkill -f 'inngest-cli dev' && pkill -f 'vite preview' && pkill -f 'tsc --watch' && pkill -f 'nodemon'
-  # Run this command a couple of times if needed, then try 'pnpm run dev' again.
-  ```
-- **Stale Commands/Behavior:** If `pnpm run dev` seems to be running an old version of the script (e.g., still trying to launch `nodemon`), try cleaning the pnpm cache:
-  ```bash
-  pnpm store prune
-  ```
-  If that doesn't work, try a full reinstall:
-  ```bash
-  rm -rf node_modules
-  pnpm install
-  ```
-  Then, use the `pkill` command above before running `pnpm run dev` again.
-
-## Sending Test Events
-
-To trigger the `coding-agent/run` function during development, use the provided script:
-
-```bash
-# Ensure 'pnpm run dev' is running in another terminal
-
-# Send event with default task
-node scripts/send-test-event.mjs
-
-# Send event with a custom task string
-node scripts/send-test-event.mjs "Implement a function that calculates Fibonacci sequence"
-
-# Send event with custom JSON data (pass as a single string argument)
-node scripts/send-test-event.mjs '{"input": "Refactor this code to use async/await", "context": "some existing code..."}'
-```
-
-## Running Tests
-
-- **Run all tests once:** `pnpm test`
-- **Run tests in watch mode with UI and coverage:** `pnpm run test:watch` (Access UI typically at `http://localhost:51204/__vitest__/`)
-- **Generate coverage report:** `pnpm run coverage` (HTML report available in `html/` directory, view with `pnpm run dev:test-report`)
-
-## Linting and Formatting
-
-- **Check formatting:** `pnpm run format:check`
-- **Apply formatting:** `pnpm run format`
-- **Check linting:** `pnpm run lint`
-- **Apply linting fixes:** `pnpm run lint:fix`
-
-These checks are also run automatically on staged files before committing if you've set up Husky hooks (`pnpm prepare`).
-
-## Building for Production
-
-```bash
-pnpm run build
-```
-
-This compiles TypeScript code to the `dist/` directory.
-
-## Starting in Production Mode
-
-```bash
-node dist/index.js
-```
-
-This starts the Express server which serves the Inngest functions. Ensure necessary environment variables are set.
-
-## Development Notes
-
-### Node.js ES Modules and File Extensions
-
-This project uses native ES Modules (ESM) configured via `"type": "module"` in `package.json` and compiled with TypeScript (`tsc`).
-
-**Problem:** Node.js, when running ESM code, requires **explicit file extensions** for relative imports (e.g., `.js`). It does not automatically resolve extensions like `.ts` or look for `index.js` within directories as CommonJS did.
-
-**Symptom:** Running the compiled code (e.g., `node dist/index.js`) results in `ERR_MODULE_NOT_FOUND` or `ERR_UNSUPPORTED_DIR_IMPORT` errors for relative paths.
-
-**Solution:** You **MUST** include the `.js` extension in all relative import/export paths within the TypeScript source code (`.ts` files).
-
-```typescript
-// Incorrect (causes runtime error in Node.js ESM)
-import { something } from "./my-module"
-import { helper } from "../utils/helpers"
-export * from "./logic/service"
-
-// Correct (works after tsc compilation)
-import { something } from "./my-module.js"
-import { helper } from "../utils/helpers.js"
-export * from "./logic/service.js"
-```
-
-**Why?**
-
-- `tsc` (with current settings like `moduleResolution: "bundler"` or even `"NodeNext"`) does not automatically append `.js` extensions to relative paths in the compiled JavaScript output.
-- Node.js strictly follows the ESM specification, which mandates explicit extensions for relative paths to avoid ambiguity and align with browser behavior.
-
-**Alternatives (Not Recommended):**
-
-- Using `--experimental-specifier-resolution=node`: Relies on an experimental Node.js flag.
-- Using Bundlers (Vite, esbuild): Adds complexity but can handle resolution automatically (potential future improvement).
-
-**Current Practice:** Manually add `.js` to all relative imports/exports in `.ts` files.
-
-### Common Testing Issues & Solutions
-
-## Запуск Окружения для Тестирования Агентов (Ручной режим)
-
-Вместо использования PM2 или сложных скриптов, для стабильной работы во время совместной разработки с AI-ассистентом рекомендуется запускать необходимые фоновые сервисы вручную в отдельных окнах терминала:
-
-1.  **Окно 1: Компиляция TypeScript (Watch Mode)**
-
-    ```bash
-    pnpm run build:watch
-    ```
-
-    - **Назначение:** Запускает `tsc --watch --preserveWatchOutput`. Автоматически перекомпилирует `.ts` файлы в `dist/` при их изменении.
-
-2.  **Окно 2: Inngest Dev Server**
-
-    ```bash
-    pnpm run dev:serve
-    ```
-
-    - **Назначение:** Запускает `inngest-cli dev`. Слушает события на `http://localhost:8288`, находит и запускает функции Inngest из работающего приложения (подключаясь к нему по URL, указанному в команде, обычно `http://localhost:8484/api/inngest`).
-
-3.  **Окно 3: Сервер Приложения (Vite)**
-    ```bash
-    pnpm run dev:start
-    ```
-    - **Назначение:** Запускает `vite --port 8484`. Основной сервер, который обслуживает API для Inngest (`/api/inngest`) и выполняет код функций/агентов. Пытается использовать порт 8484.
-
-**Перед началом работы с AI:** Убедитесь, что все три команды успешно запущены в отдельных окнах и работают без ошибок.
-
-## ⚙️ Управление Окружением Разработки (PM2)
-
-Для стабильной работы агентов в режиме разработки необходимо запустить несколько фоновых сервисов. Рекомендуется использовать `pm2` для управления ими.
-
-1.  **Установка (если не установлен):**
-    ```bash
-    npm install -g pm2
-    ```
-2.  **Первый Запуск / Перезапуск:**
-    Остановите все текущие процессы (`pm2 delete all`) и запустите необходимые:
-
-    ```bash
-    # Компилятор TypeScript в режиме наблюдения
-    pm2 start pnpm --name tsc-watch -- run dev:watch
-
-    # Inngest Dev Server (требуется для локальной разработки Inngest)
-    pm2 start pnpm --name inngest-dev -- run dev:inngest
-
-    # Основное приложение (Vite сервер)
-    pm2 start pnpm --name vite-app -- run dev:start
-    ```
-
-3.  **Проверка Статуса:**
-    ```bash
-    pm2 list
-    ```
-    Убедитесь, что все три процесса (`tsc-watch`, `inngest-dev`, `vite-app`) имеют статус `online`.
-4.  **Просмотр Логов:**
-    ```bash
-    pm2 logs <имя_процесса> # например, pm2 logs tsc-watch
-    pm2 logs # Показать логи всех процессов
-    ```
-5.  **Сохранение Конфигурации:**
-    После успешного запуска всех процессов сохраните их список:
-    ```bash
-    pm2 save
-    ```
-    Это позволит восстановить их позже.
-6.  **Восстановление Конфигурации:**
-    После перезагрузки машины или если процессы были остановлены:
-    ```bash
-    pm2 resurrect
-    ```
-7.  **Полная Остановка:**
-    ```bash
-    pm2 delete all
-    ```
-
-**Важно:** Для максимальной стабильности рекомендуется запускать эти `pm2 start` команды в **отдельном терминале**, а не через AI ассистента, так как сессия ассистента может прерываться.
-
----
+[MIT](./LICENSE)

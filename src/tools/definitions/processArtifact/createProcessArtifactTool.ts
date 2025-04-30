@@ -49,7 +49,7 @@ export function createProcessArtifactTool(
         // 3. Extract the artifact using tar command (assuming tar is available)
         // We need to run this command outside the sandbox, in the host environment where the artifact was downloaded.
         // TODO: Add 'tar' package and types if dynamic import fails OR use sandbox.process.start('tar ...')
-        /* // ВРЕМЕННО ЗАКОММЕНТИРОВАНО ИЗ-ЗА ОШИБКИ ТИПОВ
+        /* // ВРЕМЕННО ЗАКОММЕНТИРОВАНО ИЗ-ЗА ОШИБОК ТИПОВ
         const tar = await import("tar"); // Dynamically import tar
         await tar.x({
           file: params.artifactPath,
@@ -116,7 +116,7 @@ export function createProcessArtifactTool(
         if (fs.existsSync(tempExtractDir)) {
           try {
             fs.rmSync(tempExtractDir, { recursive: true, force: true })
-          } catch (cleanupError) {
+          } catch (_cleanupError) {
             log.error(
               `${toolStepName}_CLEANUP_ERROR: Failed to cleanup temp directory after error.`,
               { eventId, currentSandboxId, dir: tempExtractDir }

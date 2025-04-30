@@ -1,48 +1,62 @@
 // --- HTTP Server (Entry Point using Fastify) --- //
-import Fastify, { FastifyInstance } from "fastify" // Import FastifyInstance for typing
-import { fastifyPlugin } from "inngest/fastify"
-// import { type InngestFunction } from "inngest" // Revert this import
-import { log } from "@/utils" // Import log
-import { inngest, runCodingAgent } from "@/inngest/index" // Import client and CORRECT function name
-import { pathToFileURL } from "node:url" // Import pathToFileURL
+import { fastify } from "fastify"
+import { Inngest } from "inngest"
+import { serve } from "@inngest/fastify"
+import { agentFunction, runCodingAgent } from "@/inngest"
+import { log } from "@/utils/logic"
+import dotenv from "dotenv"
 
-// Create Fastify instance with explicit type
-const app: FastifyInstance = Fastify({ logger: false })
+dotenv.config()
 
-// Serve the Inngest function(s) using the plugin
-app.register(fastifyPlugin, {
+// --- Configuration ---
+const APP_PORT = parseInt(process.env.APP_PORT || "8484", 10)
+const SIGNING_KEY = process.env.INNGEST_SIGNING_KEY
+const EVENT_KEY = process.env.INNGEST_EVENT_KEY
+const ENVIRONMENT = process.env.NODE_ENV || "development"
+
+// Basic validation
+if (ENVIRONMENT !== "development" && !SIGNING_KEY) {
+  log.error(
+    "INNGEST_SIGNING_KEY is required in production. INNGEST_EVENT_KEY is recommended."
+  )
+  // process.exit(1); // Consider exiting in production
+}
+
+// Initialize Fastify
+const app = fastify()
+
+// Initialize Inngest client
+const inngest = new Inngest({ id: "999-project", eventKey: EVENT_KEY })
+
+// Serve Inngest API handler
+app.register(serve, {
   client: inngest,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  functions: [runCodingAgent] as any[], // Revert back to any[] for now
+  functions: [agentFunction, runCodingAgent], // Your Inngest functions
+  signingKey: SIGNING_KEY,
+  logLevel: process.env.LOG_LEVEL || "info", // Control Inngest handler logging
 })
 
-const APP_PORT = parseInt(process.env.APP_PORT || "8484", 10) // Ensure port is number
+// Basic health check endpoint
+app.get("/")
 
-// Define the start function
-export const start = async () => {
+// Basic health check endpoint
+app.get("/health", async (request, reply) => {
+  log.info("Health check request received.")
+  reply.send({ status: "ok" })
+})
+
+// Start the server
+const start = async () => {
   try {
     await app.listen({ port: APP_PORT, host: "0.0.0.0" })
-    log(
-      "info",
-      "SERVER_START",
-      `Fastify server listening on http://localhost:${APP_PORT}/api/inngest`,
-      { port: APP_PORT }
-    )
+    log.info(`Server listening on port ${APP_PORT}`)
   } catch (err) {
-    log("error", "SERVER_ERROR", "Error starting Fastify server", {
-      error: (err as Error).message,
-    })
+    log.error("Error starting server:", err)
     process.exit(1)
   }
 }
 
-// Only start the server if not in a test environment AND this file is run directly
-if (
-  process.env.NODE_ENV !== "test" &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
-  start()
-}
+start()
 
-// Export app for vite-plugin-node
+// Export app for potential programmatic use (though Bun typically runs the file directly)
 export { app }

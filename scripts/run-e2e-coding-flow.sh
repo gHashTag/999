@@ -1,21 +1,40 @@
 #!/bin/bash
 # Запускает E2E тест coding-agent-flow.e2e.test.ts и выводит JSON-результат
 
-TEST_FILE="src/__tests__/e2e/coding-agent-flow.e2e.test.ts"
+# Exit immediately if a command exits with a non-zero status.
+set -eo pipefail
+
+# --- Configuration ---
+TEST_FILE="src/__tests__/e2e/teamLeadAgent.e2e.test.ts"
+# TEST_FILE="src/__tests__/e2e/coding-agent-flow.e2e.test.ts" # Example of another test
 REPORTER="json"
 OUTPUT_FILE="test-results.json"
 
-echo "🚀 Running E2E test: ${TEST_FILE}"
+# --- Main Script ---
+echo "🚀 Starting E2E Test Workflow for ${TEST_FILE}..."
+
 echo "📂 Using output file: ${OUTPUT_FILE}"
 
-# Run Vitest with specific parameters
-echo "🏃 Running Vitest E2E test..."
-# pnpm exec bun:test run ${TEST_FILE} --no-watch --reporter=${REPORTER} --outputFile=${OUTPUT_FILE}
-bunx bun:test run ${TEST_FILE} --no-watch --reporter=${REPORTER} --outputFile=${OUTPUT_FILE}
+# Run Bun test with specific parameters
+echo "🏃 Running Bun E2E test..."
+# Set environment variable for E2E context
+VITEST_E2E=true \
+  bun test --isolate --bail "${TEST_FILE}"
 
 EXIT_CODE=$?
+echo "📊 Bun test finished with exit code: ${EXIT_CODE}"
 
-echo "📊 Vitest finished with exit code: ${EXIT_CODE}"
+# Analyze logs (example)
+# echo "📄 Analyzing node-app.log..."
+# grep -i "error\|warn" node-app.log || echo "  -> No errors or warnings found."
+
+# Check exit code
+if [ ${EXIT_CODE} -ne 0 ]; then
+  echo "❌ E2E test failed."
+  exit ${EXIT_CODE}
+else
+  echo "✅ E2E test passed successfully!"
+fi
 
 # Выводим результат из JSON-файла, если он существует
 if [ -f "${OUTPUT_FILE}" ]; then
@@ -27,5 +46,5 @@ else
   echo "⚠️ JSON output file (${OUTPUT_FILE}) not found."
 fi
 
-# Завершаем скрипт с кодом выхода Vitest
+# Завершаем скрипт с кодом выхода Bun теста
 exit ${EXIT_CODE} 

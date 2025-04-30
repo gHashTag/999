@@ -1,112 +1,102 @@
-import { createCodingAgent } from "@/agents/coder/logic/createCodingAgent"
-import { createCriticAgent } from "@/agents/critic/logic/createCriticAgent"
-import { createTesterAgent } from "@/agents/tester/logic/createTesterAgent"
-import { createTeamLeadAgent } from "@/agents/teamlead/logic/createTeamLeadAgent" // Correct casing
-import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"
+import {
+  createTeamLeadAgent,
+  createTesterAgent,
+  createCoderAgent,
+  createCriticAgent,
+  createToolingAgent,
+  createOpenCodexAgent,
+} from "@/agents"
+import { appLog /*, systemEvents*/ } from "@/utils/logic"
 import { getAllTools } from "@/tools/toolDefinitions"
-import { type AgentDependencies, type HandlerLogger } from "../../types/agents" // Correct
-import { log as appLog } from "@/utils/logic/logger"
-import { systemEvents } from "@/utils/logic/systemEvents"
-import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
-import { getSandbox } from "@/inngest/utils/sandboxUtils"
-import { Agent, Tool } from "@inngest/agent-kit"
-import { TddNetworkState } from "../../types/network" // Correct
-import { EventEmitter } from "events"
-import { SystemEventEmitter } from "../../types/systemEvents" // Correct
-import { createMockLogger } from "../../utils/logic/mockLogger" // Correct
-import { mockDeepseekModel } from "../../utils/logic/mockDeepseekModel" // Correct
-import { Sandbox } from "e2b"
+// import { Tool } from "@inngest/agent-kit"
+import type {
+  AgentDependencies,
+  BaseLogger,
+  KvStore,
+  // Sandbox,
+  SystemEvents,
+} from "@/types/agents"
+import { Sandbox } from "@e2b/sdk"
 
-// Define the structure for the CLI agents object
-export interface CliAgents {
-  coder: Agent<TddNetworkState>
-  tester: Agent<TddNetworkState>
-  critic: Agent<TddNetworkState>
-  teamLead: Agent<TddNetworkState>
-  tooling: Agent<TddNetworkState>
+// Mock dependencies for CLI usage
+const mockApiKey = process.env.DEEPSEEK_API_KEY || "mock-api-key"
+const mockModelName = process.env.DEEPSEEK_MODEL_NAME || "deepseek-coder"
+const mockEventId = "cli-event"
+
+const mockSandbox = new Sandbox({ apiKey: process.env.E2B_API_KEY })
+
+// Simple in-memory KV for CLI
+const cliKvStore: KvStore = {
+  data: {} as Record<string, any>,
+  async get<T = unknown>(key: string): Promise<T | undefined> {
+    return this.data[key] as T | undefined
+  },
+  async set<T = unknown>(key: string, value: T): Promise<void> {
+    this.data[key] = value
+  },
+  async delete(key: string): Promise<boolean> {
+    const exists = key in this.data
+    delete this.data[key]
+    return exists
+  },
+  async has(key: string): Promise<boolean> {
+    return key in this.data
+  },
+  async all(): Promise<Record<string, unknown>> {
+    return { ...this.data }
+  },
 }
 
-/**
- * Creates agent instances specifically for the CLI PoC context.
- * NOTE: This function is now async due to instruction loading.
- * @returns An object containing the initialized CLI agents.
- */
-export async function createCliAgents(): Promise<CliAgents> {
-  const log: HandlerLogger = appLog as any // Assign appLog to HandlerLogger compatible variable
-  log.info("CLI_AGENTS_INIT", "Initializing CLI agents...")
-  const apiKey = process.env.DEEPSEEK_API_KEY || ""
-  const modelName = process.env.DEEPSEEK_MODEL || "deepseek-coder"
+const baseDeps: Omit<AgentDependencies, "allTools" | "agents"> = {
+  apiKey: mockApiKey,
+  modelName: mockModelName,
+  systemEvents: null, // System events are not used in direct CLI chat
+  sandbox: mockSandbox,
+  eventId: mockEventId,
+  log: appLog as BaseLogger,
+  kv: cliKvStore,
+  model: null, // Agents will create their own model instance if needed
+}
 
-  if (!apiKey) {
-    log.warn("CLI_AGENTS_WARN", "DEEPSEEK_API_KEY not found in environment.")
-  }
+const allTools = getAllTools(baseDeps as any)
 
-  // Pass empty string to getSandbox as it expects a string
-  const sandbox = await getSandbox("") // Changed undefined to ""
-  const eventId = "cli-event-id"
-  // Pass the correctly typed log, and check sandbox before accessing id
-  const allTools = getAllTools(
-    log,
-    getSandbox,
-    eventId,
-    sandbox?.sandboxId ?? null
-  )
+export const cliAgentDependencies: AgentDependencies = {
+  ...baseDeps,
+  allTools: allTools,
+  agents: {}, // No inter-agent communication needed for basic chat
+}
 
-  log.info("CLI_AGENTS_INSTR", "Loading agent instructions...")
-  const [
-    coderInstructions,
-    testerInstructions,
-    criticInstructions,
-    teamLeadInstructions,
-    toolingInstructions,
-  ] = await Promise.all([
-    readAgentInstructions("Coder"),
-    readAgentInstructions("Tester"),
-    readAgentInstructions("Critic"),
-    readAgentInstructions("TeamLead"), // Correct casing
-    readAgentInstructions("Tooling"),
-  ])
-  log.info("CLI_AGENTS_INSTR_LOADED", "Instructions loaded for CLI agents.")
+// Create agent instances
+export const teamLead = createTeamLeadAgent(
+  cliAgentDependencies,
+  "You are a helpful assistant."
+)
+export const tester = createTesterAgent(
+  cliAgentDependencies,
+  "You write tests based on requirements."
+)
+export const coder = createCoderAgent(
+  cliAgentDependencies,
+  "You write code to pass tests."
+)
+export const critic = createCriticAgent(
+  cliAgentDependencies,
+  "You review code and tests."
+)
+export const tooling = createToolingAgent(
+  cliAgentDependencies,
+  "You execute commands and scripts."
+)
+export const openCodex = createOpenCodexAgent(
+  cliAgentDependencies,
+  "You interact with Open Codex."
+)
 
-  const mockSystemEvents = new EventEmitter() as SystemEventEmitter
-  const mockLogger = createMockLogger("CLI") // Use mock logger
-
-  // Create base dependencies, including the mock logger
-  const baseDependencies: Omit<AgentDependencies, "agents"> = {
-    apiKey: process.env.DEEPSEEK_API_KEY || "mock-api-key",
-    modelName: process.env.DEEPSEEK_MODEL || "deepseek-coder",
-    model: mockDeepseekModel, // Add mock model
-    allTools: getAllTools(
-      mockLogger,
-      async () => sandbox,
-      eventId,
-      null // Pass null for sandboxId
-    ),
-    log: mockLogger,
-    systemEvents: mockSystemEvents,
-    sandbox,
-    eventId,
-  }
-
-  // Move dependency definitions inside the function
-  const coderDeps = { ...baseDependencies, instructions: coderInstructions }
-  const testerDeps = { ...baseDependencies, instructions: testerInstructions }
-  const criticDeps = { ...baseDependencies, instructions: criticInstructions }
-  const teamLeadDeps = {
-    ...baseDependencies,
-    instructions: teamLeadInstructions,
-  }
-  const toolingDeps = { ...baseDependencies, instructions: toolingInstructions }
-
-  const agents: CliAgents = {
-    // Use the deps variables for creation
-    coder: createCodingAgent(coderDeps) as Agent<TddNetworkState>,
-    tester: createTesterAgent(testerDeps) as Agent<TddNetworkState>,
-    critic: createCriticAgent(criticDeps) as Agent<TddNetworkState>,
-    teamLead: createTeamLeadAgent(teamLeadDeps) as Agent<TddNetworkState>,
-    tooling: createToolingAgent(toolingDeps) as Agent<TddNetworkState>,
-  }
-
-  log.info("CLI_AGENTS_READY", "CLI agents created successfully.")
-  return agents
+export const agents: Record<string, any> = {
+  teamlead: teamLead,
+  tester: tester,
+  coder: coder,
+  critic: critic,
+  tooling: tooling,
+  opencodex: openCodex,
 }

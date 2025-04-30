@@ -91,9 +91,9 @@ describe.skip("TeamLead Agent Workflow (E2E using InngestTestEngine - Simplified
           // Restore mock for the step that gets sandbox ID
           id: "get-sandbox-id", // ID used inside the *real* ensureSandboxId
           handler() {
-            console.log(
-              "[E2E TEST] Mock handler for step 'get-sandbox-id' executed!"
-            )
+            // console.log(
+            //   "[E2E TEST] Mock handler for step 'get-sandbox-id' executed!"
+            // )
             return mockSandboxId // Return the mock sandbox ID
           },
         },
@@ -101,9 +101,9 @@ describe.skip("TeamLead Agent Workflow (E2E using InngestTestEngine - Simplified
           // Mock the step that runs the agent network
           id: "run-agent-network", // ID given in step.run('run-agent-network', ...)
           handler() {
-            console.log(
-              "[E2E TEST] Mock handler for network run executed! Returning dummy state."
-            )
+            // console.log(
+            //   "[E2E TEST] Mock handler for network run executed! Returning dummy state."
+            // )
             // Return the structure expected by processNetworkResult or final assertions
             return {
               // No 'finalState' nesting needed if processNetworkResult handles it

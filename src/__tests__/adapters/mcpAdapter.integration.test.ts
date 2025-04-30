@@ -19,9 +19,8 @@ import {
   // FIX: Import findToolMock
   findToolMock,
 } from "../setup/testSetupFocused"
-import { TddNetworkState /*, NetworkStatus*/ } from "@/types/network"
-// import { type Agent /*, type AnyTool */ } from "@inngest/agent-kit" // Remove AnyTool
-import type { Agent } from "@inngest/agent-kit"
+// import { TddNetworkState /*, NetworkStatus*/ } from "@/types/network" // Remove unused
+// import type { Agent } from "@inngest/agent-kit" // Remove unused
 // Remove unused AnyTool import
 // import { AnyTool } from "@inngest/agent-kit";
 // FIX: Import Mock type from bun:test
