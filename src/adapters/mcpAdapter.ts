@@ -20,6 +20,34 @@ export function createMCPAdapter(deps: AgentDependencies) {
     run: async () => ({}) as any,
   }
 
+  // --- Helper Function for Response Validation ---
+  const _validateAndLogResponseFormat = (
+    result: unknown,
+    toolName: string,
+    attempt: number
+  ): { isValid: boolean; errorResult?: { error: string } } => {
+    if (
+      typeof result !== "object" ||
+      result === null ||
+      !("output" in result)
+    ) {
+      const errorMsg = `Invalid response format from MCP tool on attempt ${attempt}`
+      logger?.error?.("mcpAdapter.error", {
+        toolName,
+        error: errorMsg,
+        response: result,
+        attempt,
+      })
+      return { isValid: false, errorResult: { error: errorMsg } }
+    }
+    return { isValid: true }
+  }
+  // --- End Helper Function ---
+
+  // --- Helper Function for Delay ---
+  const _delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+  // --- End Helper Function ---
+
   return {
     mcpTools,
     logger,
@@ -28,43 +56,105 @@ export function createMCPAdapter(deps: AgentDependencies) {
     async run(toolName: string, ...args: unknown[]): Promise<unknown> {
       const tool = mcpTools.find((t: Tool.Any) => t.name === toolName)
       if (!tool) {
+        const errorMsg = `Tool ${toolName} is not an MCP tool`
         logger?.error?.("mcpAdapter.error", {
           toolName,
           args,
-          message: "Tool not found or not an MCP tool",
+          message: errorMsg,
         })
-        throw new Error(`Tool ${toolName} is not an MCP tool`)
+        throw new Error(errorMsg)
       }
+      logger?.info?.("mcpAdapter.run_start", { toolName, params: args[0] })
+
+      let attempt = 1
       try {
         const params = args[0]
-        logger?.info?.("mcpAdapter.run", { toolName, params })
         const mockOpts: any = {
           agent: this as any,
           network: mockNetworkForOpts as any,
-          invocation: { id: "mock-invocation", ts: Date.now() },
-          step: { id: "mock-step", ts: Date.now() } as any,
+          invocation: { id: `mock-invocation-att${attempt}`, ts: Date.now() },
+          step: { id: `mock-step-att${attempt}`, ts: Date.now() } as any,
           resources: {},
         }
-        return await tool.handler(params as any, mockOpts as any)
+        const result = await tool.handler(params as any, mockOpts as any)
+
+        // Validate format using helper
+        const validation = _validateAndLogResponseFormat(
+          result,
+          toolName,
+          attempt
+        )
+        if (!validation.isValid) {
+          return validation.errorResult
+        }
+
+        logger?.info?.("mcpAdapter.run_success", { toolName, result, attempt })
+        return result
       } catch (err) {
-        logger?.error?.("mcpAdapter.error", { toolName, err, attempt: 1 })
+        const is429Error = err instanceof Error && (err as any).status === 429
+        logger?.error?.("mcpAdapter.error", {
+          toolName,
+          err,
+          attempt,
+          status: is429Error ? 429 : undefined,
+        })
+
+        attempt++ // Increment attempt count
+        if (attempt > 2) {
+          throw err // Max retries exceeded
+        }
+
+        // Retry logic: wait specifically for 429, retry others immediately
+        if (is429Error) {
+          const retryDelay = 50 // ms
+          logger?.info?.("mcpAdapter.retry_delay", {
+            toolName,
+            delay: retryDelay,
+          })
+          await _delay(retryDelay) // Wait before retrying 429
+        }
+
+        // Retry attempt (common for all errors after potential delay)
         try {
           const params = args[0]
-          const mockOpts: any = {
+          const mockOptsRetry: any = {
             agent: this as any,
             network: mockNetworkForOpts as any,
-            invocation: { id: "mock-invocation-retry", ts: Date.now() },
-            step: { id: "mock-step-retry", ts: Date.now() } as any,
+            invocation: { id: `mock-invocation-att${attempt}`, ts: Date.now() },
+            step: { id: `mock-step-att${attempt}`, ts: Date.now() } as any,
             resources: {},
           }
-          return await tool.handler(params as any, mockOpts as any)
+          const resultRetry = await tool.handler(
+            params as any,
+            mockOptsRetry as any
+          )
+
+          // Validate format on retry result using helper
+          const validationRetry = _validateAndLogResponseFormat(
+            resultRetry,
+            toolName,
+            attempt
+          )
+          if (!validationRetry.isValid) {
+            return validationRetry.errorResult
+          }
+
+          logger?.info?.("mcpAdapter.run_success", {
+            toolName,
+            result: resultRetry,
+            attempt,
+          })
+          return resultRetry
         } catch (err2) {
+          const is429ErrorRetry =
+            err2 instanceof Error && (err2 as any).status === 429
           logger?.error?.("mcpAdapter.error", {
             toolName,
             err: err2,
-            attempt: 2,
+            attempt,
+            status: is429ErrorRetry ? 429 : undefined,
           })
-          throw err2
+          throw err2 // Rethrow final error
         }
       }
     },
@@ -77,8 +167,17 @@ export function createMCPAdapter(deps: AgentDependencies) {
       logger?.info?.("mcpAdapter.kvGet", { key })
       return (global as any).__mcpKV ? (global as any).__mcpKV[key] : undefined
     },
-    logError(error: Error): void {
-      logger?.error?.(error)
+    /** Logs an error message, potentially enriching it with adapter context */
+    logError(error: Error | string, context?: Record<string, unknown>): void {
+      const message = error instanceof Error ? error.message : error
+      const stack = error instanceof Error ? error.stack : undefined
+      // Pass string message first
+      logger?.error?.(message, {
+        adapter: "MCPAdapter",
+        ...(context || {}),
+        error: message, // Keep error message in context too
+        stack: stack,
+      })
     },
     async sendToAgent(agentName: string, message: unknown): Promise<void> {
       logger?.info?.("mcpAdapter.sendToAgent", { agentName, message })
