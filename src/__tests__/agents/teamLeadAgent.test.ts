@@ -5,14 +5,17 @@ import { describe, it, expect, beforeEach /*, mock*/ } from "bun:test" // Remove
 // import { EventEmitter } from "events" // Removed unused import
 import { Inngest } from "inngest"
 import {
-  type AgentDependencies,
-  // Import setup helpers
-  // setupTestEnvironment, // Removed unused
+  // setupTestEnvironmentFocused as setupTestEnvironment, // Unused alias
   createBaseMockDependencies,
   getMockTools,
-  // findToolMock, // Removed unused
-  // mockLogger, // Assuming mockLogger is globally available or handled in setupTestEnvironment
-} from "../testSetup" // Corrected path
+  // findToolMock, // Unused
+  type AgentDependencies,
+  // Import necessary mocks explicitly
+  mockLogger,
+  mockKv,
+  mockDeepseekModelAdapter,
+  mockSystemEvents,
+} from "../setup/testSetupFocused" // Corrected path
 import type { Tool } from "@inngest/agent-kit"
 
 // Create a dummy Inngest instance for testing
@@ -61,11 +64,15 @@ describe("Agent Definitions: TeamLead Agent", () => {
     // Define tools typically needed/filtered by TeamLead
     toolsForTest = getMockTools(["updateTaskState", "web_search"])
     // Combine base deps with tools and agents - No need to re-add log, model etc.
+    // mockDeps is now the full AgentDependencies object
     mockDeps = {
       ...baseDeps,
-      // log: mockDeepseekModelAdapter, // Already in baseDeps
+      log: mockLogger, // Add mockLogger
+      kv: mockKv, // Add mockKv
+      model: mockDeepseekModelAdapter, // Add mock model
+      systemEvents: mockSystemEvents, // Add systemEvents
       allTools: toolsForTest,
-      // agents: {}, // Already in baseDeps
+      agents: {}, // Add empty agents object
     }
   })
 
