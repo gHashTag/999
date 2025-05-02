@@ -183,11 +183,16 @@ export async function defaultRouter(
     // Add other mandatory fields from TddNetworkState if they exist
     // e.g., test_requirements: undefined, test_code: undefined, ...
   }
+  // Cast dependencies.agents to the expected Agents type
+  // TODO: Find a better way to ensure type compatibility or refine the Agents type/interface
+  // const agents = (dependencies.agents || {}) as Agents
+  const agents = dependencies.agents || {} // Use without assertion for now
+
   // FIX: Cast dependencies.agents to Agents
   const agentToRun = chooseNextAgent(
     current || defaultState,
     // FIX: Restore type cast
-    (dependencies.agents || {}) as Agents
+    agents as Agents
   )
 
   if (!agentToRun) {
@@ -210,7 +215,7 @@ export async function defaultRouter(
   })
 
   // Check if the chosen agent exists in dependencies
-  const agentExists = dependencies.agents && dependencies.agents[nextAgentName]
+  const agentExists = agents && agents[nextAgentName]
   if (!agentExists) {
     log.error(
       `Agent ${nextAgentName} not found in dependencies.`, // String message first
@@ -218,7 +223,7 @@ export async function defaultRouter(
         step: "ROUTER_AGENT_MISSING",
         eventId,
         requestedAgent: nextAgentName,
-        availableAgents: Object.keys(dependencies.agents || {}),
+        availableAgents: Object.keys(agents || {}),
       }
     )
     // Comment out call to removed function
