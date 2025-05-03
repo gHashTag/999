@@ -1,6 +1,6 @@
 // import { InngestTestEngine } from "@inngest/test"
 import { createTeamLeadAgent } from "@/agents/teamlead/logic/createTeamLeadAgent"
-import { describe, it, expect, beforeEach, mock } from "bun:test"
+import { describe, it, expect, beforeEach, spyOn } from "bun:test"
 // import { Inngest } from "inngest" // Remove unused Inngest import
 import {
   createFullMockDependencies,
@@ -11,7 +11,7 @@ import {
   // mockSystemEvents, // Remove unused
   mockDeepseekModelAdapter,
 } from "../setup/testSetupFocused"
-// import type { Tool, Agent } from "@inngest/agent-kit"
+import { openai } from "@inngest/agent-kit" // Import openai adapter
 import { TddNetworkState, NetworkStatus } from "@/types/network"
 
 // Create a dummy Inngest instance for testing
@@ -50,7 +50,7 @@ import { TddNetworkState, NetworkStatus } from "@/types/network"
 // Remove unused mockTool definition
 // const mockTool = mock((): any => ({}))
 
-describe.skip("TeamLead Agent Integration (Network Simulation)", () => {
+describe.skip("TeamLead Agent Integration (Network Simulation) - SKIPPED due to agent-kit #147", () => {
   let dependencies: AgentDependencies
   // Remove unused mockTools variable
   // let mockTools: Map<string, any>
@@ -83,18 +83,54 @@ describe.skip("TeamLead Agent Integration (Network Simulation)", () => {
     }
     await dependencies.kv?.set("networkState", fullInitialState)
 
-    dependencies.model = {
-      request: mock(async () => ({ result: requirementsResponse })),
+    // --- Replace mock model with configured openai adapter for OpenRouter ---
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY
+    if (!openRouterApiKey) {
+      throw new Error(
+        "OPENROUTER_API_KEY environment variable is not set for test!"
+      )
     }
+
+    const openAiAdapter = openai({
+      apiKey: openRouterApiKey,
+      model: "deepseek/deepseek-coder", // Or use another model like "openai/gpt-3.5-turbo"
+      // model: "openai/gpt-3.5-turbo",
+      baseUrl: "https://openrouter.ai/api/v1",
+    })
+
+    // Mock the request method of the created adapter instance
     const requirementsResponse = `* Req 1
 * Req 2`
+    // Assuming the adapter instance has a 'request' method we can mock
+    // If this fails, we might need to investigate the adapter's structure further
+    // mock(openAiAdapter.request).mockResolvedValue({ result: requirementsResponse })
+    // --- NEW MOCKING STRATEGY: Mock the underlying fetch call ---
+    // We assume the openai adapter uses fetch internally. We mock the global fetch.
+    spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          // Simulate the expected response structure from OpenAI/OpenRouter
+          choices: [
+            { message: { role: "assistant", content: requirementsResponse } },
+          ],
+        })
+      )
+    )
+
+    // Assign the configured adapter to dependencies
+    dependencies.model = openAiAdapter
+    // --- End of adapter replacement ---
 
     // Act: Create and run the agent
     const teamLeadAgent = createTeamLeadAgent(dependencies, "Instructions")
-    const result = await (teamLeadAgent as any).ask(initialTask)
+    const result = await teamLeadAgent.run(initialTask)
 
     // Assert: Check agent response
-    expect(result).toBe(requirementsResponse)
+    expect(result.output).toBeDefined()
+    const lastMessage = result.output[result.output.length - 1]
+    // --- Check last message content safely ---
+    expect(lastMessage).toBeDefined()
+    expect((lastMessage as any).content).toBe(requirementsResponse) // Use type assertion for now
 
     // Remove unused mock tool check
     // const updateTaskStateToolMock = mockTools.get("updateTaskState")

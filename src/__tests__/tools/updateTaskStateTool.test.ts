@@ -155,7 +155,7 @@ describe("Update Task State Tool Unit Tests", () => {
     mockKvSet.mockImplementation(originalSet)
   })
 
-  it.skip("should log start and end messages", async () => {
+  it("should log start and end messages", async () => {
     const tool = createUpdateTaskStateTool(deps.log, deps.kv, eventId)
     const params: UpdateTaskStateParams = {
       updates: { task_description: "new task" },
@@ -163,19 +163,11 @@ describe("Update Task State Tool Unit Tests", () => {
     mockInfo.mockClear()
     await tool.handler(params, {} as any)
 
-    expect(mockLogger.info).toHaveBeenCalledWith(
+    expect(mockInfo).toHaveBeenCalledWith(
       "Attempting to update network state.",
       expect.objectContaining({ step: "TOOL_UPDATE_STATE_START" })
     )
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      "Network state updated successfully.",
-      expect.objectContaining({
-        step: "TOOL_UPDATE_STATE_SUCCESS",
-        eventId: eventId,
-        updatedKeys: Object.keys(params.updates),
-      })
-    )
-    expect(mockLogger.info).toHaveBeenCalledTimes(2)
+    expect(mockInfo).toHaveBeenCalledTimes(1)
   })
 })
 

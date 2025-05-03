@@ -30,8 +30,10 @@ describe("Agent Definitions: Coder Agent", () => {
     expect((agent as any).model.options.apiKey).toBe(baseDeps.apiKey)
   })
 
-  it.skip("should generate code using InngestTestEngine", async () => {
+  it.skip("should generate code using InngestTestEngine - REQUIRES IMPLEMENTATION", async () => {
     // ... test body remains skipped ...
+    // Placeholder assertion to make the test runnable (but it will fail if body is missing)
+    // expect(true).toBe(false) // Intentionally failing placeholder
   })
 
   it("should generate a system prompt containing core instructions", () => {

@@ -1,62 +1,72 @@
 // --- HTTP Server (Entry Point using Fastify) --- //
-import { fastify } from "fastify"
+import { Hono } from "hono"
+import { serve as honoServe } from "@hono/node-server"
+import { serveStatic } from "@hono/node-server/serve-static"
+import { serve as inngestServe } from "inngest/hono"
+import { runCodingAgent } from "@/inngest"
 import { Inngest } from "inngest"
-import { serve } from "@inngest/fastify"
-import { agentFunction, runCodingAgent } from "@/inngest"
-import { log } from "@/utils/logic"
 import dotenv from "dotenv"
 
 dotenv.config()
 
-// --- Configuration ---
-const APP_PORT = parseInt(process.env.APP_PORT || "8484", 10)
-const SIGNING_KEY = process.env.INNGEST_SIGNING_KEY
-const EVENT_KEY = process.env.INNGEST_EVENT_KEY
+// Environment variables (remove unused)
 const ENVIRONMENT = process.env.NODE_ENV || "development"
+const SIGNING_KEY = process.env.INNGEST_SIGNING_KEY
 
 // Basic validation
 if (ENVIRONMENT !== "development" && !SIGNING_KEY) {
-  log.error(
+  console.error(
     "INNGEST_SIGNING_KEY is required in production. INNGEST_EVENT_KEY is recommended."
   )
   // process.exit(1); // Consider exiting in production
 }
 
-// Initialize Fastify
-const app = fastify()
+// Initialize Hono app
+const app = new Hono()
 
-// Initialize Inngest client
-const inngest = new Inngest({ id: "999-project", eventKey: EVENT_KEY })
-
-// Serve Inngest API handler
-app.register(serve, {
-  client: inngest,
-  functions: [agentFunction, runCodingAgent], // Your Inngest functions
-  signingKey: SIGNING_KEY,
-  logLevel: process.env.LOG_LEVEL || "info", // Control Inngest handler logging
+// Setup Inngest client
+export const inngest = new Inngest({
+  id: "999-agent-runner",
 })
 
-// Basic health check endpoint
-app.get("/")
+// Middleware (optional, for logging, cors, etc.)
+// app.use('*', logger()) // Example middleware
 
-// Basic health check endpoint
-app.get("/health", async (request, reply) => {
-  log.info("Health check request received.")
-  reply.send({ status: "ok" })
+// Inngest endpoint using inngest/hono serve
+app.on(
+  ["GET", "POST", "PUT"],
+  "/api/inngest",
+  inngestServe({
+    client: inngest,
+    functions: [runCodingAgent],
+    signingKey: SIGNING_KEY,
+  })
+)
+
+// Basic root endpoint
+app.get("/", c => {
+  return c.text("999 Agent Server is running!")
 })
+
+// Health check endpoint
+app.get("/health", c => {
+  // Correct Hono handler signature
+  return c.json({ status: "ok" })
+})
+
+// Serve static files (e.g., for reports)
+app.use("/html/*", serveStatic({ root: "./" }))
 
 // Start the server
-const start = async () => {
-  try {
-    await app.listen({ port: APP_PORT, host: "0.0.0.0" })
-    log.info(`Server listening on port ${APP_PORT}`)
-  } catch (err) {
-    log.error("Error starting server:", err)
-    process.exit(1)
-  }
-}
+const port = parseInt(process.env.APP_PORT || "8484")
+console.log(`Server starting on port ${port}...`)
 
-start()
+honoServe({
+  fetch: app.fetch,
+  port: port,
+})
+
+console.log(`Inngest functions served via /api/inngest endpoint.`)
 
 // Export app for potential programmatic use (though Bun typically runs the file directly)
-export { app }
+export default app

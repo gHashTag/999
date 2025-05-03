@@ -1,248 +1,163 @@
-import { Agent, Network /*, type NetworkRun*/ } from "@inngest/agent-kit"
-import { TddNetworkState, NetworkStatus } from "@/types/network"
-import { type Agents, type HandlerLogger } from "@/types/agents"
-// Remove unused KvStore import
-// import type { AgentDependencies, BaseLogger, KvStore } from "@/types/agents"
-import type { AgentDependencies, BaseLogger } from "@/types/agents"
-// Removed direct import of log, assuming it's passed via dependencies
-// import { log } from "@/utils/logic/logger"
+import { Agent } from "@inngest/agent-kit"
+// import type { Agents } from "@inngest/agent-kit" // Removed import for non-existent type
+import { /*TddNetworkState,*/ NetworkStatus } from "@/types/network" // Removed unused TddNetworkState
+import type { HandlerLogger } from "@/types/agents"
 
-// Type definition for the agents structure passed to chooseNextAgent
-// Removed unused type definition AgentsMap
-
-// Removed unused interface RouteArgs
-
-/**
- * Parses the state from the network's KV store and initializes it if necessary.
- * @param network - The agent network instance.
- * @returns The parsed or initialized TddNetworkState.
- */
-export function parseAndInitializeState(
-  network: Network<TddNetworkState>
-): TddNetworkState {
-  const state = network.state.kv.all()
-  // Ensure basic structure if state is empty
-  if (!state || Object.keys(state).length === 0) {
-    return {
-      status: NetworkStatus.Enum.IDLE,
-      task: "Initial task description missing",
-      sandboxId: undefined,
-      run_id: "unknown",
-    }
-  }
-  // Safer cast
-  return state as unknown as TddNetworkState
-}
-
-/**
- * Chooses the next agent based on the current network state.
- * @param state - The current network state.
- * @param agents - An object containing the agent instances.
- * @returns The next agent to run, or undefined to stop the network.
- */
-// FIX: Update parameter type to use imported Agents type
-export function chooseNextAgent(
-  state: TddNetworkState,
-  agents: Agents // Use imported Agents type
-): Agent<TddNetworkState> | undefined {
-  switch (state.status) {
-    case NetworkStatus.Enum.IDLE:
-    case NetworkStatus.Enum.READY:
-      return agents.teamLead // Start with TeamLead
-    case NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE:
-      return agents.critic
-    case NetworkStatus.Enum.NEEDS_TEST:
-    case NetworkStatus.Enum.NEEDS_TEST_REVISION:
-      return agents.tester
-    case NetworkStatus.Enum.NEEDS_TEST_CRITIQUE:
-      return agents.critic
-    // FIX: Use NEEDS_CODE instead of non-existent NEEDS_IMPLEMENTATION
-    case NetworkStatus.Enum.NEEDS_CODE:
-    case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION:
-      return agents.coder
-    case NetworkStatus.Enum.NEEDS_TYPE_CHECK: // Added type check step
-    case NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION:
-      return agents.tooling // Tooling agent handles type checks and commands
-    case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE:
-      return agents.critic
-    case NetworkStatus.Enum.COMPLETED:
-    case NetworkStatus.Enum.FAILED:
-    case NetworkStatus.Enum.NEEDS_HUMAN_INPUT: // Added case for human input stop
-      return undefined // Stop the network
-    default:
-      console.error(`Unknown network status: ${state.status}`)
-      return undefined // Stop on unknown status
-  }
-}
-
-/**
- * Saves the current state to the network's KV store.
- * @param network - The agent network instance.
- * @param state - The state object to save.
- */
-export function saveStateToKv(
-  network: Network<TddNetworkState>,
-  state: TddNetworkState | null,
-  log: HandlerLogger // Pass logger for saving state logs
-) {
-  if (state) {
-    // Correct logger call order
-    log.info("Saving state to KV.", {
-      step: "KV_SET_BEFORE_RETURN",
-      status: state.status,
-      sandboxId: state.sandboxId,
-    })
-    // Add detailed log of the state being saved
-    // Correct logger call order
-    log.info("State value being saved:", {
-      step: "KV_SET_VALUE",
-      // Limit logged state for brevity if needed
-      stateToSave: JSON.stringify(state).substring(0, 500) + "...",
-    })
-    network?.state?.kv?.set("network_state", state)
-  } else {
-    // Correct logger call order
-    log.warn("Skipping KV set because state is null.", { step: "KV_SET_SKIP" })
-  }
-}
-
-// Removed unused shouldStop function
-
-// Comment out the problematic saveStateBeforeReturn helper function
-/*
-async function saveStateBeforeReturn(
-  state: State<TddNetworkState>,
-  log: BaseLogger,
-  eventId?: string
-): Promise<void> {
-  // FIX: Use get instead of current()
-  const currentState = state.kv.get("network_state") // Example, adjust key if needed
-  if (currentState) {
-    log.info(
-      "Saving state before returning/sleeping.", // String message first
-      { step: "KV_SET_BEFORE_RETURN", eventId, status: currentState.status }
-    )
-    try {
-      log.info(
-        "State value being saved:", // String message first
-        { step: "KV_SET_VALUE", value: currentState }
-      )
-      // FIX: Use set instead of commit() ? Or maybe this function is not needed.
-      // await state.kv.set("network_state", currentState); // Example save
-      await state.kv.commit() // This method likely doesn't exist
-    } catch (error) {
-      log.error(
-        "Failed to save state to KV store before return.", // String message first
-        {
-          step: "KV_SET_ERROR",
-          eventId,
-          error: error instanceof Error ? error.message : String(error),
-        }
-      )
-      // Optionally re-throw or handle the error
-    }
-  } else {
-    log.warn(
-      "Skipping KV set because state is null.", // String message first
-      { step: "KV_SET_SKIP" }
-    )
-  }
-}
-*/
-
-/**
- * Default router logic for the TDD agent network.
- */
-// FIX: Remove NetworkRun import as lastRun is removed
-import type { State } from "@inngest/agent-kit"
-
-// FIX: Correct return type - Remove RouterResult
-export async function defaultRouter(
-  state: State<TddNetworkState>,
-  dependencies: AgentDependencies,
-  // FIX: Remove unused lastRun parameter
-  // lastRun: NetworkRun<TddNetworkState> | null,
-  log: BaseLogger // Explicitly accept BaseLogger
-): Promise<{ agent: Agent<TddNetworkState> | undefined } | undefined> {
-  // FIX: Define return type explicitly
-  // FIX: Use get instead of current()
-  const current = state.kv.get("network_state") as TddNetworkState | undefined // Use get and cast
-  const eventId = dependencies.eventId // Get eventId from dependencies
-
-  log.info(
-    `Routing based on status: ${current?.status}`, // String message first
-    { step: "ROUTER_ITERATION_START", eventId, status: current?.status }
-  )
-
-  // FIX: Pass current state and agents from dependencies to chooseNextAgent
-  // FIX: Provide default state object if current is undefined
-  const defaultState: TddNetworkState = {
-    status: NetworkStatus.Enum.IDLE,
-    task: "State missing in KV",
-    run_id: eventId || "unknown",
-    // Add other mandatory fields from TddNetworkState if they exist
-    // e.g., test_requirements: undefined, test_code: undefined, ...
-  }
-  // FIX: Cast dependencies.agents to Agents
-  const agentToRun = chooseNextAgent(
-    current || defaultState,
-    // FIX: Restore type cast
-    (dependencies.agents || {}) as Agents
-  )
-
-  if (!agentToRun) {
-    log.info("No agent selected by chooseNextAgent. Stopping.", {
-      step: "ROUTER_NO_AGENT",
-      eventId,
-      status: current?.status,
-    })
-    // Comment out call to removed function
-    // await saveStateBeforeReturn(state, log, eventId)
-    return undefined // Stop the network if no agent is chosen
-  }
-
-  // FIX: Use agentToRun.name instead of undefined nextAgentName
-  const nextAgentName = agentToRun.name
-  log.info(`Next agent selected: ${nextAgentName}`, {
-    step: "ROUTER_AGENT_SELECTED",
-    eventId,
-    nextAgentName,
-  })
-
-  // Check if the chosen agent exists in dependencies
-  const agentExists = dependencies.agents && dependencies.agents[nextAgentName]
-  if (!agentExists) {
-    log.error(
-      `Agent ${nextAgentName} not found in dependencies.`, // String message first
-      {
-        step: "ROUTER_AGENT_MISSING",
-        eventId,
-        requestedAgent: nextAgentName,
-        availableAgents: Object.keys(dependencies.agents || {}),
+// Define simplified types for router function arguments
+interface SimplifiedRouterOpts {
+  network: {
+    state: {
+      kv: {
+        get: (key: string) => Promise<any>
+        set: (key: string, value: any) => Promise<void>
       }
-    )
-    // Comment out call to removed function
-    // await saveStateBeforeReturn(state, log, eventId)
-    return { agent: undefined } // Indicate failure or stop by returning undefined agent
+    }
+    getAgents: () => Promise<Record<string, Agent<any>>>
+  }
+  dependencies: {
+    log: HandlerLogger // Use HandlerLogger type
+    // Add other dependencies if needed
+  }
+}
+
+interface SimplifiedStepResult {
+  nextAgent?: Agent<any>
+  result?: string
+}
+
+/**
+ * Default router logic for the TDD Agent Network.
+ * Determines the next agent to run based on the current network state.
+ * NOTE: This is currently NOT used as the standard AgentKit router.
+ */
+export const defaultRouter = async (
+  opts: SimplifiedRouterOpts // Use simplified opts type
+): Promise<SimplifiedStepResult> => {
+  // Use simplified result type
+  const status = await opts.network.state.kv.get("status")
+  const agents = await opts.network.getAgents()
+  const log = opts.dependencies.log // Use HandlerLogger now
+
+  log.info("defaultRouter_start", { status })
+
+  // Use Record<string, Agent<any>> for the type
+  const typedAgents: Record<string, Agent<any>> = {
+    teamLead: agents.teamLead,
+    tester: agents.tester,
+    coder: agents.coder,
+    critic: agents.critic,
+    tooling: agents.tooling,
   }
 
-  // Return the chosen agent
-  log.info(`Returning agent ${nextAgentName} to run.`, {
-    step: "ROUTER_RETURNING_AGENT",
-    eventId,
-    nextAgentName,
-  })
-  // Comment out call to removed function
-  // await saveStateBeforeReturn(state, log, eventId) // Save state before returning agent
-  return { agent: agentToRun }
+  try {
+    switch (status) {
+      case NetworkStatus.Enum.IDLE:
+      case NetworkStatus.Enum.READY:
+        // Start: Ask TeamLead for requirements
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE
+        )
+        return { nextAgent: typedAgents.teamLead }
 
-  // Default case: If status doesn't match, or COMPLETED/FAILED - Handled by chooseNextAgent now
-  // log.info(
-  //   "No further routing action needed for current status.", // String message first
-  //   { step: "ROUTER_ITERATION_END", eventId, status: current?.status }
-  // )
-  // await saveStateBeforeReturn(state, log, eventId) // Already saved before return
-  // return undefined // Stop the network run
+      case NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE:
+        // Requirements ready: Ask Critic to review them
+        // Critic's approval implicitly leads to needing a test
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_TEST // Set status for Tester after Critic review
+        )
+        return { nextAgent: typedAgents.critic }
+
+      case NetworkStatus.Enum.NEEDS_TEST:
+        // Test needed: Ask Tester to generate/provide the test
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_TEST_CRITIQUE // After Tester, Critic reviews the test
+        )
+        return { nextAgent: typedAgents.tester }
+
+      case NetworkStatus.Enum.NEEDS_TEST_CRITIQUE:
+        // Test ready/reviewed: Ask Critic to review it (or check if it was approved)
+        // Critic's approval implicitly leads to needing code
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_CODE // Set status for Coder after Critic test review
+        )
+        return { nextAgent: typedAgents.critic }
+
+      case NetworkStatus.Enum.NEEDS_CODE:
+        // Code needed: Ask Coder to write implementation
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_TYPE_CHECK // After Coder, Tooling checks types
+        )
+        return { nextAgent: typedAgents.coder }
+
+      case NetworkStatus.Enum.NEEDS_TYPE_CHECK:
+        // Type check needed: Ask Tooling to perform it
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION // After type check, Tooling runs tests
+        )
+        return { nextAgent: typedAgents.tooling }
+
+      case NetworkStatus.Enum.NEEDS_COMMAND_EXECUTION:
+        // Command (tests) executed: Ask Critic to review implementation
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE
+        )
+        return { nextAgent: typedAgents.critic }
+
+      case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE:
+        // Implementation reviewed/refactored: Cycle complete
+        await opts.network.state.kv.set("status", NetworkStatus.Enum.COMPLETED)
+        return { result: "COMPLETED" }
+
+      // --- Other States ---
+      case NetworkStatus.Enum.COMPLETED:
+        log.info("defaultRouter_already_completed")
+        return { result: "COMPLETED" }
+
+      case NetworkStatus.Enum.FAILED:
+        log.warn("defaultRouter_failed_state")
+        return { result: "FAILED" }
+
+      case NetworkStatus.Enum.NEEDS_HUMAN_INPUT:
+        log.info("defaultRouter_human_input_needed")
+        return { result: "NEEDS_HUMAN_INPUT" }
+
+      // Handle removed/renamed intermediate states gracefully if encountered
+      case NetworkStatus.Enum.NEEDS_TEST_REVISION:
+      case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION:
+      case NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION: // If this status is used elsewhere
+        log.warn("defaultRouter_unexpected_intermediate_status", { status })
+        // Decide recovery path, e.g., go back to critic or fail
+        await opts.network.state.kv.set(
+          "status",
+          NetworkStatus.Enum.NEEDS_IMPLEMENTATION_CRITIQUE
+        )
+        return { nextAgent: typedAgents.critic } // Or { result: "FAILED" }
+
+      default:
+        log.error("defaultRouter_unknown_status", { status })
+        await opts.network.state.kv.set("status", NetworkStatus.Enum.FAILED)
+        await opts.network.state.kv.set("error", `Unknown status: ${status}`)
+        return { result: "FAILED" }
+    }
+  } catch (error: any) {
+    log.error("defaultRouter_exception", {
+      error: error.message,
+      stack: error.stack,
+    })
+    await opts.network.state.kv.set("status", NetworkStatus.Enum.FAILED)
+    await opts.network.state.kv.set(
+      "error",
+      error.message || "Router exception"
+    )
+    return { result: "FAILED" }
+  }
 }
 // Note: The closing brace causing the original error should be implicitly removed by replacing the content.
 // If the error persists, the issue might be elsewhere or the file wasn't saved correctly.

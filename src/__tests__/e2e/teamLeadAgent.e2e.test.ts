@@ -10,7 +10,9 @@ import {
   /* NetworkStatus, */ TddNetworkState,
   NetworkStatus,
 } from "@/types/network"
-// import { processNetworkResult } from "@/inngest/logic/resultUtils" // Keep original import commented/removed
+// import { processNetworkResult } from "@/inngest/logic/resultUtils" // Removed unused import
+// Import mockKv to use in step mock
+// import { mockKv } from "../setup/testSetupFocused" // Removed unused import
 
 // Mock dependencies using mock.module
 mock.module("@/inngest/logic/dependencyUtils", () => ({
@@ -25,6 +27,8 @@ mock.module("@/inngest/logic/dependencyUtils", () => ({
     },
     model: { adapterId: "mock-adapter" }, // Mock model adapter
     allTools: [], // Empty tools array
+    kv: { get: mock(), set: mock(), all: mock() }, // Add a mock KV store
+    log: { info: mock(), warn: mock(), error: mock() }, // Add mock logger
   }),
 }))
 
@@ -100,17 +104,45 @@ describe.skip("TeamLead Agent Workflow (E2E using InngestTestEngine - Simplified
         {
           // Mock the step that runs the agent network
           id: "run-agent-network", // ID given in step.run('run-agent-network', ...)
-          handler() {
-            // console.log(
-            //   "[E2E TEST] Mock handler for network run executed! Returning dummy state."
-            // )
+          async handler() {
+            console.log(
+              "[E2E TEST] Mock handler for network run executed! Returning dummy state."
+            )
             // Return the structure expected by processNetworkResult or final assertions
-            return {
-              // No 'finalState' nesting needed if processNetworkResult handles it
-              status: NetworkStatus.Enum.COMPLETED, // Example status
+            // --- Return structure similar to actual network.run() result ---
+            // Simulate setting the final state in the mock KV
+            // await mockKv.set("status", NetworkStatus.Enum.COMPLETED)
+            // await mockKv.set("task", initialTaskDescription)
+            // await mockKv.set("sandboxId", mockKvSandboxId) // Use a different var name
+
+            // --- Return a PLAIN OBJECT simulating the state KV ---
+            const finalMockState = {
+              status: NetworkStatus.Enum.COMPLETED,
               task: initialTaskDescription,
-              sandboxId: mockSandboxId,
-              // Add other fields from TddNetworkState if needed by subsequent steps/assertions
+              sandboxId: mockSandboxId, // Use the var defined in the test scope
+              // Include other necessary fields from TddNetworkState
+              test_requirements: "mock reqs",
+              test_code: "mock test",
+              implementation_code: "mock impl",
+              run_id: "mock-run-id",
+            }
+
+            // Explicitly type finalMockState as any before indexing
+            const stateAsAny: any = finalMockState
+
+            return {
+              // state: { kv: mockKv }, // Return the mock KV containing the state
+              state: {
+                // Return an object that mimics the KV store's .all() or .get() results
+                // We can simulate the .get method if processNetworkResult uses it
+                get: mock(
+                  // Use 'any' for key type to bypass strict indexing check for now
+                  async (key: any) => stateAsAny[key] // Index the 'any' type
+                ),
+                // Or simulate .all() if it reads everything
+                all: mock(async () => finalMockState),
+              },
+              // Add other potential fields from NetworkRun if needed
             }
           },
         },
