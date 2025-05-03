@@ -88,7 +88,7 @@ describe("MCP Adapter Integration", () => {
   })
 
   // Skip this test due to logger mock anomaly
-  it.skip("должен логировать ключевые события и ошибки", async () => {
+  it("должен логировать ключевые события и ошибки", async () => {
     // Arrange: Mock a tool that will throw an error
     const errorToolName = "mcp_error_tool"
     const errorTool = {
@@ -126,7 +126,9 @@ describe("MCP Adapter Integration", () => {
       expect.objectContaining({
         toolName: errorToolName,
         attempt: 1,
-        error: expect.stringContaining("Test Log Error"),
+        err: expect.objectContaining({
+          message: expect.stringContaining("Test Log Error"),
+        }),
       })
     )
     expect(mockError).toHaveBeenCalledWith(
@@ -134,7 +136,9 @@ describe("MCP Adapter Integration", () => {
       expect.objectContaining({
         toolName: errorToolName,
         attempt: 2,
-        error: expect.stringContaining("Test Log Error"),
+        err: expect.objectContaining({
+          message: expect.stringContaining("Test Log Error"),
+        }),
       })
     )
   })
@@ -220,7 +224,8 @@ describe("MCP Adapter Integration", () => {
 })
 
 describe("MCP Adapter — Codex CLI Integration", () => {
-  let deps: AgentDependencies
+  let deps: AgentDependencies // Declare deps here
+  const toolName = "mcp_cli-mcp-server_run_command" // Define toolName here
 
   beforeEach(() => {
     // Use import instead of require
@@ -239,7 +244,6 @@ describe("MCP Adapter — Codex CLI Integration", () => {
   it("should connect to Codex CLI via MCP server and run a command tool", async () => {
     // Arrange: Create adapter with dependencies including the mock MCP tool
     const adapter = createMCPAdapter(deps)
-    const toolName = "mcp_cli-mcp-server_run_command"
     const params = { command: "echo 'hello from codex'" }
     const mockToolHandler = findToolMock(toolName)?.handler // Find the mock handler
 
@@ -253,11 +257,11 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
     // Assert: Check if the logger was called correctly
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_start", {
-      toolName,
+      toolName: toolName,
       params,
     })
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_success", {
-      toolName,
+      toolName: toolName,
       result: { output: "mcp command output" }, // Check the actual result logged
       attempt: 1, // Verify it succeeded on the first attempt
     })
@@ -267,9 +271,7 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
   it("should handle MCP server error and log attempts", async () => {
     // Arrange: Find the mock tool and configure its handler to fail once
-    const toolName = "mcp_cli-mcp-server_run_command"
     const mockTool = findToolMock(toolName)
-    // FIX: Remove check for mock.isMock and cast handler to Mock
     if (!mockTool) {
       throw new Error("Mock tool or handler not found/not mockable")
     }
@@ -294,17 +296,17 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
     // Assert: Check logs
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_start", {
-      toolName,
+      toolName: toolName,
       params,
     })
     expect(mockError).toHaveBeenCalledWith("mcpAdapter.error", {
-      toolName,
+      toolName: toolName,
       err: serverError,
       attempt: 1,
     })
     // Ensure the second attempt (which succeeds) logs success
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_success", {
-      toolName,
+      toolName: toolName,
       result: { output: "mcp command output" },
       attempt: 2,
     })
@@ -314,7 +316,6 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
   it("should handle MCP timeout error and log attempts", async () => {
     // Arrange: Configure mock handler to throw a timeout error
-    const toolName = "mcp_cli-mcp-server_run_command"
     const mockTool = findToolMock(toolName)
     if (!mockTool) {
       throw new Error("Mock tool or handler not found/not mockable")
@@ -340,16 +341,16 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
     // Assert: Check logs
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_start", {
-      toolName,
+      toolName: toolName,
       params,
     })
     expect(mockError).toHaveBeenCalledWith("mcpAdapter.error", {
-      toolName,
+      toolName: toolName,
       err: timeoutError,
       attempt: 1,
     })
     expect(mockError).toHaveBeenCalledWith("mcpAdapter.error", {
-      toolName,
+      toolName: toolName,
       err: timeoutError,
       attempt: 2, // Check second attempt log
     })
@@ -364,7 +365,6 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
   it("should handle invalid response format from MCP tool", async () => {
     // Arrange: Configure mock handler to return an invalid format
-    const toolName = "mcp_cli-mcp-server_run_command"
     const mockTool = findToolMock(toolName)
     if (!mockTool) {
       throw new Error("Mock tool or handler not found/not mockable")
@@ -392,13 +392,13 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
     // Assert: Check logs
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_start", {
-      toolName,
+      toolName: toolName,
       params,
     })
     expect(mockError).toHaveBeenCalledWith(
       "mcpAdapter.error",
       expect.objectContaining({
-        toolName,
+        toolName: toolName,
         error: expect.stringMatching(/invalid response format/i), // Or specific error message
         response: invalidResponse,
         attempt: 1, // Should fail on the first attempt
@@ -415,7 +415,6 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
   it("should retry after a specific delay on 429 error", async () => {
     // Arrange: Configure mock handler to throw a 429 error once
-    const toolName = "mcp_cli-mcp-server_run_command"
     const mockTool = findToolMock(toolName)
     if (!mockTool) {
       throw new Error("Mock tool or handler not found/not mockable")
@@ -445,13 +444,13 @@ describe("MCP Adapter — Codex CLI Integration", () => {
 
     // Assert: Check logs
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_start", {
-      toolName,
+      toolName: toolName,
       params,
     })
     expect(mockError).toHaveBeenCalledWith(
       "mcpAdapter.error",
       expect.objectContaining({
-        toolName,
+        toolName: toolName,
         err: error429,
         attempt: 1,
         status: 429, // Check if status is logged
@@ -460,7 +459,7 @@ describe("MCP Adapter — Codex CLI Integration", () => {
     // Check if a delay was logged or handled (this assertion might need adjustment)
     // expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.retry_delay", { toolName, delay: expect.any(Number) });
     expect(mockInfo).toHaveBeenCalledWith("mcpAdapter.run_success", {
-      toolName,
+      toolName: toolName,
       result: { output: "mcp command output after retry" },
       attempt: 2,
     })
