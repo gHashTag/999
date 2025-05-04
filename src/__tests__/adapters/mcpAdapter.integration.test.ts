@@ -141,8 +141,7 @@ describe("MCP Adapter Integration", () => {
     expect(retrievedValue).toBe(testValue)
   })
 
-  // Skip this test due to logger mock anomaly
-  it.skip("должен логировать ключевые события и ошибки", async () => {
+  it("должен логировать ключевые события и ошибки", async () => {
     // Arrange: Mock a tool that will throw an error
     const errorToolName = "mcp_error_tool"
     const errorTool = {
