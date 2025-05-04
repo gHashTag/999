@@ -56,11 +56,12 @@ describe("Tooling Agent Unit Tests", () => {
     ).sort()
     const expectedToolNames = [
       "readFile",
-      "writeFile",
       "runTerminalCommand",
       "updateTaskState",
+      "web_search",
+      "writeFile",
     ].sort()
     expect(agentToolNames).toEqual(expectedToolNames)
-    expect(agentWithInstructions.tools?.size).toBe(4)
+    expect(agentWithInstructions.tools?.size).toBe(5)
   })
 })

@@ -23,6 +23,7 @@ import {
   // Use mockMcpRunCommandTool instead
   mockMcpRunCommandTool,
   // mockTools, // REMOVED UNUSED IMPORT
+  mockMcpShowSecurityRulesTool,
 } from "../setup/testSetup" // UPDATED PATH
 // import { TddNetworkState /*, NetworkStatus*/ } from "@/types/network" // Keep commented if unused
 // import type { Agent /*, type AnyTool */ } from "@inngest/agent-kit" // Keep commented if unused
@@ -89,7 +90,7 @@ describe("MCP Adapter Integration", () => {
     const depsWithMixedTools = createFullMockDependencies({
       allTools: [
         mockMcpRunCommandTool,
-        // mockMcpShowSecurityRulesTool, // Assume not exported yet
+        mockMcpShowSecurityRulesTool,
         nonMcpTool,
       ],
     })
