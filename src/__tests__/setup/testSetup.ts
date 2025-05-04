@@ -1,14 +1,24 @@
-// src/__tests__/setup/testSetup.ts --- FINAL SIMPLIFIED ---
+// src/__tests__/setup/testSetup.ts --- FINAL TRY ---
 import { mock, type Mock } from "bun:test"
 import { Tool, type Agent } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
-// DO NOT RE-EXPORT TYPES HERE - Import them directly in test files
+// Import types directly from their source file
 import {
-  type AgentDependencies,
-  type BaseLogger,
-  type KvStore,
-  type SystemEvents,
+  type AgentDependencies as AgentDependenciesType, // Import with alias
+  type BaseLogger as BaseLoggerType, // Import with alias
+  type KvStore as KvStoreType, // Import with alias
+  type SystemEvents as SystemEventsType, // Import with alias
 } from "../../types/agents"
+// Import necessary types from the correct path
+import type {} from // ... existing code ...
+// ... existing code ...
+"../../types/agents"
+
+// Re-export types individually
+export type AgentDependencies = AgentDependenciesType
+export type BaseLogger = BaseLoggerType
+export type KvStore = KvStoreType
+export type SystemEvents = SystemEventsType
 
 // --- Constants ---
 export const mockApiKey = "mock-api-key"
@@ -19,21 +29,25 @@ export const mockSandboxId = "mock-sandbox-id"
 // --- Mock Implementations ---
 
 export const mockLoggerInstance: BaseLogger = {
+  // Use exported type BaseLogger
   info: mock((..._args: unknown[]) => {}),
   error: mock((...args: unknown[]) => console.error("ERROR:", ...args)),
   warn: mock((...args: unknown[]) => console.warn("WARN:", ...args)),
   debug: mock((..._args: unknown[]) => {}),
-  fatal: mock((...args: unknown[]) => console.error("FATAL:", ...args)),
+  fatal: mock((...args: unknown[]) => {
+    throw new Error(`FATAL: ${args}`)
+  }),
   trace: mock((..._args: unknown[]) => {}),
   silent: mock((..._args: unknown[]) => {}),
   level: "info",
   child: mock(function (
-    this: BaseLogger,
+    this: BaseLogger, // Use exported type BaseLogger
     _bindings: Record<string, unknown>
   ): BaseLogger {
+    // Use exported type BaseLogger
     return this
   }),
-}
+} satisfies BaseLogger
 
 export const mockInfo = mockLoggerInstance.info as Mock<
   (...args: unknown[]) => void
@@ -57,18 +71,56 @@ export const mockSilent = mockLoggerInstance.silent as Mock<
   (...args: unknown[]) => void
 >
 export const mockChild = mockLoggerInstance.child as Mock<
-  (bindings: Record<string, unknown>) => BaseLogger
+  (bindings: Record<string, unknown>) => BaseLogger // Use exported type BaseLogger
 >
 
 export const mockSystemEvents: SystemEvents = {
+  // Use exported type SystemEvents
   emit: mock(async (_event: string, _payload: Record<string, unknown>) => {}),
 }
 
-// Commented out Sandbox mock
-/*
-export const mockSandbox = { ... } as any
-*/
-export const mockSandbox: any = undefined // Placeholder
+// Uncomment and define mockSandbox
+// Ensure Sandbox type is imported correctly
+export const mockSandbox = {
+  // Mock essential Sandbox methods used by agents/tools
+  // Add minimal mocks for required properties/methods
+  // We can refine these later as needed by specific tests
+  filesystem: {
+    write: mock(async (_path: string, _content: string) => {}),
+    read: mock(async (_path: string) => "mock file content"),
+    list: mock(async (_path: string) => []),
+    remove: mock(async (_path: string) => {}),
+    watchDir: mock((_path: string) => ({
+      /* mock watcher */ stop: mock(() => {}),
+    })),
+  },
+  process: {
+    start: mock(async (_cmd: string, _opts?: any) => ({
+      exitCode: 0,
+      stdout: "",
+      stderr: "",
+      finished: Promise.resolve({ exitCode: 0, stdout: "", stderr: "" }),
+    })),
+    // Add other common process methods if needed
+    // startAndWait: mock(async ...),
+    // kill: mock(async ...),
+  },
+  terminal: {
+    start: mock(async (_opts: any) => ({
+      /* mock terminal */ kill: mock(() => {}),
+      onData: { subscribe: mock(() => {}) },
+    })),
+  },
+  // Add basic mocks for top-level properties often checked
+  files: {}, // Placeholder
+  commands: {}, // Placeholder
+  pty: {}, // Placeholder
+  // Add other methods as needed, e.g.:
+  close: mock(async () => {}),
+  // Add potentially required internal properties/methods if errors persist
+  // _Stopped: mock(async () => {}),
+  // Define as Mock<Sandbox> directly for better type safety
+} as any // Temporarily use 'as any' to bypass strict type checking on the mock object itself
 
 export const mockDeepseekModelAdapter: any = {
   ...(deepseek({
@@ -79,6 +131,7 @@ export const mockDeepseekModelAdapter: any = {
 
 const mockKvStoreDataInternal: Record<string, unknown> = {}
 export const createMockKvStore = (): KvStore => ({
+  // Use exported type KvStore
   get: mock(async <T = unknown>(key: string): Promise<T | undefined> => {
     return mockKvStoreDataInternal[key] as T | undefined
   }) as <T = unknown>(key: string) => Promise<T | undefined>,
@@ -99,7 +152,6 @@ export const createMockKvStore = (): KvStore => ({
 })
 export const mockKv = createMockKvStore()
 
-// Ensure this is exported
 export const createMockTool = <TOutput = unknown>(
   name: string,
   output: TOutput
@@ -168,6 +220,7 @@ export const mockTools: Tool.Any[] = [
   mockGrepSearchTool,
 ]
 
+// Use exported type AgentDependencies
 export function createBaseMockDependencies(
   eventIdInput = mockEventId
 ): Omit<
@@ -188,6 +241,7 @@ export function createBaseMockDependencies(
   }
 }
 
+// Use exported type AgentDependencies
 export function createFullMockDependencies(
   overrides: Partial<AgentDependencies> = {}
 ): AgentDependencies {
@@ -202,7 +256,7 @@ export function createFullMockDependencies(
     apiKey: mockApiKey,
     modelName: mockModelName,
     systemEvents: mockSystemEvents,
-    sandbox: mockSandbox,
+    sandbox: mockSandbox as any, // Use 'as any' for now
   }
 
   return {

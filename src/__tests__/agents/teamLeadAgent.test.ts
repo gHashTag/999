@@ -16,7 +16,7 @@ import {
 import { openai } from "@inngest/agent-kit" // Import openai adapter
 import { TddNetworkState, NetworkStatus } from "@/types/network"
 // Import type directly
-import type { AgentDependencies } from "../../types/agents" // ADDED DIRECT IMPORT
+// import type { AgentDependencies } from "../../types/agents" // REMOVED - Use re-export from testSetup
 
 // Create a dummy Inngest instance for testing
 // const testInngest = new Inngest({ id: "test-app" })

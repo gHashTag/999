@@ -29,7 +29,7 @@ import {
 // Import Mock type from bun:test
 import type { Mock } from "bun:test"
 // Import type directly from source
-import type { AgentDependencies } from "../../types/agents" // ADDED DIRECT IMPORT
+// import type { AgentDependencies } from "../../types/agents" // REMOVED - Use re-export from testSetup
 // import { createMcpAdapterTool } from "@/adapters/mcpAdapter" // Use createMCPAdapter instead
 // import { ToolExecutionError } from "@/errors/ToolExecutionError" // File likely doesn't exist
 
