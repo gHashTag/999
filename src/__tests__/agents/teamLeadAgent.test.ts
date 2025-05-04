@@ -73,13 +73,13 @@ describe.skip("TeamLead Agent Integration Test", () => {
     // Arrange: Set initial state
     // Use undefined for sandboxId as it's optional string
     const fullInitialState: TddNetworkState = {
+      task: "Initial task description",
       status: NetworkStatus.Enum.READY,
-      task: initialTask,
-      test_requirements: "",
+      test_requirements: undefined,
       test_code: "",
       implementation_code: "",
       sandboxId: undefined,
-      run_id: dependencies.eventId,
+      run_id: dependencies.eventId ?? "mock-event-id",
     }
     await dependencies.kv?.set("networkState", fullInitialState)
 

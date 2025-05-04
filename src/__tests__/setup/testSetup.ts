@@ -131,26 +131,68 @@ export const mockDeepseekModelAdapter: any = {
 
 // Uncomment Mock KvStore
 const mockKvStoreDataInternal: Record<string, unknown> = {}
-export const createMockKvStore = (): KvStore => ({
+export const createMockKvStore = (
+  initialData?: Record<string, unknown>
+): KvStore => {
   // Use exported type KvStore
-  get: mock(async <T = unknown>(key: string): Promise<T | undefined> => {
-    return mockKvStoreDataInternal[key] as T | undefined
-  }) as <T = unknown>(key: string) => Promise<T | undefined>,
-  set: mock(async <T = unknown>(key: string, value: T): Promise<void> => {
-    mockKvStoreDataInternal[key] = value
-  }),
-  delete: mock(async (key: string): Promise<boolean> => {
-    const exists = key in mockKvStoreDataInternal
-    delete mockKvStoreDataInternal[key]
-    return exists
-  }),
-  has: mock(async (key: string): Promise<boolean> => {
-    return key in mockKvStoreDataInternal
-  }),
-  all: mock(async (): Promise<Record<string, unknown>> => {
-    return { ...mockKvStoreDataInternal }
-  }),
-})
+  // Очищаем перед инициализацией нового экземпляра
+  Object.keys(mockKvStoreDataInternal).forEach(
+    key => delete mockKvStoreDataInternal[key]
+  )
+  // Если переданы начальные данные, сохраняем их целиком по ключу 'network_state'
+  if (initialData) {
+    console.log(
+      "[MOCK KV] Initializing with data under key 'network_state':",
+      initialData
+    )
+    mockKvStoreDataInternal["network_state"] = { ...initialData } // Сохраняем копию
+  } else {
+    console.log("[MOCK KV] Initializing empty.")
+  }
+
+  return {
+    get: mock(async <T>(key: string): Promise<T | undefined> => {
+      console.log(`[MOCK KV] GET called for key: ${key}`)
+      let value: unknown
+      if (key === "network_state" && mockKvStoreDataInternal["network_state"]) {
+        value = { ...(mockKvStoreDataInternal["network_state"] as object) }
+      } else {
+        value = mockKvStoreDataInternal[key]
+      }
+      return Promise.resolve(value) as Promise<T | undefined>
+    }),
+    set: mock(async (key: string, value: unknown): Promise<void> => {
+      console.log(`[MOCK KV] SET called for key: ${key} with value:`, value)
+      if (
+        key === "network_state" &&
+        typeof value === "object" &&
+        value !== null
+      ) {
+        mockKvStoreDataInternal["network_state"] = { ...value }
+      } else {
+        mockKvStoreDataInternal[key] = value
+      }
+      return Promise.resolve()
+    }),
+    delete: mock(async (key: string): Promise<boolean> => {
+      console.log(`[MOCK KV] DELETE called for key: ${key}`)
+      const exists = key in mockKvStoreDataInternal
+      delete mockKvStoreDataInternal[key]
+      if (key === "network_state") {
+        delete mockKvStoreDataInternal["network_state"]
+      }
+      return Promise.resolve(exists)
+    }),
+    has: mock(async (key: string): Promise<boolean> => {
+      console.log(`[MOCK KV] HAS called for key: ${key}`)
+      return Promise.resolve(key in mockKvStoreDataInternal)
+    }),
+    all: mock(async (): Promise<Record<string, unknown>> => {
+      console.log("[MOCK KV] ALL called")
+      return Promise.resolve({ ...mockKvStoreDataInternal })
+    }),
+  }
+}
 export const mockKv = createMockKvStore()
 
 // Uncomment createMockTool

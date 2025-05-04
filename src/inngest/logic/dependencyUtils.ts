@@ -23,6 +23,8 @@ import type {
   // SystemEvents, // Removed unused
 } from "@/types/agents"
 import { type Tool } from "@inngest/agent-kit"
+// Импортируем синглтон KV - ЗАКОММЕНТИРОВАНО ДЛЯ ТЕСТА
+// import { kvStoreSingletonInstance } from "@/utils/kv/kvStoreSingletonInstance"
 
 /**
  * Creates all agent dependencies, including loading instructions
@@ -60,6 +62,8 @@ export async function createAgentDependencies(
   // FIX: Comment out model creation until import is fixed
   // const model = deepseek({ apiKey, model: modelName })
   const sandboxInstance = await getSandbox(sandboxId)
+  // Получаем экземпляр KV - ЗАКОММЕНТИРОВАНО ДЛЯ ТЕСТА
+  // const kvInstance = kvStoreSingletonInstance
 
   const baseDeps: Omit<AgentDependencies, "agents" | "model"> = {
     allTools,
@@ -71,8 +75,9 @@ export async function createAgentDependencies(
     systemEvents: {} as any, // Provide dummy object
     sandbox: sandboxInstance as any, // Cast sandbox
     eventId,
-    // Add kv explicitly if needed by agents, currently missing
-    // kv: undefined,
+    // Добавляем kv - ЗАКОММЕНТИРОВАНО ДЛЯ ТЕСТА
+    // kv: kvInstance,
+    kv: undefined, // Явно ставим undefined, пока KV не реализован
   }
 
   // Use placeholder instructions directly

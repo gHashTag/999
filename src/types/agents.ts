@@ -65,8 +65,8 @@ export interface AgentDependencies {
   apiKey: string
   modelName: string
   systemEvents: SystemEvents
-  sandbox: Sandbox | null
-  eventId: string
+  sandbox?: Sandbox | null
+  eventId?: string
   agents?: Record<string, Agent<any>>
   kv?: KvStore
   model?: any // Add optional model property (type can be refined later)
