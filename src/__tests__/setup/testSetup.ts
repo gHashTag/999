@@ -129,6 +129,7 @@ export const mockDeepseekModelAdapter: any = {
   }) as any),
 }
 
+// Uncomment Mock KvStore
 const mockKvStoreDataInternal: Record<string, unknown> = {}
 export const createMockKvStore = (): KvStore => ({
   // Use exported type KvStore
@@ -152,6 +153,7 @@ export const createMockKvStore = (): KvStore => ({
 })
 export const mockKv = createMockKvStore()
 
+// Uncomment createMockTool
 export const createMockTool = <TOutput = unknown>(
   name: string,
   output: TOutput
@@ -163,6 +165,7 @@ export const createMockTool = <TOutput = unknown>(
   >,
 })
 
+// Uncomment all tool mocks
 // Ensure all tool mocks are exported
 export const mockUpdateTaskStateTool = createMockTool("updateTaskState", {
   success: true,
@@ -205,6 +208,7 @@ export const mockGrepSearchTool = createMockTool("grep_search", {
   results: ["Grep Result"],
 })
 
+// Uncomment mockTools array
 export const mockTools: Tool.Any[] = [
   mockUpdateTaskStateTool,
   mockAskHumanForInputTool,
@@ -251,7 +255,7 @@ export function createFullMockDependencies(
     log: mockLoggerInstance,
     allTools: [...mockTools],
     agents: {} as Record<string, Agent<any>>,
-    kv: createMockKvStore(),
+    kv: createMockKvStore(), // Use the function here
     model: mockDeepseekModelAdapter,
     apiKey: mockApiKey,
     modelName: mockModelName,
@@ -319,10 +323,21 @@ export const getMockTools = (
   })
 }
 
-// Commented out createMockAgent
-/*
-export const createMockAgent = (name: string, description: string): any => ({ ... })
-*/
-export const createMockAgent: any = undefined // Placeholder
+// Uncomment createMockAgent - Use the actual implementation with 'as any'
+export const createMockAgent = (name: string, description: string): any =>
+  ({
+    name,
+    description,
+    // Add mock methods as needed, e.g.:
+    ask: mock(async () => ({ final_output: "mock agent output" })),
+    run: mock(async () => ({ final_output: "mock agent output" })),
+    // Add a basic definition structure if AgentKit requires it internally
+    definition: {
+      name,
+      description,
+      tools: {},
+      model: {} as any,
+    },
+  }) as any // Use 'as any' for the overall return type for now
 
 // REMOVED: Conflicting 'export { mockLoggerInstance }'
