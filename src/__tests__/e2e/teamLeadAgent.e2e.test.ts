@@ -3,16 +3,20 @@
 // Basic imports for Vitest
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test" // Changed bun:test to bun:test
 import { InngestTestEngine } from "@inngest/test"
+// import { type Context, Inngest } from "inngest" // REMOVED UNUSED
 // Import the handler and Inngest instance
-import { runCodingAgent } from "@/inngest/index" // Removed unused 'inngest' import
+import { runCodingAgent } from "@/inngest/index" // Corrected path to index
 // Import types
 import {
   /* NetworkStatus, */ TddNetworkState,
   NetworkStatus,
 } from "@/types/network"
 // import { processNetworkResult } from "@/inngest/logic/resultUtils" // Removed unused import
-// Import mockKv to use in step mock
-// import { mockKv } from "../setup/testSetupFocused" // Removed unused import
+// import { type AgentDependencies } from "@/types/agents" // REMOVED UNUSED
+// import { createDevOpsNetwork } from "@/network/network" // REMOVED UNUSED
+// import { mockKv } from "../setup/testSetup" // UPDATED PATH (Removed unused import)
+// import { mockLoggerInstance } from "@/__tests__/setup/testSetup" // REMOVED UNUSED
+// import { codingAgentHandler } from "@/inngest" // REMOVED UNUSED
 
 // Mock dependencies using mock.module
 mock.module("@/inngest/logic/dependencyUtils", () => ({

@@ -70,6 +70,7 @@ export interface AgentDependencies {
   agents?: Record<string, Agent<any>>
   kv?: KvStore
   model?: any // Add optional model property (type can be refined later)
+  modelApiKey?: string
 }
 
 // Helper type for critique data extraction

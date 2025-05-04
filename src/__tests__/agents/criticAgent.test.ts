@@ -3,8 +3,8 @@ import {
   createFullMockDependencies,
   getMockTools,
   mockDeepseekModelAdapter,
-  mockLogger,
-} from "../setup/testSetupFocused"
+  mockLoggerInstance,
+} from "../setup/testSetup"
 import { createCriticAgent } from "@/agents/critic/logic/createCriticAgent"
 import type { AgentDependencies } from "@/types/agents"
 
@@ -12,7 +12,7 @@ describe("Critic Agent Unit Tests", () => {
   let baseDeps: AgentDependencies
 
   beforeEach(() => {
-    baseDeps = createFullMockDependencies()
+    baseDeps = createFullMockDependencies({ log: mockLoggerInstance })
   })
 
   it("should create a Critic agent with default dependencies", () => {
@@ -38,7 +38,7 @@ describe("Critic Agent Unit Tests", () => {
     const depsWithTools: AgentDependencies = {
       ...baseDeps,
       allTools: allMockTools,
-      log: mockLogger,
+      log: mockLoggerInstance,
     }
     const criticAgent = createCriticAgent(depsWithTools, "Test instructions")
 

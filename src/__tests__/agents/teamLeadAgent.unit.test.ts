@@ -1,29 +1,30 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import {
-  // createBaseMockDependencies, // Deprecated
   createFullMockDependencies, // Use new factory
+  setupTestEnvironment,
   getMockTools,
-  // mockDeepseekModelAdapter, // Remove unused
-} from "../setup/testSetupFocused"
+  // mockDeepseekModelAdapter, // Removed unused
+} from "../setup/testSetup" // UPDATED PATH
 import { createTeamLeadAgent } from "@/agents/teamlead/logic/createTeamLeadAgent"
 import type { AgentDependencies } from "@/types/agents"
 
 describe("TeamLead Agent Unit Tests", () => {
-  let baseDeps: AgentDependencies
+  let deps: AgentDependencies
 
   beforeEach(() => {
-    baseDeps = createFullMockDependencies() // Use new factory
+    setupTestEnvironment() // Use exported name
+    deps = createFullMockDependencies()
   })
 
   it("should create a TeamLead agent with default dependencies", () => {
-    const agent = createTeamLeadAgent(baseDeps, "Test instructions")
+    const agent = createTeamLeadAgent(deps, "Test instructions")
     expect(agent).toBeDefined()
     expect(agent.name).toBe("TeamLead")
   })
 
   it("should have access to the correct model adapter", () => {
-    const agent = createTeamLeadAgent(baseDeps, "Test instructions")
-    expect((agent as any).model).toBe(baseDeps.model)
+    const agent = createTeamLeadAgent(deps, "Test instructions")
+    expect((agent as any).model).toBe(deps.model)
   })
 
   it("should filter tools correctly based on teamlead requirements", () => {

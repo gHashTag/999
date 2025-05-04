@@ -1,17 +1,27 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import {
   createFullMockDependencies,
+  // mockLogger, // Removed unused
+  // mockEventId, // Removed unused
+  // Use exported function name
+  setupTestEnvironment,
   getMockTools,
-  // mockDeepseekModelAdapter,
-} from "../setup/testSetupFocused"
+  createMockTool,
+  // Import Tool type
+  // mockDeepseekModelAdapter, // Removed unused
+} from "../setup/testSetup" // UPDATED PATH
 import { createTesterAgent } from "@/agents/tester/logic/createTesterAgent"
+// Import AgentDependencies type
 import type { AgentDependencies } from "@/types/agents"
+// Remove unused Tool import
 import type { Tool } from "@inngest/agent-kit"
 
 describe("Tester Agent Unit Tests", () => {
+  // Use correct type
   let baseDeps: AgentDependencies
 
   beforeEach(() => {
+    setupTestEnvironment() // Use exported name
     baseDeps = createFullMockDependencies()
   })
 
@@ -56,5 +66,18 @@ describe("Tester Agent Unit Tests", () => {
     const testerAgent = createTesterAgent(depsWithoutTools, "Test instructions")
     expect(testerAgent.tools).toBeDefined()
     expect(testerAgent.tools.size).toBe(0)
+  })
+
+  it("should filter tools correctly", () => {
+    const testerTools = getMockTools(["runTerminalCommand", "updateTaskState"])
+    baseDeps.allTools = [
+      ...testerTools,
+      createMockTool("other_tool", {}), // Add a tool that should be filtered out
+    ]
+    const agent = createTesterAgent(baseDeps, "Test instructions")
+    // Agent tools are stored in agent.tools Map
+    const agentToolNames = Array.from(agent.tools?.keys() || [])
+    expect(agentToolNames).toEqual(["runTerminalCommand", "updateTaskState"])
+    expect(agent.tools?.size).toBe(2)
   })
 })

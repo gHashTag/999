@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from "bun:test"
 import {
   createFullMockDependencies,
   getMockTools,
-  mockLogger,
-} from "../setup/testSetupFocused"
+  mockLoggerInstance,
+  setupTestEnvironment,
+} from "../setup/testSetup"
 import { createCoderAgent } from "@/agents/coder/logic/createCoderAgent"
 
 const coderInstructions =
@@ -13,7 +14,8 @@ describe("Agent Definitions: Coder Agent", () => {
   let baseDeps: ReturnType<typeof createFullMockDependencies>
 
   beforeEach(() => {
-    baseDeps = createFullMockDependencies()
+    setupTestEnvironment()
+    baseDeps = createFullMockDependencies({ log: mockLoggerInstance })
   })
 
   it("should create a Coder agent with correct basic properties", () => {
@@ -65,7 +67,7 @@ describe("Agent Definitions: Coder Agent", () => {
       ...baseDeps,
       instructions: coderInstructions,
       allTools: allMockTools,
-      log: mockLogger,
+      log: mockLoggerInstance,
     })
 
     expect(agent.tools.size).toBe(6)

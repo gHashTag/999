@@ -1,15 +1,17 @@
+import { mockKv } from "@/__tests__/setup/testSetup"
 import type { /* HandlerLogger, */ AgentDependencies } from "../types/agents"
 import type { Tool /*, Options Agent */ } from "@inngest/agent-kit"
-import { mockKv } from "../__tests__/setup/testSetupFocused"
+// import type { ToolMetadata } from "@/types/tools"
+// import { logger } from "@/utils/logger"
 
 export function createMCPAdapter(deps: AgentDependencies) {
-  const { allTools, log: logger, agents = {}, ...rest } = deps
+  const { allTools, log: logger, agents = {}, kv = mockKv, ...rest } = deps
   const mcpTools: Tool.Any[] = allTools.filter(
     (t: Tool.Any) => t && t.name?.startsWith("mcp_")
   )
 
   const mockNetworkForOpts = {
-    state: { kv: mockKv },
+    state: { kv: kv },
     invoke: async () => {},
     sleep: async () => {},
     waitForEvent: async () => ({}) as any,
@@ -52,6 +54,7 @@ export function createMCPAdapter(deps: AgentDependencies) {
     mcpTools,
     logger,
     agents,
+    kv,
     ...rest,
     async run(toolName: string, ...args: unknown[]): Promise<unknown> {
       const tool = mcpTools.find((t: Tool.Any) => t.name === toolName)
@@ -160,12 +163,11 @@ export function createMCPAdapter(deps: AgentDependencies) {
     },
     async kvSet(key: string, value: unknown): Promise<void> {
       logger?.info?.("mcpAdapter.kvSet", { key, value })
-      ;(global as any).__mcpKV = (global as any).__mcpKV || {}
-      ;(global as any).__mcpKV[key] = value
+      await kv.set(key, value)
     },
     async kvGet(key: string): Promise<unknown> {
       logger?.info?.("mcpAdapter.kvGet", { key })
-      return (global as any).__mcpKV ? (global as any).__mcpKV[key] : undefined
+      return await kv.get(key)
     },
     /** Logs an error message, potentially enriching it with adapter context */
     logError(error: Error | string, context?: Record<string, unknown>): void {
