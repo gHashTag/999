@@ -16,19 +16,22 @@ import type { AgentDependencies } from "@/types/agents"
 // Remove unused Tool import
 import type { Tool } from "@inngest/agent-kit"
 
-describe("Tester Agent Unit Tests", () => {
+describe("Agent Definitions: Tester Agent", () => {
   // Use correct type
-  let baseDeps: AgentDependencies
+  let dependencies: AgentDependencies
 
   beforeEach(() => {
     setupTestEnvironment() // Use exported name
-    baseDeps = createFullMockDependencies()
+    dependencies = createFullMockDependencies()
   })
 
-  it("should create a Tester agent with default dependencies", () => {
-    const testerAgent = createTesterAgent(baseDeps, "Test instructions")
-    expect(testerAgent).toBeDefined()
-    expect(testerAgent.name).toBe("Tester")
+  it("should create a Tester agent with correct basic properties", () => {
+    const agent = createTesterAgent(dependencies, "Test instructions")
+    expect(agent).toBeDefined()
+    expect(agent.name).toBe("Tester Agent")
+    expect(agent.description).toBeDefined()
+    expect((agent as any).model.options.model).toBe(dependencies.modelName)
+    expect((agent as any).model.options.apiKey).toBe(dependencies.apiKey)
   })
 
   it("should filter tools correctly based on tester requirements", () => {
@@ -70,11 +73,11 @@ describe("Tester Agent Unit Tests", () => {
 
   it("should filter tools correctly", () => {
     const testerTools = getMockTools(["runTerminalCommand", "updateTaskState"])
-    baseDeps.allTools = [
+    dependencies.allTools = [
       ...testerTools,
       createMockTool("other_tool", {}), // Add a tool that should be filtered out
     ]
-    const agent = createTesterAgent(baseDeps, "Test instructions")
+    const agent = createTesterAgent(dependencies, "Test instructions")
     // Agent tools are stored in agent.tools Map
     const agentToolNames = Array.from(agent.tools?.keys() || [])
     expect(agentToolNames).toEqual(["runTerminalCommand", "updateTaskState"])

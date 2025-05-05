@@ -7,13 +7,23 @@ import type {
 } from "@/types/agents"
 // import type { TddNetworkState } from '@/types/network.types'
 
+// Список инструментов, разрешенных для использования Агентом-Тестировщиком
+const TESTER_ALLOWED_TOOLS = [
+  "runTerminalCommand",
+  "readFile",
+  "updateTaskState",
+  // Возможно, понадобятся writeFile, mcp_...?
+]
+
 // ----------------------------------------------------
 
 /**
- * Creates the Tester agent.
- * @param dependencies - The dependencies for the agent.
- * @param instructions - The system instructions for the agent.
- * @returns The Tester agent instance.
+ * Creates the Tester agent instance.
+ * Configures the agent with specific tools and system instructions.
+ *
+ * @param dependencies - The common dependencies injected into the agent.
+ * @param instructions - The specific system prompt/instructions for the agent.
+ * @returns An initialized Agent instance configured for the Tester role.
  */
 export const createTesterAgent = (
   dependencies: AgentDependencies,
@@ -26,20 +36,17 @@ export const createTesterAgent = (
   //   systemEvents, // Destructure event emitter from dependencies
   // } = dependencies
 
-  // Filter tools specifically needed by Tester
-  const allowedToolNames = ["runTerminalCommand", "readFile", "updateTaskState"] // Correct list from tests
   const toolsToUse = allTools.filter((tool: Tool<any>) =>
-    allowedToolNames.includes(tool.name)
+    TESTER_ALLOWED_TOOLS.includes(tool.name)
   )
 
-  log?.info("Creating Tester Agent", { toolCount: toolsToUse.length }) // Optional logging
+  log?.info("Creating Tester Agent", { toolCount: toolsToUse.length })
 
   return new Agent({
-    name: "Tester", // Simplified name
-    description:
-      "Создает или выполняет команды для создания тестов, запускает тесты и анализирует результаты.",
-    system: instructions, // Use passed instructions
+    name: "Tester Agent", // Исправляем имя
+    description: "Создает и запускает тесты, анализирует результаты.", // Добавляем описание
+    system: instructions,
     model: deepseek({ apiKey, model: modelName }),
-    tools: toolsToUse, // Use the determined tools
+    tools: toolsToUse,
   })
 }
