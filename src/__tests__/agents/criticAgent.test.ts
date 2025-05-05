@@ -51,18 +51,27 @@ describe("Agent Definitions: Critic Agent", () => {
     )
   })
 
-  // Тест фильтрации инструментов (заглушка)
-  it.skip("should correctly filter tools needed by Critic", () => {
-    // Добавляем явный тип для allMockTools
-    const allMockTools: Tool<any>[] = [] // TODO: Получить все моки инструментов
-    const depsWithTools = createFullMockDependencies({ allTools: allMockTools })
-    const agent = createCriticAgent(depsWithTools, criticInstructions)
+  // Тест фильтрации инструментов
+  // Убираем .skip и добавляем логику
+  it("should correctly filter tools needed by Critic", () => {
+    // 1. Получаем полный набор мок-инструментов из setup
+    const allMockTools = dependencies.allTools // Используем инструменты из beforeEach
+    expect(allMockTools.length).toBeGreaterThan(2) // Убедимся, что моков больше, чем ожидаемых
 
+    // 2. Создаем агента с полным набором инструментов
+    const agent = createCriticAgent(dependencies, criticInstructions)
+
+    // 3. Определяем ожидаемый список имен инструментов для Критика
     const expectedToolNames = [
-      /* TODO: Указать ожидаемые инструменты */
+      "web_search",
+      "updateTaskState",
+      // Убеждаемся, что другие НЕ включены (например, askHumanForInput)
     ].sort()
+
+    // 4. Получаем актуальный список имен инструментов агента
     const actualToolNames = Array.from(agent.tools.keys()).sort()
 
+    // 5. Сравниваем списки
     expect(actualToolNames).toEqual(expectedToolNames)
   })
 
