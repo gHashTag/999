@@ -12,6 +12,9 @@ import {
 // import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
 // import type { TddNetworkState } from '@/types/network.types'
 
+// Список инструментов, необходимых Агенту-Руководителю
+const TEAMLEAD_REQUIRED_TOOLS = ["updateTaskState", "web_search"]
+
 /**
  * Creates the TeamLead agent.
  * @param dependencies - The dependencies for the agent.
@@ -26,9 +29,8 @@ export const createTeamLeadAgent = (
   const { log, model, allTools } = dependencies // Extract allTools
 
   // Restore tool filtering logic
-  const requiredToolNames = ["updateTaskState", "web_search"]
   const toolsToUse = allTools.filter((tool: Tool<any>) =>
-    requiredToolNames.includes(tool.name)
+    TEAMLEAD_REQUIRED_TOOLS.includes(tool.name)
   )
 
   log?.info("Creating TeamLead Agent", { toolCount: toolsToUse.length })
