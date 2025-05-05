@@ -85,7 +85,6 @@ export async function createAgentDependencies(
   const testerInstructions = "Placeholder Tester Instructions"
   const teamLeadInstructions = "Placeholder TeamLead Instructions"
   const criticInstructions = "Placeholder Critic Instructions"
-  const toolingInstructions = "Placeholder Tooling Instructions"
 
   // 4. Create Agent Instances with Instructions
   const teamLead = createTeamLeadAgent(baseDeps, teamLeadInstructions)

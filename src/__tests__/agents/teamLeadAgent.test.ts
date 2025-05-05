@@ -355,8 +355,7 @@ it.skip("should run Inngest function successfully with mocked network step", asy
 
   // 3. Выполнение теста, явно передавая событие и id
   const { result, state } = await t.execute({
-    event: initialEvent, // Передаем наше событие
-    eventId: initialEvent.id, // Передаем ID
+    events: [initialEvent], // Передаем наше событие
     steps: mockSteps,
   })
 
