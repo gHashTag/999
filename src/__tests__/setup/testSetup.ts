@@ -151,14 +151,9 @@ export const createMockKvStore = (
   }
 
   return {
-    get: mock(async <T>(key: string): Promise<T | undefined> => {
-      console.log(`[MOCK KV] GET called for key: ${key}`)
-      let value: unknown
-      if (key === "network_state" && mockKvStoreDataInternal["network_state"]) {
-        value = { ...(mockKvStoreDataInternal["network_state"] as object) }
-      } else {
-        value = mockKvStoreDataInternal[key]
-      }
+    get: mock(async <T = any>(key: string): Promise<T | undefined> => {
+      console.log(`[MOCK KV] Getting key: ${key}`)
+      const value = mockKvStoreDataInternal[key]
       return Promise.resolve(value) as Promise<T | undefined>
     }),
     set: mock(async (key: string, value: unknown): Promise<void> => {
@@ -305,9 +300,23 @@ export function createFullMockDependencies(
     sandbox: mockSandbox as any, // Use 'as any' for now
   }
 
+  // Create mock agents (add other agents as needed)
+  const agents = {
+    TeamLead: createMockAgent("TeamLead", ""),
+    // Critic: createMockAgent("Critic"),
+    // Coder: createMockAgent("Coder"),
+    // Tester: createMockAgent("Tester"),
+    // Tooling: createMockAgent("Tooling"),
+  }
+
+  // Ensure allTools defaults to base.allTools if not in overrides
+  const allTools = overrides?.allTools ?? base.allTools
+
   return {
     ...base,
     ...overrides,
+    agents,
+    allTools,
   }
 }
 

@@ -71,67 +71,78 @@ describe("Agent Definitions: Coder Agent", () => {
     expect((agent as any).model.options.apiKey).toBe(baseDeps.apiKey)
   })
 
-  it("should generate code using InngestTestEngine", async () => {
+  it("should simulate TeamLead -> Coder sequence using mocked network steps", async () => {
     const t = new InngestTestEngine({
       function: runCodingAgent,
     })
 
-    const mockEvents = [
-      {
-        name: "coding-agent/run",
-        data: {
-          input: "Implement sum function",
-        },
+    const initialEvent = {
+      name: "coding-agent/run",
+      data: {
+        input: "Implement sum function",
       },
-    ]
-
-    // Ожидаемое финальное состояние KV после работы сети
-    const expectedFinalKvData = {
-      status: NetworkStatus.Enum.NEEDS_TYPE_CHECK,
-      implementation_code: "function sum(a, b) { return a + b; }",
-      run_id: "test-run-id", // run_id будет установлен моком getCurrentState
-      task: "Implement sum function",
-      test_requirements: "* should sum 1 + 1 = 2",
-      test_code: "expect(sum(1, 1)).toBe(2);",
-      attempts: 1,
-      revisions: 0,
-      maxAttempts: 3,
-      maxRevisions: 2,
-      eventId: expect.any(String), // eventId будет установлен моком getCurrentState
-      sandboxId: "mock-sandbox-id",
     }
 
-    // Результат мока сети теперь содержит мок KV с финальным состоянием
-    const mockNetworkRunResult = {
+    const mockTeamLeadNetworkResult = {
       state: {
-        kv: createMockKvStore(expectedFinalKvData), // Используем createMockKvStore
+        kv: createMockKvStore({
+          status: NetworkStatus.Enum.NEEDS_CODE,
+          run_id: "test-run-id-1",
+          task: "Implement sum function",
+          test_requirements: "* should sum 1 + 1 = 2",
+          test_code: "expect(sum(1, 1)).toBe(2);",
+          eventId: "test-event-id-1",
+          sandboxId: "mock-sandbox-1",
+        }),
       },
       output: null,
     }
 
+    const expectedImplementation = "function sum(a, b) { return a + b; }"
+    const mockCoderNetworkResult = {
+      state: {
+        kv: createMockKvStore({
+          status: NetworkStatus.Enum.NEEDS_TYPE_CHECK,
+          implementation_code: expectedImplementation,
+          run_id: "test-run-id-1",
+          task: "Implement sum function",
+          test_requirements: "* should sum 1 + 1 = 2",
+          test_code: "expect(sum(1, 1)).toBe(2);",
+          eventId: "test-event-id-1",
+          sandboxId: "mock-sandbox-1",
+        }),
+      },
+      output: null,
+    }
+
+    const networkStepMock = mock
+      .fn()
+      .mockResolvedValueOnce(mockTeamLeadNetworkResult)
+      .mockResolvedValueOnce(mockCoderNetworkResult)
+
     const mockSteps = [
       {
         id: "run-agent-network",
-        handler: () => mockNetworkRunResult,
+        handler: networkStepMock,
       },
     ]
 
     const { result, state } = await t.execute({
-      events: mockEvents as any,
+      events: [initialEvent] as any,
       steps: mockSteps,
     })
 
     expect(result).toBeDefined()
-    // Ожидаем, что функция вернет success: true и статус из НАЧАЛЬНОГО состояния,
-    // так как processNetworkResult вернул undefined в этом сценарии.
-    expect(result).toEqual({
-      success: true,
-      finalStatus: NetworkStatus.Enum.NEEDS_CODE, // Статус из мока getCurrentState
-      // finalState: expect.objectContaining(expectedFinalKvData), // Это поле не возвращается в данном случае
-    })
+    expect(networkStepMock).toHaveBeenCalledTimes(2)
 
-    // Проверяем состояние шага run-agent-network
-    expect(await state["run-agent-network"]).toEqual(mockNetworkRunResult)
+    const finalNetworkStateResult = await state["run-agent-network"]
+    expect(finalNetworkStateResult).toEqual(mockCoderNetworkResult)
+
+    const finalKvStore = finalNetworkStateResult.state.kv
+    const finalState = await finalKvStore.get("network_state")
+    expect(finalState).toBeDefined()
+    expect(finalState?.implementation_code).toBe(expectedImplementation)
+    expect(finalState?.status).toBe(NetworkStatus.Enum.NEEDS_TYPE_CHECK)
   })
 
   it("should generate a system prompt containing core instructions", () => {
