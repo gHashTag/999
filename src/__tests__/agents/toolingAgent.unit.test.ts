@@ -11,57 +11,37 @@ import type { AgentDependencies } from "@/types/agents"
 // Import Tool type
 // import { Tool } from "@inngest/agent-kit" // Tool type is likely not needed here
 
-describe("Tooling Agent Unit Tests", () => {
-  let baseDeps: AgentDependencies
+describe("Agent Definitions: Tooling Agent", () => {
+  let dependencies: AgentDependencies
 
   beforeEach(() => {
     setupTestEnvironment()
-    baseDeps = createFullMockDependencies({ log: mockLoggerInstance })
+    dependencies = createFullMockDependencies({ log: mockLoggerInstance })
   })
 
-  it("should create a Tooling agent with default dependencies", () => {
-    // Pass dependencies and mock instructions in a single object
-    const agent = createToolingAgent({
-      ...baseDeps,
-      instructions: "Default instructions",
-    })
+  it("should create a Tooling agent with correct basic properties", () => {
+    const agent = createToolingAgent(dependencies, "Default instructions")
     expect(agent).toBeDefined()
-    // Corrected expected name based on implementation
     expect(agent.name).toBe("Tooling Agent")
+    expect(agent.description).toBeDefined()
+    expect((agent as any).model.options.model).toBe(dependencies.modelName)
+    expect((agent as any).model.options.apiKey).toBe(dependencies.apiKey)
   })
 
-  it("should filter tools correctly", () => {
-    const toolingTools = getMockTools([
-      "readFile",
-      "writeFile",
-      "runTerminalCommand",
-      "updateTaskState", // Tooling might update state too
-    ])
-    const depsWithTools = {
-      ...baseDeps,
-      allTools: [
-        ...toolingTools,
-        createMockTool("web_search", {}), // Add a tool that should be filtered out
-      ],
-    }
+  it("should filter tools correctly (exclude disallowed)", () => {
+    const allMockTools = dependencies.allTools
+    const allToolNames = allMockTools.map(t => t.name)
+    expect(allToolNames).toContain("askHumanForInput")
 
-    // Pass dependencies and specific instructions in a single object
-    const agentWithInstructions = createToolingAgent({
-      ...depsWithTools,
-      instructions: "Filter tools",
-    })
-    // Agent tools are stored in agent.tools Map
-    const agentToolNames = Array.from(
-      agentWithInstructions.tools?.keys() || []
-    ).sort()
-    const expectedToolNames = [
-      "readFile",
-      "runTerminalCommand",
-      "updateTaskState",
-      "web_search",
-      "writeFile",
-    ].sort()
-    expect(agentToolNames).toEqual(expectedToolNames)
-    expect(agentWithInstructions.tools?.size).toBe(5)
+    const agent = createToolingAgent(dependencies, "Filter tools")
+
+    const expectedToolNames = allToolNames
+      .filter(name => name !== "askHumanForInput")
+      .sort()
+
+    const actualToolNames = Array.from(agent.tools.keys()).sort()
+
+    expect(actualToolNames).toEqual(expectedToolNames)
+    expect(agent.tools.size).toBe(expectedToolNames.length)
   })
 })

@@ -12,22 +12,26 @@ import type {
 } from "@/types/agents" // Correct path
 // import type { TddNetworkState } from '@/types/network.types' // Likely unused
 
+// Список инструментов, ЗАПРЕЩЕННЫХ для Агента-Инструментальщика
+const TOOLING_DISALLOWED_TOOLS = ["askHumanForInput"]
+
 /**
  * Creates the Tooling/DevOps agent.
  * @param dependencies - The dependencies for the agent, including instructions.
  * @param instructions - The system instructions for the agent.
  * @returns The Tooling agent instance.
  */
-export const createToolingAgent = ({
-  instructions,
-  ...dependencies
-}: { instructions: string } & AgentDependencies): Agent<any> => {
+export const createToolingAgent = (
+  dependencies: AgentDependencies,
+  instructions: string
+): Agent<any> => {
   const { apiKey, modelName, allTools, log } = dependencies
 
   // Tooling agent usually needs most/all tools
   // Filter out any tools it definitely should NOT use, if any.
+  // Используем константу с обратной логикой
   const toolsToUse = allTools.filter(
-    (tool: Tool<any>) => tool.name !== "askHumanForInput" // Specify Tool<any>
+    (tool: Tool<any>) => !TOOLING_DISALLOWED_TOOLS.includes(tool.name) // Фильтруем по ЗАПРЕЩЕННЫМ
   )
 
   log?.info("Creating Tooling Agent", { toolCount: toolsToUse.length })
