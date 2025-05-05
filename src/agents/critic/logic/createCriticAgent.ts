@@ -10,12 +10,18 @@ import {
 // Removed unused imports:
 // import { NetworkStatus, type TddNetworkState } from "@/types/network"
 // import { NetworkRun } from '@inngest/agent-kit'
+import type { BaseLogger } from "@/types/agents"
+
+// Список инструментов, разрешенных для использования Агентом-Критиком
+const CRITIC_ALLOWED_TOOLS = ["updateTaskState", "web_search"]
 
 /**
- * Creates the Critic agent.
- * @param dependencies - The dependencies for the agent.
- * @param instructions - The system instructions for the agent.
- * @returns The Critic agent instance.
+ * Creates the Critic agent instance.
+ * Configures the agent with specific tools and system instructions.
+ *
+ * @param dependencies - The common dependencies injected into the agent (logger, model, tools, etc.).
+ * @param instructions - The specific system prompt/instructions for this agent instance.
+ * @returns An initialized Agent instance configured for the Critic role.
  */
 export const createCriticAgent = (
   dependencies: AgentDependencies,
@@ -24,9 +30,9 @@ export const createCriticAgent = (
   const { apiKey, modelName, allTools, log } = dependencies
 
   // Filter tools specifically needed by Critic
-  const allowedToolNames = ["updateTaskState", "web_search"] // Correct list from tests
+  // Используем константу
   const toolsToUse = allTools.filter((tool: Tool<any>) =>
-    allowedToolNames.includes(tool.name)
+    CRITIC_ALLOWED_TOOLS.includes(tool.name)
   )
 
   // Removed: const systemPrompt = readAgentInstructions("Critic")
