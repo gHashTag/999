@@ -116,15 +116,10 @@ describe("Agent Definitions: Coder Agent", () => {
       },
     ]
 
-    // @ts-expect-error TS2322 убрана, т.к. стала unused
     const { result, state } = await t.execute({
-      events: mockEvents,
+      events: mockEvents as any,
       steps: mockSteps,
     })
-
-    // TODO: Investigate and fix the remaining type errors related to
-    //       - TS2322: events: mockEvents assignment
-    //       - TS2322: KvStore mock method signatures (get)
 
     expect(result).toBeDefined()
     // Ожидаем, что функция вернет success: true и статус из НАЧАЛЬНОГО состояния,
@@ -171,6 +166,21 @@ describe("Agent Definitions: Coder Agent", () => {
       log: mockLoggerInstance,
     })
 
-    expect(agent.tools.size).toBe(6)
+    // Определяем ожидаемый список имен инструментов
+    const expectedToolNames = [
+      "readFile",
+      "createOrUpdateFiles",
+      "runTerminalCommand",
+      "edit_file",
+      "codebase_search",
+      "grep_search",
+    ].sort()
+
+    // Получаем актуальный список имен
+    const actualToolNames = Array.from(agent.tools.keys()).sort()
+
+    // Сравниваем количество и имена
+    expect(agent.tools.size).toBe(expectedToolNames.length)
+    expect(actualToolNames).toEqual(expectedToolNames)
   })
 })

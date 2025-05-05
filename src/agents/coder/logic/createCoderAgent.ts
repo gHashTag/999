@@ -3,6 +3,16 @@ import { deepseek } from "@inngest/ai/models"
 import type { AgentDependencies } from "@/types/agents"
 // import type { TddNetworkState } from '@/types/network.types'
 
+// Список инструментов, разрешенных для использования Агентом-Разработчиком
+const CODER_ALLOWED_TOOLS = [
+  "readFile",
+  "createOrUpdateFiles",
+  "runTerminalCommand",
+  "edit_file",
+  "codebase_search",
+  "grep_search",
+]
+
 /**
  * Creates the Coder agent.
  * @param dependencies - The dependencies for the agent, including instructions.
@@ -18,14 +28,7 @@ export const createCoderAgent = ({
 
   // Use allTools directly, filtering logic remains
   const toolsToUse = allTools.filter((tool: Tool<any>) =>
-    [
-      "readFile",
-      "createOrUpdateFiles",
-      "runTerminalCommand",
-      "edit_file",
-      "codebase_search",
-      "grep_search",
-    ].includes(tool.name)
+    CODER_ALLOWED_TOOLS.includes(tool.name)
   )
 
   log?.info("Creating Coder Agent", { toolCount: toolsToUse.length }) // Optional logging
