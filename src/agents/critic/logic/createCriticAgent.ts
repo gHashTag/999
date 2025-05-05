@@ -34,11 +34,56 @@ export const createCriticAgent = (
   log?.info("Creating Critic Agent", { toolCount: toolsToUse.length })
 
   return new Agent({
-    name: "Critic", // Simplified name
+    name: "Critic Agent",
     description:
       "Оценивает код, тесты или результаты выполнения команд, выполняет рефакторинг.", // Updated description
     system: instructions, // Use passed instructions
     model: deepseek({ apiKey, model: modelName }),
     tools: toolsToUse,
   })
+}
+
+// --- НОВАЯ ФУНКЦИЯ-ПАРСЕР --- //
+
+/**
+ * Parses the string output from the Critic LLM into the expected JSON structure.
+ * @param llmOutput - The raw string output from the LLM.
+ * @param logger - Optional logger for errors.
+ * @returns The parsed JSON object or null if parsing fails.
+ */
+export const parseCriticResponse = (
+  llmOutput: string,
+  logger?: BaseLogger // Добавляем опциональный логгер
+): {
+  approved: boolean
+  critique: string
+  refactored_code: string | null
+} | null => {
+  try {
+    // TODO: Add more robust parsing, potentially cleaning the string first (e.g., removing markdown backticks)
+    const parsed = JSON.parse(llmOutput)
+
+    // TODO: Add schema validation (e.g., using Zod) to ensure all fields exist and have correct types
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      typeof parsed.approved === "boolean" &&
+      typeof parsed.critique === "string" &&
+      (parsed.refactored_code === null ||
+        typeof parsed.refactored_code === "string")
+    ) {
+      return parsed
+    } else {
+      logger?.warn("Parsed Critic LLM output failed schema validation", {
+        parsed,
+      })
+      return null
+    }
+  } catch (error) {
+    logger?.error("Failed to parse Critic LLM output as JSON", {
+      error,
+      llmOutput,
+    })
+    return null
+  }
 }
