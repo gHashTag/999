@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import {
   createFullMockDependencies,
-  setupTestEnvironment,
-  getMockTools,
-  createMockTool,
   mockLoggerInstance,
+  setupTestEnvironment,
 } from "../setup/testSetup"
 import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"
 import type { AgentDependencies } from "@/types/agents"

@@ -99,10 +99,12 @@ export async function createAgentDependencies(
   const critic = createCriticAgent(baseDeps, criticInstructions)
   // FIX: Pass arguments correctly (single object including instructions)
   // const tooling = createToolingAgent(baseDeps)
-  const tooling = createToolingAgent({
-    ...baseDeps,
-    instructions: toolingInstructions,
-  })
+  const tooling = createToolingAgent(
+    {
+      ...baseDeps,
+    },
+    ""
+  )
 
   // 5. Construct Final Agents Object
   const agents: Agents = {
@@ -185,10 +187,12 @@ export const createAgents = (
     ),
     // FIX: Pass arguments correctly (single object including instructions)
     // tooling: createToolingAgent(baseAgentDeps as AgentDependencies),
-    tooling: createToolingAgent({
-      ...(baseAgentDeps as AgentDependencies),
-      instructions: "",
-    }),
+    tooling: createToolingAgent(
+      {
+        ...baseAgentDeps,
+      },
+      ""
+    ),
   }
 
   logger.info(

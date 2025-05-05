@@ -303,10 +303,10 @@ export function createFullMockDependencies(
   // Create mock agents (add other agents as needed)
   const agents = {
     TeamLead: createMockAgent("TeamLead", ""),
-    // Critic: createMockAgent("Critic"),
-    // Coder: createMockAgent("Coder"),
-    // Tester: createMockAgent("Tester"),
-    // Tooling: createMockAgent("Tooling"),
+    Critic: createMockAgent("Critic", "Reviews code and tests"),
+    Coder: createMockAgent("Coder", "Writes or fixes code"),
+    Tester: createMockAgent("Tester", "Generates and runs tests"),
+    Tooling: createMockAgent("Tooling", "Handles environment tasks"),
   }
 
   // Ensure allTools defaults to base.allTools if not in overrides
