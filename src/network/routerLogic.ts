@@ -51,8 +51,8 @@ export const defaultRouter = async (
 
   try {
     switch (status) {
-      case NetworkStatus.Enum.IDLE:
-      case NetworkStatus.Enum.READY:
+      case NetworkStatus.Enum.NEEDS_TEAMLEAD_INPUT:
+      case NetworkStatus.Enum.NEEDS_REQUIREMENTS:
         // Start: Ask TeamLead for requirements
         await opts.network.state.kv.set(
           "status",
@@ -129,9 +129,8 @@ export const defaultRouter = async (
         return { result: "NEEDS_HUMAN_INPUT" }
 
       // Handle removed/renamed intermediate states gracefully if encountered
-      case NetworkStatus.Enum.NEEDS_TEST_REVISION:
       case NetworkStatus.Enum.NEEDS_IMPLEMENTATION_REVISION:
-      case NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION: // If this status is used elsewhere
+      case NetworkStatus.Enum.NEEDS_COMMAND_VERIFICATION:
         log.warn("defaultRouter_unexpected_intermediate_status", { status })
         // Decide recovery path, e.g., go back to critic or fail
         await opts.network.state.kv.set(

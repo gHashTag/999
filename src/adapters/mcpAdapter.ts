@@ -5,8 +5,8 @@ import type { Tool /*, Options Agent */ } from "@inngest/agent-kit"
 // import { logger } from "@/utils/logger"
 
 export function createMCPAdapter(deps: AgentDependencies) {
-  const { allTools, log: logger, agents = {}, kv = mockKv, ...rest } = deps
-  const mcpTools: Tool.Any[] = allTools.filter(
+  const { tools, log: logger, agents = {}, kv = mockKv, ...rest } = deps
+  const mcpTools: Tool.Any[] = tools.filter(
     (t: Tool.Any) => t && t.name?.startsWith("mcp_")
   )
 

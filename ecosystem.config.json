@@ -1,0 +1,34 @@
+{
+  "apps": [
+    {
+      "name": "build-watch",
+      "script": "bun",
+      "args": "run build:watch",
+      "autorestart": true,
+      "watch": false,
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "dev-serve",
+      "script": "bun",
+      "args": "run dev:serve",
+      "autorestart": true,
+      "watch": false,
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "dev-start",
+      "script": "bun",
+      "args": "run dev:start",
+      "autorestart": true,
+      "watch": false,
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  ]
+}

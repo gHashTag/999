@@ -2,7 +2,7 @@ import type { Tool, Agent } from "@inngest/agent-kit"
 import { z } from "zod"
 // import type { Sandbox as E2BSandboxType } from "e2b" // Removed old import
 import type { EventPayload, Context } from "inngest"
-import type { CodingAgentEvent } from "@/types/events"
+import type { CodingAgentFullEvent } from "@/types/events"
 // import type { systemEvents } from "@/utils/logic/systemEvents" // Unused
 import { TddNetworkState } from "@/types/network"
 // import type { Logger as PinoLogger } from "pino" // Replace PinoLogger with a simpler interface
@@ -26,7 +26,6 @@ export interface BaseLogger {
   silent: (message: string, ...args: unknown[]) => void // Keep silent if needed
   level: string | number // Keep level if needed
   // Add other methods ONLY if they are strictly required by dependencies interacting with this type
-  child: (bindings: Record<string, unknown>) => BaseLogger // Keep child if necessary
 }
 
 /** Type for the logger passed specifically to tool handlers */
@@ -60,7 +59,7 @@ export interface SystemEvents {
 
 // Dependencies needed for agent creation
 export interface AgentDependencies {
-  allTools: Tool<any>[]
+  tools: Tool<any>[]
   log: BaseLogger
   apiKey: string
   modelName: string
@@ -83,7 +82,7 @@ export interface CritiqueData {
 
 // Define the type for the handler arguments
 export type CodingAgentHandlerArgs = {
-  event: EventPayload<CodingAgentEvent>
+  event: EventPayload<CodingAgentFullEvent>
   step: Context["step"]
   logger: HandlerLogger
 }
@@ -135,4 +134,12 @@ export interface BasicAgent {
   ask: (prompt: string, opts?: Record<string, unknown>) => Promise<string>
   send?: (message: unknown) => Promise<void>
   tools?: Map<string, Tool<any>>
+}
+
+// Added AgentResult interface
+export interface AgentResult {
+  output: Array<{ type: "text"; content: string; [key: string]: any }>
+  state?: Record<string, any> | null // Flexible state object, can hold various KV-like data
+  error?: string | null
+  [key: string]: any // Allow other dynamic properties if needed
 }

@@ -5,7 +5,7 @@ import type {
   // Removed unused AgentCreationProps
   // Removed unused HandlerLogger
 } from "@/types/agents"
-// import type { TddNetworkState } from '@/types/network.types'
+import type { TddNetworkState } from "@/types/network"
 
 // Список инструментов, разрешенных для использования Агентом-Тестировщиком
 const TESTER_ALLOWED_TOOLS = [
@@ -28,15 +28,15 @@ const TESTER_ALLOWED_TOOLS = [
 export const createTesterAgent = (
   dependencies: AgentDependencies,
   instructions: string
-): Agent<any> => {
-  const { apiKey, modelName, allTools, log } = dependencies
+): Agent<TddNetworkState> => {
+  const { apiKey, modelName, tools, log } = dependencies
   // const {
   //   allTools, // Destructure tools from dependencies
   //   log, // Destructure logger from dependencies
   //   systemEvents, // Destructure event emitter from dependencies
   // } = dependencies
 
-  const toolsToUse = allTools.filter((tool: Tool<any>) =>
+  const toolsToUse = tools.filter((tool: Tool<any>) =>
     TESTER_ALLOWED_TOOLS.includes(tool.name)
   )
 

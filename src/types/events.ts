@@ -5,18 +5,43 @@ import { z } from "zod"
 // import { EventPayload } from "inngest"
 
 // Define the main event payload schema
-export const codingAgentEventSchema = z.object({
+export const codingAgentEventDataSchema = z.object({
   input: z.string(),
+  eventId: z.string(), // Добавим eventId, так как он ожидается в data
   // currentState: tddNetworkStateSchema.optional(), // Используем явный тип, а не схему Zod
   // Temporarily use z.any() until full state management is robust
   currentState: z.any().optional(), // Using z.any() temporarily
 })
 
 // Тип для события
-export type CodingAgentEventData = z.infer<typeof codingAgentEventSchema>
+export type CodingAgentEventData = z.infer<typeof codingAgentEventDataSchema>
 
-export type CodingAgentEvent = {
-  name: "coding-agent/run"
+// Определяем тип полезной нагрузки события, включая data и опционально user
+export type CodingAgentEventPayload = {
   data: CodingAgentEventData
-  id?: string // Add id property as optional
+  // user?: { id: string }; // Пример пользовательского контекста, если понадобится
 }
+
+// Определяем Record всех событий проекта для EventSchemas
+export type AllProjectEvents = {
+  "coding-agent/run": CodingAgentEventPayload
+  // Здесь можно будет добавлять другие события проекта
+  // "another/event": AnotherEventPayload;
+}
+
+// Тип, представляющий полный объект события, как его ожидает EventPayload<T>
+export type CodingAgentFullEvent = {
+  name: "coding-agent/run" // Имя события должно совпадать
+  data: CodingAgentEventData // Данные события
+  id?: string // Опциональный ID
+  user?: any // Опциональный пользовательский контекст
+  ts?: number // Опциональный timestamp
+  v?: string // Опциональная версия
+}
+
+// Старый тип CodingAgentEvent можно удалить или оставить, если он где-то используется иначе
+// export type CodingAgentEvent = {
+//   name: "coding-agent/run"
+//   data: CodingAgentEventData
+//   id?: string
+// }

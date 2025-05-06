@@ -6,7 +6,7 @@ export const createCodingAgent = (
   dependencies: AgentDependencies,
   instructions: string
 ): Agent<any> => {
-  const { apiKey, modelName, allTools, log } = dependencies
+  const { apiKey, modelName, tools, log } = dependencies
 
   // Filter tools specifically needed by Coder
   const allowedToolNames = [
@@ -15,7 +15,7 @@ export const createCodingAgent = (
     "codebase_search",
     "grep_search",
   ] // Correct list from tests
-  const toolsToUse = allTools.filter((tool: Tool<any>) =>
+  const toolsToUse = tools.filter((tool: Tool<any>) =>
     allowedToolNames.includes(tool.name)
   )
 

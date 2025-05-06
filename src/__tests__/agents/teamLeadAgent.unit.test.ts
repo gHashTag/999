@@ -48,7 +48,7 @@ describe("TeamLead Agent Unit Tests", () => {
       "mcp_cli-mcp-server_show_security_rules",
     ])
     const depsWithTools = createFullMockDependencies({
-      allTools: allMockTools,
+      tools: allMockTools,
     })
     // Используем teamLeadInstructions
     const agent = createTeamLeadAgent(depsWithTools, teamLeadInstructions)
@@ -61,7 +61,7 @@ describe("TeamLead Agent Unit Tests", () => {
   })
 
   it("should handle having no tools passed in dependencies", () => {
-    const depsWithoutTools = createFullMockDependencies({ allTools: [] })
+    const depsWithoutTools = createFullMockDependencies({ tools: [] })
     // Используем teamLeadInstructions
     const agent = createTeamLeadAgent(depsWithoutTools, teamLeadInstructions)
     expect(agent.tools).toBeDefined()

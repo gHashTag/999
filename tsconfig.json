@@ -56,7 +56,10 @@
     /* Advanced Options (Keep existing relevant options) */
     "resolveJsonModule": true,
     "isolatedModules": true, // Good practice, usually requires verbatimModuleSyntax
-    "types": ["node", "bun"], // Keep existing
+    "types": [
+      "bun-types",
+      "jest"
+    ],
     "typeRoots": ["./node_modules/@types", "./node_modules"] // Keep existing
   },
   "include": ["src/**/*"], // Keep existing

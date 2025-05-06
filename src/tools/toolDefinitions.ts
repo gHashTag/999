@@ -32,7 +32,7 @@ export function getAllTools(
   sandboxId: string | null
 ): Tool<any>[] {
   // Define tools using their respective creation functions
-  const terminalTool = createTerminalTool(log, getSandbox, eventId, sandboxId)
+  const terminalTool = createTerminalTool(log, eventId)
   // FIX: Remove call for non-existent tool
   // const askHumanTool = createAskHumanTool(log, eventId)
   // Remove fileTool (createOrUpdateFiles)

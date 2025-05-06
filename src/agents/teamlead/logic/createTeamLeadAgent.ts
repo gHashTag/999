@@ -10,7 +10,7 @@ import {
 // import { createUpdateTaskStateTool } from "@/tools/definitions/updateTaskStateTool" // Unused
 // import { filterTeamLeadTools } from "./filterTools" // Unused
 // import { readAgentInstructions } from "@/utils/logic/readAgentInstructions"
-// import type { TddNetworkState } from '@/types/network.types'
+import type { TddNetworkState } from "@/types/network"
 
 // Список инструментов, необходимых Агенту-Руководителю
 const TEAMLEAD_REQUIRED_TOOLS = ["updateTaskState", "web_search"]
@@ -24,12 +24,11 @@ const TEAMLEAD_REQUIRED_TOOLS = ["updateTaskState", "web_search"]
 export const createTeamLeadAgent = (
   dependencies: AgentDependencies,
   instructions: string
-): Agent<any> => {
-  // Extract ONLY used dependencies
-  const { log, model, allTools } = dependencies // Extract allTools
+): Agent<TddNetworkState> => {
+  const { log, model, tools } = dependencies // <--- ИЗМЕНЕНО allTools на tools
 
   // Restore tool filtering logic
-  const toolsToUse = allTools.filter((tool: Tool<any>) =>
+  const toolsToUse = tools.filter((tool: Tool<any>) =>
     TEAMLEAD_REQUIRED_TOOLS.includes(tool.name)
   )
 

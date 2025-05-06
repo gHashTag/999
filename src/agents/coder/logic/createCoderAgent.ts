@@ -23,11 +23,11 @@ export const createCoderAgent = ({
   instructions,
   ...dependencies
 }: { instructions: string } & AgentDependencies): Agent<any> => {
-  const { apiKey, modelName, allTools, log } = dependencies
+  const { apiKey, modelName, tools, log } = dependencies
   // log, systemEvents are unused for now
 
   // Use allTools directly, filtering logic remains
-  const toolsToUse = allTools.filter((tool: Tool<any>) =>
+  const toolsToUse = tools.filter((tool: Tool<any>) =>
     CODER_ALLOWED_TOOLS.includes(tool.name)
   )
 

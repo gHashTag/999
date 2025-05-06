@@ -68,8 +68,8 @@ mock.module("@/inngest/logic/stateUtils.ts", () => ({
       // Возвращаем начальное состояние READY для этого теста
       const mockInitialState: Partial<TddNetworkState> = {
         run_id: eventId,
-        task: initialTask,
-        status: NetworkStatus.Enum.READY,
+        task_description: initialTask,
+        status: NetworkStatus.Enum.NEEDS_REQUIREMENTS,
         sandboxId: "mock-sandbox-id",
       }
       return mockInitialState
@@ -81,9 +81,9 @@ mock.module("@/inngest/logic/stateUtils.ts", () => ({
       "[MOCK initializeOrRestoreState in teamLeadAgent.test.ts] Called"
     )
     return {
-      status: NetworkStatus.Enum.READY,
+      status: NetworkStatus.Enum.NEEDS_REQUIREMENTS,
       run_id: _args[3],
-      task: _args[0].input,
+      task_description: _args[0].input,
     } as Partial<TddNetworkState>
   }),
   logFinalResult: mock((..._args: any[]) => {
@@ -138,7 +138,7 @@ describe("Agent Definitions: TeamLead Agent", () => {
 
   it("should handle cases with no tools provided", () => {
     const agent = createTeamLeadAgent(
-      { ...dependencies, allTools: [] }, // Передаем пустой массив инструментов
+      { ...dependencies, tools: [] }, // Передаем пустой массив инструментов
       teamLeadInstructions
     )
     expect(agent.tools).toBeDefined()
@@ -152,8 +152,8 @@ describe("Agent Definitions: TeamLead Agent", () => {
     const initialTask = "Initial task description"
     // Используем undefined for sandboxId as it's optional string
     const fullInitialState: TddNetworkState = {
-      task: initialTask, // Используем переменную
-      status: NetworkStatus.Enum.READY,
+      task_description: initialTask, // Используем переменную
+      status: NetworkStatus.Enum.NEEDS_REQUIREMENTS,
       test_requirements: undefined,
       test_code: "",
       implementation_code: "",
@@ -278,7 +278,7 @@ describe("Agent Definitions: TeamLead Agent", () => {
       "codebase_search",
       "grep_search",
     ])
-    const depsWithTools = createFullMockDependencies({ allTools: allMockTools })
+    const depsWithTools = createFullMockDependencies({ tools: allMockTools })
     const agent = createTeamLeadAgent(depsWithTools, "Test instructions")
 
     // Correct expected tools based on createTeamLeadAgent logic
@@ -295,7 +295,7 @@ describe("Agent Definitions: TeamLead Agent", () => {
   })
 
   it("should handle cases with no tools provided", () => {
-    const depsWithoutTools = createFullMockDependencies({ allTools: [] })
+    const depsWithoutTools = createFullMockDependencies({ tools: [] })
     const agent = createTeamLeadAgent(depsWithoutTools, "Test instructions")
     expect(agent.tools).toBeDefined()
     expect(agent.tools.size).toBe(0)
@@ -315,10 +315,9 @@ it.skip("should run Inngest function successfully with mocked network step", asy
     input: "Initial task description",
     currentState: {
       run_id: "test-invoke-run-id",
-      task: "Initial task description",
-      status: NetworkStatus.Enum.READY,
-      // ... другие поля начального состояния по необходимости ...
-      attempts: 0,
+      task_description: "Test task",
+      status: NetworkStatus.Enum.NEEDS_REQUIREMENTS,
+      attempts: { teamlead: 1 },
       revisions: 0,
       sandboxId: "mock-sandbox-id",
     } as Partial<TddNetworkState>,
@@ -337,7 +336,7 @@ it.skip("should run Inngest function successfully with mocked network step", asy
     test_requirements: "* Requirement 1\n* Requirement 2",
     // ... остальные поля могут обновиться или остаться ...
     run_id: "test-invoke-run-id",
-    task: "Initial task description",
+    task_description: "Initial task description",
     sandboxId: "mock-sandbox-id",
   }
   const mockNetworkRunStepResult = {
@@ -363,10 +362,18 @@ it.skip("should run Inngest function successfully with mocked network step", asy
   expect(result).toBeDefined()
   // Ожидаем, что runCodingAgent вернет success: true и статус из НАЧАЛЬНОГО состояния,
   // так как processNetworkResult вернул undefined в этом сценарии.
-  expect(result).toEqual({
-    success: true,
-    finalStatus: NetworkStatus.Enum.READY, // Статус из мока getCurrentState
-  })
+  expect(result.result).toEqual(
+    expect.objectContaining({
+      success: true,
+      // finalState.status должен быть тем, что вернул getCurrentState, если processNetworkResult не вернул ничего.
+      // getCurrentState в этом тесте мокнут на NEEDS_REQUIREMENTS
+    })
+  )
+
+  // Проверяем конкретный финальный статус, если он важен
+  expect(result.result.finalState.status).toBe(
+    NetworkStatus.Enum.NEEDS_REQUIREMENTS_CRITIQUE
+  ) // Это если mockNetworkRunStepResult отработал
 
   // 5. Проверка состояния шага (опционально, но полезно)
   expect(await state["run-agent-network"]).toEqual(mockNetworkRunStepResult)

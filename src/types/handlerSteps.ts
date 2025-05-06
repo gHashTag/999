@@ -11,6 +11,7 @@ export enum HandlerStepName {
   HANDLER_INVALID_DATA = "HANDLER_INVALID_DATA",
   HANDLER_MISSING_EVENT_ID = "HANDLER_MISSING_EVENT_ID",
   STEP_UNDEFINED = "STEP_UNDEFINED",
+  RUN_CODING_AGENT = "RUN_CODING_AGENT",
 
   // --- Sandbox Management ---
   SANDBOX_CHECK_START = "SANDBOX_CHECK_START",
@@ -49,6 +50,20 @@ export enum HandlerStepName {
   NETWORK_RUN_SUCCESS = "NETWORK_RUN_SUCCESS",
   NETWORK_RUN_ERROR = "NETWORK_RUN_ERROR",
   NETWORK_RUN_NO_RESULT = "NETWORK_RUN_NO_RESULT",
+
+  // --- TDD Cycle Steps ---
+  TYPE_CHECK_START = "TYPE_CHECK_START",
+  TYPE_CHECK_END = "TYPE_CHECK_END",
+  VITEST_RUN_START = "VITEST_RUN_START",
+  VITEST_RUN_END = "VITEST_RUN_END",
+
+  // --- TDD Cycle Step IDs (used in tddCycleLogic.ts and tests) ---
+  ENSURE_SANDBOX_ID = "ensure-sandbox-id",
+  RUN_AGENT_NETWORK_TEAMLEAD = "run-agent-network-teamlead",
+  RUN_AGENT_NETWORK_CODER = "run-agent-network-coder",
+  INVOKE_TYPE_CHECK = "invoke-type-check",
+  INVOKE_RUN_TESTS = "invoke-run-tests",
+  RUN_AGENT_NETWORK_CRITIC = "run-agent-network-critic",
 
   // --- Result Processing / Command Execution ---
   HANDLER_PROCESS_RESULT = "HANDLER_PROCESS_RESULT",

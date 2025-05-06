@@ -88,11 +88,7 @@ describe("MCP Adapter Integration", () => {
     }
 
     const depsWithMixedTools = createFullMockDependencies({
-      allTools: [
-        mockMcpRunCommandTool,
-        mockMcpShowSecurityRulesTool,
-        nonMcpTool,
-      ],
+      tools: [mockMcpRunCommandTool, mockMcpShowSecurityRulesTool, nonMcpTool],
     })
     const adapter = createMCPAdapter(depsWithMixedTools)
     expect(adapter.mcpTools.length).toBe(2)
@@ -115,7 +111,7 @@ describe("MCP Adapter Integration", () => {
     const mcpToolName = "mcp_cli-mcp-server_run_command"
     const nonMcpToolName = "web_search"
     const allMockTools = getMockTools([mcpToolName, nonMcpToolName])
-    const depsWithTools = createFullMockDependencies({ allTools: allMockTools })
+    const depsWithTools = createFullMockDependencies({ tools: allMockTools })
 
     // Act: Create the adapter
     const adapter = createMCPAdapter(depsWithTools)
@@ -149,7 +145,7 @@ describe("MCP Adapter Integration", () => {
       handler: mock().mockRejectedValue(new Error("Test Log Error")),
     } as any
     const depsWithErrorTool = createFullMockDependencies({
-      allTools: [errorTool],
+      tools: [errorTool],
       log: mockLoggerInstance, // Pass the instance
     })
     const adapter = createMCPAdapter(depsWithErrorTool)
@@ -286,7 +282,7 @@ describe("MCP Adapter — Codex CLI Integration", () => {
         agents: mockAgentRegistry,
         // FIX: Use getMockTools to provide tools
         // allTools: mockTools,
-        allTools: getMockTools(["mcp_cli-mcp-server_run_command"]), // Example: provide needed tools
+        tools: getMockTools(["mcp_cli-mcp-server_run_command"]), // Example: provide needed tools
         log: mockLoggerInstance,
       }),
     }
@@ -297,7 +293,7 @@ describe("MCP Adapter — Codex CLI Integration", () => {
     const adapter = createMCPAdapter(
       createFullMockDependencies({
         log: mockLoggerInstance,
-        allTools: [mockMcpRunCommandTool],
+        tools: [mockMcpRunCommandTool],
       })
     )
     const params = { command: "echo 'hello from codex'" }
@@ -583,7 +579,7 @@ describe("MCP Adapter logging and error handling", () => {
   it("should log info and error events during tool execution", async () => {
     const adapter = createMCPAdapter({
       ...deps,
-      allTools: [
+      tools: [
         {
           name: "mcp_test_tool",
           handler: async () => {

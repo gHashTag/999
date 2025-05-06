@@ -25,12 +25,12 @@ export const createToolingAgent = (
   dependencies: AgentDependencies,
   instructions: string
 ): Agent<any> => {
-  const { apiKey, modelName, allTools, log } = dependencies
+  const { apiKey, modelName, tools, log } = dependencies
 
   // Tooling agent usually needs most/all tools
   // Filter out any tools it definitely should NOT use, if any.
   // Используем константу с обратной логикой
-  const toolsToUse = allTools.filter(
+  const toolsToUse = tools.filter(
     (tool: Tool<any>) => !TOOLING_DISALLOWED_TOOLS.includes(tool.name) // Фильтруем по ЗАПРЕЩЕННЫМ
   )
 

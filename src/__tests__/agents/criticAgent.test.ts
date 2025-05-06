@@ -9,6 +9,8 @@ import type { AgentDependencies } from "@/types/agents"
 import { Agent } from "@inngest/agent-kit"
 import { parseCriticResponse } from "@/agents/critic/logic/createCriticAgent"
 import type { BaseLogger } from "@/types/agents"
+import { Tool } from "@inngest/agent-kit"
+import { createMockTool } from "../setup/testSetup"
 
 // Пример инструкций для Критика (можно вынести или улучшить)
 const criticInstructions = `Ты - опытный старший инженер, ревьюер кода и тестов.
@@ -23,11 +25,19 @@ const criticInstructions = `Ты - опытный старший инженер,
 
 describe("Agent Definitions: Critic Agent", () => {
   let dependencies: AgentDependencies
+  let allMockToolsArray: Tool<any>[] // Переименовал для ясности, что это массив
 
   beforeEach(() => {
     setupTestEnvironment()
+    // Инициализируем allMockToolsArray здесь, если он нужен для каждого теста
+    allMockToolsArray = [
+      createMockTool("readFile", { content: "mock file content" }),
+      createMockTool("updateTaskState", { success: true }),
+      createMockTool("logFinalResult", { success: true }),
+      createMockTool("web_search", { results: ["mock search result"] }),
+    ]
     dependencies = createFullMockDependencies({
-      log: mockLoggerInstance,
+      tools: allMockToolsArray, // <--- ИЗМЕНЕНО allTools на tools
     })
   })
 
@@ -51,7 +61,7 @@ describe("Agent Definitions: Critic Agent", () => {
   // Убираем .skip и добавляем логику
   it("should correctly filter tools needed by Critic", () => {
     // 1. Получаем полный набор мок-инструментов из setup
-    const allMockTools = dependencies.allTools // Используем инструменты из beforeEach
+    const allMockTools = dependencies.tools // Используем инструменты из beforeEach
     expect(allMockTools.length).toBeGreaterThan(2) // Убедимся, что моков больше, чем ожидаемых
 
     // 2. Создаем агента с полным набором инструментов

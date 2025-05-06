@@ -8,8 +8,6 @@ import {
 } from "@inngest/agent-kit"
 // Keep deepseek import
 // import { deepseek } from "@inngest/ai/models"
-// Use mock adapter from the corrected testSetup
-import { mockDeepseekModelAdapter } from "@/__tests__/setup/testSetup"
 // Import router logic functions if needed, otherwise remove
 // import { defaultRouter } from "./routerLogic" // REMOVED UNUSED
 import type { AgentDependencies } from "@/types/agents"
@@ -20,6 +18,8 @@ import {
   createToolingAgent,
 } from "@/definitions/agentDefinitions"
 */
+// Используем мок-адаптер для обхода проблемы с deepseek
+import { mockDeepseekModelAdapter } from "@/__tests__/setup/testSetup"
 
 /**
  * Creates the DevOps agent network.
@@ -55,8 +55,8 @@ export function createDevOpsNetwork(
     router: undefined,
     dependencies: dependencies,
     agents: dependencies.agents ? Object.values(dependencies.agents) : [],
-    // Use the imported mock adapter, ensure it aligns with expected type
-    defaultModel: mockDeepseekModelAdapter as any, // Cast if necessary
+    // Используем мок-адаптер для обхода проблемы с deepseek
+    defaultModel: mockDeepseekModelAdapter as any, // Временно возвращаемся к мок-адаптеру
   }
 
   // Use createNetwork factory

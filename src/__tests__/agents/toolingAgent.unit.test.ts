@@ -1,20 +1,50 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import {
   createFullMockDependencies,
-  mockLoggerInstance,
+  // mockLoggerInstance,
+  // setupTestEnvironment,
   setupTestEnvironment,
 } from "../setup/testSetup"
 import { createToolingAgent } from "@/agents/tooling/logic/createToolingAgent"
 import type { AgentDependencies } from "@/types/agents"
+import { getMockTools } from "../setup/testSetup"
 // Import Tool type
 // import { Tool } from "@inngest/agent-kit" // Tool type is likely not needed here
 
-describe("Agent Definitions: Tooling Agent", () => {
+describe("Unit Тесты для Tooling Agent", () => {
   let dependencies: AgentDependencies
+  // let allMockTools: Tool<any>[]; // Не используется здесь, т.к. Tooling агент должен иметь все инструменты
 
   beforeEach(() => {
     setupTestEnvironment()
-    dependencies = createFullMockDependencies({ log: mockLoggerInstance })
+    // Для Tooling агента, мы ожидаем, что он получит ВСЕ инструменты, так что передаем их все
+    dependencies = createFullMockDependencies({
+      tools: getMockTools(), // <--- ИЗМЕНЕНО allTools на getMockTools()
+    })
+  })
+
+  it("должен инициализироваться и содержать ВСЕ доступные инструменты", () => {
+    const agent = createToolingAgent(dependencies, "Default instructions")
+    const allMockToolsFromDep = dependencies.tools
+    expect(agent.tools.size).toBe(allMockToolsFromDep.length)
+
+    allMockToolsFromDep.forEach(tool => {
+      expect(agent.tools.has(tool.name)).toBe(true)
+    })
+  })
+
+  it("не должен фильтровать инструменты, кроме askHumanForInput", () => {
+    const agent = createToolingAgent(dependencies, "Default instructions")
+    const allToolNames = (dependencies.tools || []).map(t => t.name)
+    const expectedAgentTools = allToolNames.filter(
+      name => name !== "askHumanForInput"
+    )
+
+    expect(agent.tools.size).toBe(expectedAgentTools.length)
+    expectedAgentTools.forEach(toolName => {
+      expect(agent.tools.has(toolName)).toBe(true)
+    })
+    expect(agent.tools.has("askHumanForInput")).toBe(false) // Убедимся, что он отфильтрован
   })
 
   it("should create a Tooling agent with correct basic properties", () => {
@@ -27,7 +57,7 @@ describe("Agent Definitions: Tooling Agent", () => {
   })
 
   it("should filter tools correctly (exclude disallowed)", () => {
-    const allMockTools = dependencies.allTools
+    const allMockTools = dependencies.tools
     const allToolNames = allMockTools.map(t => t.name)
     expect(allToolNames).toContain("askHumanForInput")
 

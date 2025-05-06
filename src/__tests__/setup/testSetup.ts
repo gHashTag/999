@@ -1,6 +1,6 @@
 // src/__tests__/setup/testSetup.ts --- FINAL TRY ---
 import { mock, type Mock } from "bun:test"
-import { Tool, type Agent } from "@inngest/agent-kit"
+import { Tool } from "@inngest/agent-kit"
 import { deepseek } from "@inngest/ai/models"
 // Import types directly from their source file
 import {
@@ -28,7 +28,7 @@ export const mockSandboxId = "mock-sandbox-id"
 
 // --- Mock Implementations ---
 
-export const mockLoggerInstance: BaseLogger = {
+export const mockLoggerInstance: BaseLoggerType = {
   // Use exported type BaseLogger
   info: mock((..._args: unknown[]) => {}),
   error: mock((...args: unknown[]) => console.error("ERROR:", ...args)),
@@ -40,14 +40,13 @@ export const mockLoggerInstance: BaseLogger = {
   trace: mock((..._args: unknown[]) => {}),
   silent: mock((..._args: unknown[]) => {}),
   level: "info",
-  child: mock(function (
-    this: BaseLogger, // Use exported type BaseLogger
-    _bindings: Record<string, unknown>
-  ): BaseLogger {
-    // Use exported type BaseLogger
-    return this
-  }),
-} satisfies BaseLogger
+  // child: mock(function (
+  //   this: BaseLoggerType,
+  //   _bindings: Record<string, unknown>
+  // ) {
+  //   return this;
+  // }),
+} satisfies BaseLoggerType
 
 export const mockInfo = mockLoggerInstance.info as Mock<
   (...args: unknown[]) => void
@@ -69,9 +68,6 @@ export const mockTrace = mockLoggerInstance.trace as Mock<
 >
 export const mockSilent = mockLoggerInstance.silent as Mock<
   (...args: unknown[]) => void
->
-export const mockChild = mockLoggerInstance.child as Mock<
-  (bindings: Record<string, unknown>) => BaseLogger // Use exported type BaseLogger
 >
 
 export const mockSystemEvents: SystemEvents = {
@@ -263,10 +259,24 @@ export const mockTools: Tool.Any[] = [
 
 // Use exported type AgentDependencies
 export function createBaseMockDependencies(
-  eventIdInput = mockEventId
+  eventIdInput = mockEventId,
+  overrides?: Partial<
+    Omit<
+      AgentDependencies,
+      | "tools"
+      | "agents"
+      | "kv"
+      | "model"
+      | "apiKey"
+      | "modelName"
+      | "systemEvents"
+      | "sandbox"
+      | "modelApiKey"
+    >
+  >
 ): Omit<
   AgentDependencies,
-  | "allTools"
+  | "tools"
   | "agents"
   | "kv"
   | "model"
@@ -279,44 +289,41 @@ export function createBaseMockDependencies(
   return {
     eventId: eventIdInput,
     log: mockLoggerInstance,
+    ...(overrides || {}),
   }
 }
 
 // Use exported type AgentDependencies
 export function createFullMockDependencies(
-  overrides: Partial<AgentDependencies> = {}
+  overrides?: Partial<AgentDependencies>
 ): AgentDependencies {
   const base: AgentDependencies = {
-    modelApiKey: mockApiKey,
-    eventId: mockEventId,
     log: mockLoggerInstance,
-    allTools: [...mockTools],
-    agents: {} as Record<string, Agent<any>>,
-    kv: createMockKvStore(), // Use the function here
-    model: mockDeepseekModelAdapter,
-    apiKey: mockApiKey,
-    modelName: mockModelName,
+    apiKey: "testApiKey",
+    modelName: "testModel",
     systemEvents: mockSystemEvents,
     sandbox: mockSandbox as any, // Use 'as any' for now
+    eventId: "mockEventId",
+    kv: mockKv,
+    model: mockDeepseekModelAdapter,
+    tools: [...mockTools],
+    agents: {
+      teamLead: createMockAgent("TeamLead"),
+      tester: createMockAgent("Tester"),
+      coder: createMockAgent("Coder"),
+      critic: createMockAgent("Critic"),
+      tooling: createMockAgent("Tooling"),
+    },
+    ...(overrides || {}),
   }
 
-  // Create mock agents (add other agents as needed)
-  const agents = {
-    TeamLead: createMockAgent("TeamLead", ""),
-    Critic: createMockAgent("Critic", "Reviews code and tests"),
-    Coder: createMockAgent("Coder", "Writes or fixes code"),
-    Tester: createMockAgent("Tester", "Generates and runs tests"),
-    Tooling: createMockAgent("Tooling", "Handles environment tasks"),
-  }
-
-  // Ensure allTools defaults to base.allTools if not in overrides
-  const allTools = overrides?.allTools ?? base.allTools
+  // Важно: обеспечиваем, чтобы `tools` из `overrides` действительно переопределял базовые `tools`
+  const toolsToUse = overrides?.tools ?? base.tools
 
   return {
     ...base,
     ...overrides,
-    agents,
-    allTools,
+    tools: toolsToUse,
   }
 }
 
@@ -332,8 +339,6 @@ export function setupTestEnvironment() {
   mockFatal.mockClear()
   mockTrace.mockClear()
   mockSilent.mockClear()
-  mockChild.mockClear()
-  // REMOVED: mockSystemEvents.emit.mockClear()
   ;(
     mockKv.get as Mock<(key: string) => Promise<unknown | undefined>>
   ).mockClear?.()
@@ -363,32 +368,25 @@ export const findToolMock = (
 }
 
 export const getMockTools = (
-  names: string[],
+  names?: string[],
   allAvailableMockTools: Tool.Any[] = mockTools
 ): Tool.Any[] => {
-  return names.map(name => {
-    const tool = findToolMock(name, allAvailableMockTools)
-    if (!tool)
-      throw new Error(`Mock tool "${name}" not found in available mocks`)
-    return tool
-  })
+  if (!names || names.length === 0) {
+    return [...allAvailableMockTools]
+  }
+  return allAvailableMockTools.filter(tool => names.includes(tool.name))
 }
 
 // Uncomment createMockAgent - Use the actual implementation with 'as any'
-export const createMockAgent = (name: string, description: string): any =>
+export const createMockAgent = (name: string, description?: string): any =>
   ({
     name,
-    description,
-    // Add mock methods as needed, e.g.:
-    ask: mock(async () => ({ final_output: "mock agent output" })),
-    run: mock(async () => ({ final_output: "mock agent output" })),
-    // Add a basic definition structure if AgentKit requires it internally
-    definition: {
-      name,
-      description,
-      tools: {},
-      model: {} as any,
-    },
+    description: description ?? `Mock Agent ${name}`,
+    tools: new Map(),
+    ask: mock(async (_prompt: string) => ({
+      output: [{ type: "text", content: "Mock agent response" }],
+    })),
+    send: mock(async (_data: any) => {}),
   }) as any // Use 'as any' for the overall return type for now
 
 // REMOVED: Conflicting 'export { mockLoggerInstance }'

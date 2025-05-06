@@ -19,10 +19,14 @@ import type { Tool } from "@inngest/agent-kit"
 describe("Agent Definitions: Tester Agent", () => {
   // Use correct type
   let dependencies: AgentDependencies
+  let allMockTools: Tool<any>[]
 
   beforeEach(() => {
     setupTestEnvironment() // Use exported name
-    dependencies = createFullMockDependencies()
+    allMockTools = getMockTools() // Предполагается, что эта функция возвращает все моки
+    dependencies = createFullMockDependencies({
+      tools: allMockTools, // <--- ИЗМЕНЕНО allTools на tools
+    })
   })
 
   it("should create a Tester agent with correct basic properties", () => {
@@ -35,20 +39,7 @@ describe("Agent Definitions: Tester Agent", () => {
   })
 
   it("should filter tools correctly based on tester requirements", () => {
-    const allMockTools: Tool<any>[] = getMockTools([
-      "readFile",
-      "writeFile",
-      "runTerminalCommand",
-      "updateTaskState",
-      "web_search",
-      "mcp_cli-mcp-server_run_command",
-      "mcp_cli-mcp-server_show_security_rules",
-    ])
-    const depsWithTools: AgentDependencies = createFullMockDependencies({
-      allTools: allMockTools,
-    })
-
-    const testerAgent = createTesterAgent(depsWithTools, "Test instructions")
+    const agent = createTesterAgent(dependencies, "Test instructions")
 
     const expectedToolNames = [
       "runTerminalCommand",
@@ -56,15 +47,15 @@ describe("Agent Definitions: Tester Agent", () => {
       "updateTaskState",
     ].sort()
 
-    const actualToolNames = Array.from(testerAgent.tools.keys()).sort()
+    const actualToolNames = Array.from(agent.tools.keys()).sort()
 
     expect(actualToolNames).toEqual(expectedToolNames)
-    expect(testerAgent.tools.size).toBe(expectedToolNames.length)
+    expect(agent.tools.size).toBe(expectedToolNames.length)
   })
 
   it("should handle having no tools passed in dependencies", () => {
     const depsWithoutTools: AgentDependencies = createFullMockDependencies({
-      allTools: [],
+      tools: [],
     })
     const testerAgent = createTesterAgent(depsWithoutTools, "Test instructions")
     expect(testerAgent.tools).toBeDefined()
@@ -73,7 +64,7 @@ describe("Agent Definitions: Tester Agent", () => {
 
   it("should filter tools correctly", () => {
     const testerTools = getMockTools(["runTerminalCommand", "updateTaskState"])
-    dependencies.allTools = [
+    dependencies.tools = [
       ...testerTools,
       createMockTool("other_tool", {}), // Add a tool that should be filtered out
     ]

@@ -27,11 +27,11 @@ export const createCriticAgent = (
   dependencies: AgentDependencies,
   instructions: string
 ): Agent<any> => {
-  const { apiKey, modelName, allTools, log } = dependencies
+  const { apiKey, modelName, tools, log } = dependencies
 
   // Filter tools specifically needed by Critic
   // Используем константу
-  const toolsToUse = allTools.filter((tool: Tool<any>) =>
+  const toolsToUse = tools.filter((tool: Tool<any>) =>
     CRITIC_ALLOWED_TOOLS.includes(tool.name)
   )
 
