@@ -9,6 +9,7 @@ export {
   // API для пользователей и проектов
   createUser,
   getUserByTelegramId,
+  getAllActiveUsers,
   createProject,
   getProjectsByUserId,
 
@@ -32,6 +33,7 @@ export {
 
   // API для логирования
   getParsingLogs,
+  logParsingRun,
 } from "./storage/neonStorage-multitenant"
 
 // Экспорт функций для скрапинга

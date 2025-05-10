@@ -74,11 +74,12 @@ export interface TrackingHashtag {
  * Лог процесса парсинга
  */
 export interface ParsingLog {
+  id?: number
   run_id: string
   project_id: number
   source_type: "competitor" | "hashtag"
   source_id: number
-  status: "running" | "completed" | "error"
+  status: "running" | "completed" | "failed"
   reels_added_count: number
   errors_count: number
   start_time: Date
@@ -865,6 +866,76 @@ export async function getParsingLogs(
     return logsRes as ParsingLog[]
   } catch (error) {
     console.error("Ошибка при получении логов парсинга:", error)
+    throw error
+  }
+}
+
+/**
+ * Получает всех активных пользователей (активных в последние 30 дней)
+ */
+export async function getAllActiveUsers(): Promise<User[]> {
+  ensureInitialized()
+
+  try {
+    const usersRes = await sql`
+      SELECT id, telegram_id, username, first_name, last_name, subscription_level, subscription_expires_at
+      FROM Users
+      WHERE last_active_at > NOW() - INTERVAL '30 days'
+      ORDER BY last_active_at DESC
+    `
+
+    return usersRes as User[]
+  } catch (error) {
+    console.error("Ошибка при получении активных пользователей:", error)
+    throw error
+  }
+}
+
+/**
+ * Записывает информацию о процессе скрапинга
+ */
+export async function logParsingRun(
+  log: Partial<ParsingLog>
+): Promise<ParsingLog> {
+  ensureInitialized()
+
+  try {
+    // Если это новая запись
+    if (!log.end_time) {
+      // Создаем новую запись для запуска парсинга
+      const logRes = await sql`
+        INSERT INTO ParsingLogs (
+          run_id, project_id, source_type, source_id, status, 
+          reels_added_count, errors_count, start_time, log_message
+        )
+        VALUES (
+          ${log.run_id}, ${log.project_id}, ${log.source_type}, ${log.source_id}, ${log.status || "running"}, 
+          ${log.reels_added_count || 0}, ${log.errors_count || 0}, ${log.start_time}, ${log.log_message || null}
+        )
+        RETURNING *
+      `
+      return logRes[0] as ParsingLog
+    } else {
+      // Обновляем существующую запись при завершении или ошибке
+      const logRes = await sql`
+        UPDATE ParsingLogs 
+        SET 
+          status = ${log.status}, 
+          reels_added_count = ${log.reels_added_count || 0}, 
+          errors_count = ${log.errors_count || 0}, 
+          end_time = ${log.end_time}, 
+          log_message = ${log.log_message || null},
+          error_details = ${log.error_details ? JSON.stringify(log.error_details) : null}
+        WHERE run_id = ${log.run_id} 
+          AND project_id = ${log.project_id}
+          AND source_type = ${log.source_type}
+          AND source_id = ${log.source_id}
+        RETURNING *
+      `
+      return logRes[0] as ParsingLog
+    }
+  } catch (error) {
+    console.error("Ошибка при логировании процесса скрапинга:", error)
     throw error
   }
 }
