@@ -13,40 +13,105 @@
 
 - `storage/rebuild-multi-tenant-tables.ts` — скрипт для создания структуры БД
 - `storage/neonStorage-multitenant.ts` — API для работы с данными
+- `scripts/seed-competitors.ts` — скрипт для заполнения базы данных конкурентами и запуска скрапинга
 - `MULTITENANT_STRUCTURE.md` — подробная документация по архитектуре
 - `SUCCESS_HISTORY.md` — история успешных решений
 - `REGRESSION_PATTERNS.md` — документация о неудачных подходах
-- `competitor_urls.json` — список URL аккаунтов конкурентов
 
-## Начало работы
+## Настройка и использование
 
-1. Настроить переменные окружения в `.env`:
+### Подготовка окружения
 
-   ```
-   NEON_DATABASE_URL=postgres://...
-   APIFY_TOKEN=apify_api_...
-   ```
+1. Создайте файл `.env` в директории `src/agents/scraper` на основе примера:
 
-2. Создать структуру базы данных:
+```bash
+# Настройки подключения к базе данных Neon
+NEON_DATABASE_URL=postgres://[username]:[password]@[host]/[database]
 
-   ```bash
-   CONFIRM=YES node storage/rebuild-multi-tenant-tables.ts
-   ```
+# API токен для Apify (необходим для скрапинга Instagram)
+APIFY_TOKEN=your_apify_token_here
 
-3. Использовать API для работы с данными:
+# ID Telegram пользователя для демонстрационного аккаунта
+DEMO_USER_ID=12345678
 
-   ```typescript
-   import {
-     initializeNeonStorage,
-     createUser,
-     createProject,
-     addCompetitorAccount,
-     saveReels,
-   } from "./storage/neonStorage-multitenant"
+# Настройки фильтрации контента
+MIN_VIEWS=50000
+MAX_DAYS_OLD=14
+```
 
-   // Инициализация и использование API
-   // См. примеры в MULTITENANT_STRUCTURE.md
-   ```
+2. Установите зависимости:
+
+```bash
+bun install
+```
+
+### Инициализация базы данных
+
+1. Создайте структуру таблиц:
+
+```bash
+bun run tsx src/agents/scraper/storage/rebuild-multi-tenant-tables.ts
+```
+
+2. Заполните базу данных конкурентами и запустите скрапинг:
+
+```bash
+bun run tsx src/agents/scraper/scripts/seed-competitors.ts
+```
+
+Этот скрипт:
+
+- Создаст демо-пользователя и проект (если еще не существуют)
+- Добавит аккаунты конкурентов, перечисленные в документации
+- Запустит скрапинг с фильтрацией (не старше 14 дней, не менее 50K просмотров)
+- Сохранит результаты в базу данных
+
+## API Использование
+
+Пример использования API в коде:
+
+```typescript
+import {
+  initializeNeonStorage,
+  createUser,
+  createProject,
+  addCompetitorAccount,
+  scrapeInstagramReels,
+  saveReels,
+} from "./src/agents/scraper"
+
+async function example() {
+  await initializeNeonStorage()
+
+  // Создаем пользователя
+  const user = await createUser(123456789, "username", "Имя", "Фамилия")
+
+  // Создаем проект
+  const project = await createProject(
+    user.id,
+    "Название проекта",
+    "Описание",
+    "Индустрия"
+  )
+
+  // Добавляем конкурента
+  await addCompetitorAccount(
+    project.id,
+    "https://instagram.com/competitor",
+    "Competitor"
+  )
+
+  // Скрапим данные
+  const reels = await scrapeInstagramReels(
+    "APIFY_TOKEN",
+    [{ type: "username", value: "competitor" }],
+    { minViews: 50000, maxDaysOld: 14 }
+  )
+
+  // Сохраняем в базу
+  await saveReels(project.id, reels, [])
+}
+```
 
 ## Документация
 
