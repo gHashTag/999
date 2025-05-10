@@ -1,7 +1,7 @@
 "use server"
 
 import { OpenAI } from "openai"
-import { createAI, getMutableAIState, AIState } from "ai"
+import { Message } from "ai"
 import {
   initializeNeonStorage,
   closeNeonStorage,
@@ -35,63 +35,39 @@ const ScrapeSchema = z.object({
   sourceUrl: z.string(),
 })
 
-// Инструменты для AI
-const tools = [
-  {
-    name: "get_user",
-    description: "Получает информацию о пользователе по его Telegram ID",
-    parameters: UserSchema.shape.telegramId,
-    execute: async (telegramId: number) => {
+// Вспомогательная функция для выполнения запроса к API
+async function callApi(
+  action: string,
+  params: Record<string, any>
+): Promise<Record<string, any>> {
+  switch (action) {
+    case "get_user":
       await initializeNeonStorage()
-      const user = await getUserByTelegramId(telegramId)
+      const user = await getUserByTelegramId(params.telegramId)
       await closeNeonStorage()
-      return user
-    },
-  },
-  {
-    name: "get_projects",
-    description: "Получает проекты пользователя",
-    parameters: z.number(),
-    execute: async (userId: number) => {
+      return user || {}
+
+    case "get_projects":
       await initializeNeonStorage()
-      const projects = await getProjectsByUserId(userId)
+      const projects = await getProjectsByUserId(params.userId)
       await closeNeonStorage()
-      return projects
-    },
-  },
-  {
-    name: "get_competitors",
-    description: "Получает список конкурентов проекта",
-    parameters: z.number(),
-    execute: async (projectId: number) => {
+      return { projects: projects || [] }
+
+    case "get_competitors":
       await initializeNeonStorage()
-      const competitors = await getCompetitorAccounts(projectId)
+      const competitors = await getCompetitorAccounts(params.projectId)
       await closeNeonStorage()
-      return competitors
-    },
-  },
-  {
-    name: "get_hashtags",
-    description: "Получает список отслеживаемых хэштегов проекта",
-    parameters: z.number(),
-    execute: async (projectId: number) => {
+      return { competitors: competitors || [] }
+
+    case "get_hashtags":
       await initializeNeonStorage()
-      const hashtags = await getTrackingHashtags(projectId)
+      const hashtags = await getTrackingHashtags(params.projectId)
       await closeNeonStorage()
-      return hashtags
-    },
-  },
-  {
-    name: "scrape_reels",
-    description: "Запускает скрапинг Reels",
-    parameters: ScrapeSchema,
-    execute: async ({
-      sourceType,
-      sourceId,
-      projectId,
-      sourceUrl,
-    }: z.infer<typeof ScrapeSchema>) => {
+      return { hashtags: hashtags || [] }
+
+    case "scrape_reels":
       await initializeNeonStorage()
+      const { sourceType, sourceId, projectId, sourceUrl } = params
 
       // Скрапим данные
       const reels = await scrapeInstagramReels(sourceUrl, {
@@ -109,134 +85,94 @@ const tools = [
         totalReels: reels.length,
         savedReels: savedCount,
       }
-    },
-  },
-]
 
-// Интерфейс для сообщения
-interface Message {
-  role: "user" | "assistant"
-  content: string
+    default:
+      throw new Error(`Неизвестное действие: ${action}`)
+  }
 }
 
 // Обработчик сообщений пользователя
-export async function submitUserMessage(userInput: string) {
-  // Получаем состояние AI
-  const aiState = getMutableAIState<typeof AIState>()
-
-  // Обновляем историю сообщений
-  const messageHistory = [
-    {
-      role: "user",
-      content: userInput,
-    },
-  ]
-
-  // Отправляем запрос к OpenAI с инструментами
-  const response = await openai.chat.completions.create({
-    model: "gpt-4-0125-preview",
-    messages: [
-      {
-        role: "system",
-        content: `Ты — ассистент по управлению скрапером Instagram Reels для эстетической медицины.
-        Ты помогаешь пользователям управлять скрапингом, находить информацию и выполнять действия.
-        
-        Твоя задача — интерпретировать запросы пользователей и выполнять соответствующие действия с помощью доступных инструментов.
-        
-        Говори только на русском языке.`,
-      },
-      ...messageHistory,
-    ],
-    tools: tools.map(tool => ({
-      type: "function" as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: {
-          type: "object",
-          properties: {
-            [tool.name === "get_user"
-              ? "telegramId"
-              : tool.name === "get_projects"
-                ? "userId"
-                : tool.name === "get_competitors" ||
-                    tool.name === "get_hashtags"
-                  ? "projectId"
-                  : "data"]: {
-              type: "object",
-              properties: tool.parameters ? tool.parameters.shape : {},
-            },
-          },
-          required: [
-            tool.name === "get_user"
-              ? "telegramId"
-              : tool.name === "get_projects"
-                ? "userId"
-                : tool.name === "get_competitors" ||
-                    tool.name === "get_hashtags"
-                  ? "projectId"
-                  : "data",
-          ],
+export async function submitUserMessage(message: string) {
+  try {
+    // Отправляем запрос к OpenAI для анализа сообщения
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-0125-preview",
+      messages: [
+        {
+          role: "system",
+          content: `Ты — ассистент по управлению скрапером Instagram Reels для эстетической медицины.
+          Ты помогаешь пользователям управлять скрапингом, находить информацию и выполнять действия.
+          
+          Твоя задача — интерпретировать запросы пользователей и определить, какое API-действие нужно выполнить.
+          
+          Доступные действия:
+          1. get_user(telegramId: number) - получить информацию о пользователе
+          2. get_projects(userId: number) - получить проекты пользователя
+          3. get_competitors(projectId: number) - получить список конкурентов
+          4. get_hashtags(projectId: number) - получить список хэштегов
+          5. scrape_reels(sourceType: "competitor"|"hashtag", sourceId: number, projectId: number, sourceUrl: string) - запустить скрапинг
+          
+          Если запрос пользователя не требует выполнения API-действия, просто ответь на него.
+          Если требуется выполнить действие, верни JSON в формате: {"action": "название_действия", "params": {...параметры...}}
+          
+          Говори только на русском языке.`,
         },
-      },
-    })),
-    tool_choice: "auto",
-  })
+        { role: "user", content: message },
+      ],
+    })
 
-  // Обработка вызова инструментов
-  if (response.choices[0]?.message?.tool_calls) {
-    for (const toolCall of response.choices[0].message.tool_calls) {
-      const tool = tools.find(t => t.name === toolCall.function.name)
-      if (tool) {
-        try {
-          const args = JSON.parse(toolCall.function.arguments)
-          const result = await tool.execute(args)
+    const assistantMessage = response.choices[0].message.content || ""
 
-          // Отправляем результат обратно в OpenAI для формирования ответа
-          const followUpResponse = await openai.chat.completions.create({
-            model: "gpt-4-0125-preview",
-            messages: [
-              {
-                role: "system",
-                content: `Ты — ассистент по управлению скрапером Instagram Reels.
-                Ты получил результат выполнения инструмента ${tool.name}.
-                Сформируй понятный и полезный ответ на основе этих данных.`,
-              },
-              ...messageHistory,
-              {
-                role: "function",
-                name: tool.name,
-                content: JSON.stringify(result),
-              },
-            ],
-          })
+    // Проверяем, есть ли в ответе JSON с действием API
+    try {
+      if (assistantMessage.includes("{") && assistantMessage.includes("}")) {
+        // Ищем JSON в сообщении (без использования флага s)
+        const jsonMatch = assistantMessage.match(/{[\s\S]*}/)
+        if (jsonMatch) {
+          const actionData = JSON.parse(jsonMatch[0])
 
-          // Обновляем состояние AI с ответом
-          aiState.update({
-            role: "assistant",
-            content:
-              followUpResponse.choices[0]?.message?.content ||
-              "Произошла ошибка при обработке запроса",
-          })
-        } catch (error) {
-          aiState.update({
-            role: "assistant",
-            content: `Произошла ошибка при выполнении действия: ${error}`,
-          })
+          if (actionData.action && actionData.params) {
+            // Выполняем действие API
+            const result = await callApi(actionData.action, actionData.params)
+
+            // Формируем итоговый ответ с результатами
+            const finalResponse = await openai.chat.completions.create({
+              model: "gpt-4-0125-preview",
+              messages: [
+                {
+                  role: "system",
+                  content: `Ты — ассистент по управлению скрапером Instagram Reels.
+                  Ты получил результат выполнения инструмента ${actionData.action}.
+                  Сформируй понятный и полезный ответ на основе этих данных.`,
+                },
+                { role: "user", content: message },
+                {
+                  role: "assistant",
+                  content: "Выполняю запрос...",
+                },
+                {
+                  role: "user",
+                  content: `Результат выполнения действия ${actionData.action}: ${JSON.stringify(result)}`,
+                },
+              ],
+            })
+
+            return (
+              finalResponse.choices[0].message.content ||
+              "Произошла ошибка при обработке результата"
+            )
+          }
         }
       }
-    }
-  } else {
-    // Если инструменты не вызывались, просто возвращаем ответ
-    aiState.update({
-      role: "assistant",
-      content:
-        response.choices[0]?.message?.content || "Не удалось получить ответ",
-    })
-  }
 
-  return {
-    id: Date.now().toString(),
-    display: aiState.get().content,
+      // Если нет JSON с действием, возвращаем обычный ответ
+      return assistantMessage
+    } catch (error) {
+      console.error("Ошибка при разборе ответа:", error)
+      return assistantMessage
+    }
+  } catch (error) {
+    console.error("Ошибка при обработке сообщения:", error)
+    return "Произошла ошибка при обработке запроса. Пожалуйста, попробуйте еще раз."
   }
 }
