@@ -1,5 +1,5 @@
 import { Markup } from "telegraf"
-import type { Project } from "../../../../../agents/scraper/types"
+import type { Project } from "../../types"
 
 /**
  * Генерирует inline клавиатуру для списка проектов

@@ -1,77 +1,96 @@
-import { Telegraf, Scenes, session } from "telegraf"
-import { ScraperBotContext, InstagramScraperBotConfig } from "./types"
-import projectScene from "./scenes/project-scene"
+/**
+ * Модуль Instagram Scraper Bot для Telegram
+ *
+ * Предоставляет функциональность для скрапинга Instagram Reels
+ * в нише эстетической медицины через интерфейс Telegram бота.
+ */
 
-// Импортируем другие сцены (добавим позже)
-// import competitorScene from './scenes/competitor-scene';
-// import hashtagScene from './scenes/hashtag-scene';
-// import scrapeScene from './scenes/scrape-scene';
+import { Telegraf, Scenes } from "telegraf"
+import type { MiddlewareFn } from "telegraf/typings/composer"
+import {
+  StorageAdapter,
+  ScraperBotContext,
+  InstagramScraperBotConfig,
+} from "./types"
+import projectScene from "./scenes/project-scene"
+import competitorScene from "./scenes/competitor-scene"
+
+// Экспортируем адаптеры хранилища
+export { createNeonStorageAdapter, createMemoryStorageAdapter } from "./storage"
+
+// Экспортируем типы
+export type {
+  StorageAdapter,
+  ScraperBotContext,
+  Project,
+  Competitor,
+  Hashtag,
+  Reel,
+  InstagramScraperBotConfig,
+} from "./types"
 
 /**
- * Создает экземпляр модуля Instagram Scraper Bot
- * @param bot Экземпляр бота Telegraf
+ * Настройка модуля Instagram Scraper Bot
+ *
+ * @param bot Экземпляр Telegraf бота
+ * @param storageAdapter Адаптер хранилища данных
  * @param config Конфигурация модуля
+ * @returns Объект с API модуля
  */
 export function setupInstagramScraperBot(
   bot: Telegraf<ScraperBotContext>,
+  storageAdapter: StorageAdapter,
   config: InstagramScraperBotConfig = {}
 ) {
-  // Настраиваем сессии и сцены
+  // Инициализируем сцены
   const stage = new Scenes.Stage<ScraperBotContext>([
     projectScene,
-    // competitorScene,
-    // hashtagScene,
-    // scrapeScene
+    competitorScene,
+    // Здесь будут добавляться другие сцены
   ])
 
-  // Добавляем middleware для сессии и сцены
-  bot.use(session())
-  bot.use(stage.middleware())
-
-  // Настраиваем конфигурацию
+  // Добавляем middleware для доступа к хранилищу и конфигурации
   bot.use((ctx, next) => {
+    ctx.storage = storageAdapter
     ctx.scraperConfig = config
     return next()
   })
 
-  // Добавляем команду для входа в сцену управления проектами
-  bot.command("scraper_projects", ctx =>
-    ctx.scene.enter("instagram_scraper_projects")
+  // Подключаем Stage middleware
+  bot.use(stage.middleware() as MiddlewareFn<ScraperBotContext>)
+
+  // Регистрируем обработчики команд
+  bot.command("projects", ctx => ctx.scene.enter("instagram_scraper_projects"))
+  bot.command("competitors", ctx =>
+    ctx.scene.enter("instagram_scraper_competitors")
   )
 
-  // Обработчик для кнопки "Управление проектами" (может быть добавлен в основной бот)
-  bot.hears("📊 Управление проектами", ctx =>
-    ctx.scene.enter("instagram_scraper_projects")
+  // Обработчики текстовых сообщений для меню
+  bot.hears("📊 Проекты", ctx => ctx.scene.enter("instagram_scraper_projects"))
+  bot.hears("🔍 Конкуренты", ctx =>
+    ctx.scene.enter("instagram_scraper_competitors")
   )
 
-  // Логируем успешную настройку
-  if (config.enableLogging) {
-    console.log("Instagram Scraper Bot модуль успешно настроен")
-  }
-
+  // Возвращаем API модуля
   return {
-    // Возвращаем методы для добавления кнопок в основной бот
+    // Методы для входа в сцены
+    enterProjectScene: () => "instagram_scraper_projects",
+    enterCompetitorScene: () => "instagram_scraper_competitors",
+
+    // Получение кнопок для меню
     getMenuButtons: () => [
-      ["📊 Управление проектами", "🔍 Скрапинг Instagram"],
+      ["📊 Проекты", "🔍 Конкуренты"],
+      ["#️⃣ Хэштеги", "🎬 Запустить скрапинг"],
+      ["📱 Результаты", "ℹ️ Помощь"],
     ],
 
-    // Возвращаем команды для добавления в меню бота
+    // Получение команд для регистрации в Telegram
     getCommands: () => [
-      {
-        command: "scraper_projects",
-        description: "Управление проектами скрапера",
-      },
-      // Другие команды могут быть добавлены здесь
+      { command: "projects", description: "Управление проектами" },
+      { command: "competitors", description: "Управление конкурентами" },
+      { command: "hashtags", description: "Управление хэштегами" },
+      { command: "scrape", description: "Запустить скрапинг" },
+      { command: "reels", description: "Просмотр результатов" },
     ],
-
-    // Вход в сцену проектов программно
-    enterProjectsScene: (ctx: ScraperBotContext) =>
-      ctx.scene.enter("instagram_scraper_projects"),
   }
 }
-
-// Экспортируем типы
-export * from "./types"
-
-// Экспортируем сцены для возможности расширения
-export { projectScene }

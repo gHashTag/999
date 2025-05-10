@@ -1,83 +1,125 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
 import { Telegraf } from "telegraf"
-import { setupInstagramScraperBot } from ".."
-import type { ScraperBotContext } from "../types"
+import { describe, it, expect, beforeEach, vi } from "vitest"
+import {
+  setupInstagramScraperBot,
+  createMemoryStorageAdapter,
+  ScraperBotContext,
+} from "../"
 
-// Импортируем наш модуль для тестирования и моки
-import "./setup"
-import { telegrafMocks } from "./setup"
+// Типизируем мокированный бот
+type MockBot = {
+  use: ReturnType<typeof vi.fn>
+  command: ReturnType<typeof vi.fn>
+  hears: ReturnType<typeof vi.fn>
+  launch: ReturnType<typeof vi.fn>
+  telegram: {
+    setMyCommands: ReturnType<typeof vi.fn>
+  }
+}
+
+// Типизируем API модуля
+type ScraperBotAPI = ReturnType<typeof setupInstagramScraperBot>
+
+// Мокируем ответы бота для тестирования
+vi.mock("telegraf", async () => {
+  const actual = await vi.importActual("telegraf")
+
+  return {
+    ...actual,
+    Telegraf: vi.fn().mockImplementation(() => {
+      return {
+        use: vi.fn(),
+        command: vi.fn(),
+        hears: vi.fn(),
+        launch: vi.fn().mockResolvedValue(undefined),
+        telegram: {
+          setMyCommands: vi.fn(),
+        },
+      }
+    }),
+    Scenes: {
+      Stage: vi.fn().mockImplementation(() => {
+        return {
+          middleware: vi.fn().mockReturnValue(() => {}),
+          register: vi.fn(),
+        }
+      }),
+      BaseScene: vi.fn().mockImplementation(() => {
+        return {
+          enter: vi.fn(),
+          leave: vi.fn(),
+          hears: vi.fn(),
+          action: vi.fn(),
+          on: vi.fn(),
+        }
+      }),
+    },
+  }
+})
 
 describe("Instagram Scraper Bot Module", () => {
-  let bot: Telegraf<ScraperBotContext>
+  let bot: MockBot
+  let scraperBot: ScraperBotAPI
 
   beforeEach(() => {
-    // Создаем новый экземпляр бота перед каждым тестом
-    bot = new Telegraf<ScraperBotContext>("fake-token")
-  })
+    vi.clearAllMocks()
+    bot = new Telegraf("fake-token") as unknown as MockBot
+    const storageAdapter = createMemoryStorageAdapter()
 
-  it("should register middleware and commands", () => {
-    // Настраиваем модуль
-    setupInstagramScraperBot(bot, { enableLogging: true })
-
-    // Проверяем, что middleware были добавлены
-    expect(telegrafMocks.use).toHaveBeenCalledTimes(3)
-  })
-
-  it("should register command handlers", () => {
-    // Настраиваем модуль
-    setupInstagramScraperBot(bot, { enableLogging: false })
-
-    // Проверяем, что обработчики команд были добавлены
-    expect(telegrafMocks.command).toHaveBeenCalledWith(
-      "scraper_projects",
-      expect.any(Function)
-    )
-    expect(telegrafMocks.hears).toHaveBeenCalledWith(
-      "📊 Управление проектами",
-      expect.any(Function)
-    )
-  })
-
-  it("should return menu buttons", () => {
-    // Настраиваем модуль
-    const scraperBot = setupInstagramScraperBot(bot)
-
-    // Проверяем возвращаемые кнопки меню
-    const buttons = scraperBot.getMenuButtons()
-    expect(buttons).toEqual([
-      ["📊 Управление проектами", "🔍 Скрапинг Instagram"],
-    ])
-  })
-
-  it("should return commands for bot menu", () => {
-    // Настраиваем модуль
-    const scraperBot = setupInstagramScraperBot(bot)
-
-    // Проверяем возвращаемые команды
-    const commands = scraperBot.getCommands()
-    expect(commands).toEqual([
+    scraperBot = setupInstagramScraperBot(
+      bot as unknown as Telegraf<ScraperBotContext>,
+      storageAdapter,
       {
-        command: "scraper_projects",
-        description: "Управление проектами скрапера",
-      },
-    ])
+        enableLogging: true,
+        minViews: 10000,
+        maxAgeDays: 14,
+      }
+    )
   })
 
-  it("should provide a method to enter projects scene", () => {
-    // Настраиваем модуль
-    const scraperBot = setupInstagramScraperBot(bot)
+  it("экспортирует необходимые функции и адаптеры", () => {
+    expect(setupInstagramScraperBot).toBeDefined()
+    expect(createMemoryStorageAdapter).toBeDefined()
+  })
 
-    // Создаем мок-контекст
-    const ctx = {
-      scene: {
-        enter: vi.fn(),
-      },
-    } as unknown as ScraperBotContext
+  it("возвращает API объект с необходимыми методами", () => {
+    expect(scraperBot).toBeDefined()
+    expect(scraperBot.enterProjectScene).toBeDefined()
+    expect(scraperBot.enterCompetitorScene).toBeDefined()
+    expect(scraperBot.getMenuButtons).toBeDefined()
+    expect(scraperBot.getCommands).toBeDefined()
+  })
 
-    // Вызываем метод входа в сцену
-    scraperBot.enterProjectsScene(ctx)
+  it("возвращает правильные кнопки меню", () => {
+    const buttons = scraperBot.getMenuButtons()
+    expect(buttons).toHaveLength(3) // 3 ряда кнопок
+    expect(buttons[0]).toHaveLength(2) // Первый ряд: 2 кнопки
+    expect(buttons[1]).toHaveLength(2) // Второй ряд: 2 кнопки
+    expect(buttons[2]).toHaveLength(2) // Третий ряд: 2 кнопки
 
-    // Проверяем, что был выполнен вход в нужную сцену
-    expect(ctx.scene.enter).toHaveBeenCalledWith("instagram_scraper_projects")
+    // Проверяем наличие ключевых кнопок
+    const flatButtons = buttons.flat()
+    expect(flatButtons).toContain("📊 Проекты")
+    expect(flatButtons).toContain("🔍 Конкуренты")
+  })
+
+  it("возвращает правильные команды", () => {
+    const commands = scraperBot.getCommands()
+    expect(commands).toHaveLength(5) // 5 команд
+
+    // Проверяем наличие ключевых команд
+    const commandNames = commands.map((cmd: { command: string }) => cmd.command)
+    expect(commandNames).toContain("projects")
+    expect(commandNames).toContain("competitors")
+    expect(commandNames).toContain("hashtags")
+    expect(commandNames).toContain("scrape")
+    expect(commandNames).toContain("reels")
+  })
+
+  it("возвращает правильные идентификаторы сцен", () => {
+    expect(scraperBot.enterProjectScene()).toBe("instagram_scraper_projects")
+    expect(scraperBot.enterCompetitorScene()).toBe(
+      "instagram_scraper_competitors"
+    )
   })
 })

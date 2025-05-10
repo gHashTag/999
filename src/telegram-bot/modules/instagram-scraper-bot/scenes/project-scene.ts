@@ -1,12 +1,9 @@
 import { Scenes } from "telegraf"
 import {
-  initializeNeonStorage,
-  closeNeonStorage,
-  getProjectsByUserId,
-  getUserByTelegramId,
-  createProject,
-} from "../../../../agents/scraper"
-import { ScraperBotContext, ScraperSceneStep } from "../types"
+  ScraperBotContext,
+  ScraperSceneStep,
+  ScraperSceneSessionData,
+} from "../types"
 import {
   generateProjectsKeyboard,
   generateProjectMenuKeyboard,
@@ -16,42 +13,43 @@ import {
 /**
  * Сцена для управления проектами
  */
-export const projectScene = new Scenes.BaseScene<ScraperBotContext>(
-  "instagram_scraper_projects"
-)
+export const projectScene = new Scenes.BaseScene<
+  ScraperBotContext & { scene: { session: ScraperSceneSessionData } }
+>("instagram_scraper_projects")
 
 // Вход в сцену - показываем список проектов
 projectScene.enter(async ctx => {
   try {
-    await initializeNeonStorage()
+    await ctx.storage?.initialize()
 
-    const user = await getUserByTelegramId(ctx.from?.id || 0)
+    const user = await ctx.storage?.getUserByTelegramId(ctx.from?.id || 0)
 
     if (!user) {
       await ctx.reply(
         "Вы не зарегистрированы. Пожалуйста, используйте сначала основные команды бота."
       )
+      await ctx.storage?.close()
       return await ctx.scene.leave()
     }
 
-    const projects = await getProjectsByUserId(user.id)
+    const projects = await ctx.storage?.getProjectsByUserId(user.id)
 
     await ctx.reply(
       projects && projects.length > 0
         ? "Ваши проекты:"
         : "У вас пока нет проектов. Хотите создать новый?",
       {
-        reply_markup: generateProjectsKeyboard(projects),
+        reply_markup: generateProjectsKeyboard(projects || []).reply_markup,
       }
     )
 
-    await closeNeonStorage()
+    await ctx.storage?.close()
   } catch (error) {
     console.error("Ошибка при получении проектов:", error)
     await ctx.reply(
       "Произошла ошибка при получении проектов. Пожалуйста, попробуйте позже."
     )
-    await closeNeonStorage()
+    await ctx.storage?.close()
     await ctx.scene.leave()
   }
 })
@@ -80,12 +78,12 @@ projectScene.on("text", async ctx => {
   // Обработка шага создания проекта
   if (ctx.scene.session.step === ScraperSceneStep.ADD_PROJECT) {
     try {
-      await initializeNeonStorage()
+      await ctx.storage?.initialize()
 
-      const user = await getUserByTelegramId(ctx.from.id)
+      const user = await ctx.storage?.getUserByTelegramId(ctx.from.id)
       if (!user) {
         await ctx.reply("Ошибка: пользователь не найден.")
-        await closeNeonStorage()
+        await ctx.storage?.close()
         return await ctx.scene.leave()
       }
 
@@ -97,21 +95,25 @@ projectScene.on("text", async ctx => {
         return
       }
 
-      const project = await createProject(user.id, projectName)
+      const project = await ctx.storage?.createProject(user.id, projectName)
 
-      await ctx.reply(`Проект "${projectName}" успешно создан!`, {
-        reply_markup: generateNewProjectKeyboard(project.id),
-      })
+      if (project) {
+        await ctx.reply(`Проект "${projectName}" успешно создан!`, {
+          reply_markup: generateNewProjectKeyboard(project.id).reply_markup,
+        })
+      } else {
+        await ctx.reply("Ошибка при создании проекта. Попробуйте позже.")
+      }
 
       // Сбрасываем шаг
       ctx.scene.session.step = undefined
-      await closeNeonStorage()
+      await ctx.storage?.close()
     } catch (error) {
       console.error("Ошибка при создании проекта:", error)
       await ctx.reply(
         "Произошла ошибка при создании проекта. Пожалуйста, попробуйте позже."
       )
-      await closeNeonStorage()
+      await ctx.storage?.close()
     }
   } else {
     await ctx.reply(
@@ -132,20 +134,26 @@ projectScene.action(/project_(\d+)/, async ctx => {
   await ctx.answerCbQuery()
 
   try {
-    await initializeNeonStorage()
+    await ctx.storage?.initialize()
     // Здесь можно загрузить детали проекта и показать меню управления
+    const project = await ctx.storage?.getProjectById(projectId)
 
-    await ctx.reply(`Проект #${projectId}. Выберите действие:`, {
-      reply_markup: generateProjectMenuKeyboard(projectId),
-    })
+    if (project) {
+      await ctx.reply(`Проект "${project.name}". Выберите действие:`, {
+        reply_markup: generateProjectMenuKeyboard(projectId).reply_markup,
+      })
+    } else {
+      await ctx.reply("Проект не найден. Возможно, он был удален.")
+      await ctx.scene.reenter()
+    }
 
-    await closeNeonStorage()
+    await ctx.storage?.close()
   } catch (error) {
     console.error(`Ошибка при получении проекта ${projectId}:`, error)
     await ctx.reply(
       "Произошла ошибка при получении данных проекта. Пожалуйста, попробуйте позже."
     )
-    await closeNeonStorage()
+    await ctx.storage?.close()
   }
 })
 
