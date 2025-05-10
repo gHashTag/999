@@ -1,46 +1,57 @@
 import { beforeEach, afterEach, vi } from "vitest"
 
+// Создаем базовые моки
+const telegrafMocks = {
+  use: vi.fn(),
+  launch: vi.fn().mockResolvedValue(undefined),
+  stop: vi.fn(),
+  command: vi.fn(),
+  hears: vi.fn(),
+  action: vi.fn(),
+  on: vi.fn(),
+  telegram: {
+    sendMessage: vi.fn(),
+    setMyCommands: vi.fn(),
+  },
+}
+
+const scenesMocks = {
+  enter: vi.fn(),
+  leave: vi.fn(),
+  command: vi.fn(),
+  action: vi.fn(),
+  on: vi.fn(),
+}
+
+// Класс-заглушка для Telegraf
+class MockTelegraf {
+  constructor() {
+    return telegrafMocks
+  }
+}
+
 // Мокируем модуль Telegraf
 vi.mock("telegraf", () => {
-  const Telegraf = vi.fn().mockImplementation(() => ({
-    use: vi.fn(),
-    launch: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn(),
-    command: vi.fn(),
-    hears: vi.fn(),
-    action: vi.fn(),
-    on: vi.fn(),
-  }))
-
-  const Scenes = {
-    BaseScene: vi.fn().mockImplementation(() => ({
-      enter: vi.fn(),
-      leave: vi.fn(),
-      command: vi.fn(),
-      action: vi.fn(),
-      on: vi.fn(),
-    })),
-    Stage: vi.fn().mockImplementation(() => ({
-      middleware: vi.fn(),
-    })),
-  }
-
-  const Markup = {
-    inlineKeyboard: vi.fn().mockImplementation(buttons => buttons),
-    button: {
-      callback: vi
-        .fn()
-        .mockImplementation((text, data) => ({ text, callback_data: data })),
-    },
-  }
-
-  const session = vi.fn()
-
   return {
-    Telegraf,
-    Scenes,
-    Markup,
-    session,
+    Telegraf: MockTelegraf,
+    Scenes: {
+      BaseScene: vi.fn().mockImplementation(() => ({
+        ...scenesMocks,
+        emit: vi.fn(),
+      })),
+      Stage: vi.fn().mockImplementation(() => ({
+        middleware: vi.fn(),
+      })),
+    },
+    Markup: {
+      inlineKeyboard: vi.fn().mockImplementation(buttons => buttons),
+      button: {
+        callback: vi
+          .fn()
+          .mockImplementation((text, data) => ({ text, callback_data: data })),
+      },
+    },
+    session: vi.fn(),
   }
 })
 
@@ -83,3 +94,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.resetAllMocks()
 })
+
+// Экспортируем моки для использования в тестах
+export { telegrafMocks, scenesMocks }

@@ -3,8 +3,9 @@ import { Telegraf } from "telegraf"
 import { setupInstagramScraperBot } from ".."
 import type { ScraperBotContext } from "../types"
 
-// Импортируем наш модуль для тестирования
+// Импортируем наш модуль для тестирования и моки
 import "./setup"
+import { telegrafMocks } from "./setup"
 
 describe("Instagram Scraper Bot Module", () => {
   let bot: Telegraf<ScraperBotContext>
@@ -19,7 +20,7 @@ describe("Instagram Scraper Bot Module", () => {
     setupInstagramScraperBot(bot, { enableLogging: true })
 
     // Проверяем, что middleware были добавлены
-    expect(bot.use).toHaveBeenCalledTimes(3)
+    expect(telegrafMocks.use).toHaveBeenCalledTimes(3)
   })
 
   it("should register command handlers", () => {
@@ -27,11 +28,11 @@ describe("Instagram Scraper Bot Module", () => {
     setupInstagramScraperBot(bot, { enableLogging: false })
 
     // Проверяем, что обработчики команд были добавлены
-    expect(bot.command).toHaveBeenCalledWith(
+    expect(telegrafMocks.command).toHaveBeenCalledWith(
       "scraper_projects",
       expect.any(Function)
     )
-    expect(bot.hears).toHaveBeenCalledWith(
+    expect(telegrafMocks.hears).toHaveBeenCalledWith(
       "📊 Управление проектами",
       expect.any(Function)
     )
