@@ -1,7 +1,6 @@
 import dotenv from "dotenv"
 import path from "path"
 import { fileURLToPath } from "url"
-import * as crypto from "crypto"
 import { neon } from "@neondatabase/serverless"
 
 // Получаем dirname для ES модулей

@@ -47,42 +47,6 @@ function extractAccountName(url: string): string {
   return parts[parts.length - 1]
 }
 
-// Функция для генерации фиктивных данных для демо-режима
-function generateDemoReels(sources: Array<{ type: string; value: string }>) {
-  const now = new Date()
-  const demoReels = []
-
-  for (let i = 0; i < 20; i++) {
-    const source = sources[Math.floor(Math.random() * sources.length)]
-    const authorUsername = source.value
-
-    // Случайная дата публикации за последние 14 дней
-    const pubDate = new Date(now)
-    pubDate.setDate(now.getDate() - Math.floor(Math.random() * 14))
-
-    // Случайное количество просмотров от 50,000 до 500,000
-    const views = Math.floor(Math.random() * 450000) + 50000
-
-    demoReels.push({
-      reels_url: `https://www.instagram.com/reel/demo-id-${i}/`,
-      publication_date: pubDate,
-      views_count: views,
-      likes_count: Math.floor(views * 0.1),
-      comments_count: Math.floor(views * 0.01),
-      description: `Демонстрационный Reel #${i} для тестирования базы данных #aesthetics #beauty`,
-      author_username: authorUsername,
-      author_id: `user-${Math.floor(Math.random() * 10000)}`,
-      audio_title: `Demo Song ${i}`,
-      audio_artist: `Artist ${i % 5}`,
-      thumbnail_url: `https://demo-thumbnails.com/thumb${i}.jpg`,
-      duration_seconds: Math.floor(Math.random() * 30) + 10,
-      raw_data: { demoData: true },
-    })
-  }
-
-  return demoReels
-}
-
 async function main() {
   if (!DEMO_MODE && !APIFY_TOKEN) {
     console.error("Ошибка: Не указан APIFY_TOKEN в .env файле")
