@@ -288,7 +288,7 @@ export async function getCompetitorAccounts(
 
     if (activeOnly) {
       query += ` AND is_active = $${paramCount++}`
-      params.push(true)
+      params.push(1)
     }
 
     query += " ORDER BY priority ASC, created_at ASC"
@@ -355,7 +355,7 @@ export async function getTrackingHashtags(
 
     if (activeOnly) {
       query += ` AND is_active = $${paramCount++}`
-      params.push(true)
+      params.push(1)
     }
 
     query += " ORDER BY priority ASC, created_at ASC"
