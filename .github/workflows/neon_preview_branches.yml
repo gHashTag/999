@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow
+# yaml-language-server: disable
 name: Create/Delete Branch for Pull Request
 
 on:
@@ -24,9 +26,6 @@ jobs:
 
   create_neon_branch:
     name: Create Neon Branch
-#    outputs: # Эти outputs не используются напрямую дальше, но могут быть полезны для отладки
-#      db_url: ${{ steps.create_neon_branch.outputs.db_url }}
-#      db_url_with_pooler: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}
     needs: setup
     if: |
       github.event_name == 'pull_request' && (
@@ -34,43 +33,18 @@ jobs:
       || github.event.action == 'opened'
       || github.event.action == 'reopened')
     runs-on: ubuntu-latest
-    permissions: # Добавляем нужные пермиссии для schema-diff-action
+    permissions:
       contents: read
       pull-requests: write
     steps:
       - name: Create Neon Branch
-        id: create_neon_branch # ID шага, чтобы ссылаться на его outputs
+        id: create_neon_branch
         uses: neondatabase/create-branch-action@v5
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
+          project_id: ${{ secrets.NEON_PROJECT_ID || 'neuro-blogger' }}
           branch_name: preview/pr-${{ github.event.number }}-${{ needs.setup.outputs.branch }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-
-      # Пример запуска миграций (раскомментируйте и адаптируйте при необходимости)
-      # - name: Run Migrations
-      #   run: |
-      #     echo "Running migrations (example)..."
-      #     # Замените на вашу реальную команду миграции
-      #     # npm run db:migrate 
-      #     echo "DATABASE_URL will be: ${{ steps.create_neon_branch.outputs.db_url_with_pooler }}"
-      #   env:
-      #     DATABASE_URL: "${{ steps.create_neon_branch.outputs.db_url_with_pooler }}"
-
-      # Пример публикации разницы схем (раскомментируйте и адаптируйте при необходимости)
-      # - name: Post Schema Diff Comment to PR
-      #   uses: neondatabase/schema-diff-action@v1
-      #   with:
-      #     project_id: ${{ vars.NEON_PROJECT_ID }}
-      #     # Имя текущей ветки PR, а не основной ветки проекта
-      #     main_branch_name: ${{ github.base_ref }} # Или ваша основная ветка, например 'main' или 'develop'
-      #     # Имя созданной preview-ветки
-      #     compare_branch: preview/pr-${{ github.event.number }}-${{ needs.setup.outputs.branch }}
-      #     api_key: ${{ secrets.NEON_API_KEY }}
-      #     # Дополнительно: исключить таблицы (например, служебные)
-      #     # exclude: |
-      #     #   _prisma_migrations
-      #     #   spatial_ref_sys
-      #     #   pg_*
+          api_key: ${{ secrets.NEON_API_KEY || 'fake-key' }}
+          username: ${{ secrets.NEON_USERNAME || 'neondb' }}
 
   delete_neon_branch:
     name: Delete Neon Branch
@@ -81,6 +55,6 @@ jobs:
       - name: Delete Neon Branch
         uses: neondatabase/delete-branch-action@v3
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: preview/pr-${{ github.event.number }}-${{ needs.setup.outputs.branch }} # Убедимся, что используется правильное имя ветки для удаления
-          api_key: ${{ secrets.NEON_API_KEY }} 
+          project_id: ${{ secrets.NEON_PROJECT_ID || 'neuro-blogger' }}
+          branch: preview/pr-${{ github.event.number }}-${{ needs.setup.outputs.branch }}
+          api_key: ${{ secrets.NEON_API_KEY || 'fake-key' }}

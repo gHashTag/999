@@ -26,7 +26,8 @@
     "open-codex": "tsx src/cli/open-codex-cli.ts",
     "typecheck": "bun exec tsc --noEmit",
     "check": "bun run lint && bun run format && bun run typecheck",
-    "precommit": "lint-staged"
+    "precommit": "lint-staged",
+    "start:telegram-bot": "bun run src/telegram-bot/bot.ts"
   },
   "keywords": [
     "inngest",
@@ -63,6 +64,7 @@
     "lucide-react": "^0.509.0",
     "ora": "^8.2.0",
     "pg": "^8.15.6",
+    "telegraf": "^4.16.3",
     "zod": "^3.24.4"
   },
   "devDependencies": {
