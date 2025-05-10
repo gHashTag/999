@@ -34,6 +34,9 @@ export {
   getParsingLogs,
 } from "./storage/neonStorage-multitenant"
 
+// Экспорт функций для скрапинга
+export { scrapeInstagramReels } from "./scrape/instagram-scraper"
+
 // Экспорт типов
 export type {
   InstagramReel,
@@ -41,96 +44,28 @@ export type {
   Project,
   CompetitorAccount,
   TrackingHashtag,
-  ParsingLogEntry,
+  ParsingLog,
+  ReelWithSource,
 } from "./storage/neonStorage-multitenant"
 
-// Импорт для работы с Apify
-import { ApifyClient } from "apify-client"
+// Дополнительные типы, которые должны быть экспортированы
+export interface ContentSource {
+  id: number
+  reels_id: number
+  source_type: "competitor" | "hashtag"
+  competitor_id?: number
+  hashtag_id?: number
+  project_id: number
+  created_at?: Date
+}
 
-// Функция для скрапинга Instagram Reels через Apify
-export async function scrapeInstagramReels(
-  apifyToken: string,
-  sources: { type: "username" | "hashtag"; value: string }[],
-  options: {
-    limit?: number
-    minViews?: number
-    maxDaysOld?: number
-  } = {}
-): Promise<import("./storage/neonStorage-multitenant").InstagramReel[]> {
-  if (!apifyToken) throw new Error("apifyToken is required")
-  if (!sources || sources.length === 0) throw new Error("sources is required")
-
-  const client = new ApifyClient({ token: apifyToken })
-
-  // Преобразуем источники в формат, понятный Apify
-  const usernames = sources
-    .filter(source => source.type === "username")
-    .map(source => source.value)
-
-  const hashtags = sources
-    .filter(source => source.type === "hashtag")
-    .map(source => source.value)
-
-  // Формируем входные данные для актора
-  const input: any = {
-    resultsLimit: options.limit || 100,
-  }
-
-  if (usernames.length > 0) {
-    input.username = usernames
-  }
-
-  if (hashtags.length > 0) {
-    input.hashtags = hashtags
-  }
-
-  try {
-    // Запускаем актор (ID актора может отличаться в зависимости от нужного актора в Apify)
-    const run = await client.actor("xMc5Ga1oCONPmWJIa").call(input)
-
-    // Получаем результаты из датасета
-    const dataset = await client.dataset(run.defaultDatasetId).listItems()
-
-    // Преобразуем в формат InstagramReel
-    const reels = dataset.items.map((item: any) => ({
-      reels_url: item.url,
-      publication_date: item.timestamp ? new Date(item.timestamp) : undefined,
-      views_count: item.viewCount,
-      likes_count: item.likesCount,
-      comments_count: item.commentsCount,
-      description: item.caption,
-      author_username: item.ownerUsername,
-      author_id: item.ownerId,
-      audio_title: item.audioTitle,
-      audio_artist: item.audioAuthor,
-      thumbnail_url: item.thumbnailUrl,
-      duration_seconds: item.durationSec,
-      raw_data: item,
-    }))
-
-    // Применяем фильтрацию если нужно
-    let filteredReels = reels
-
-    if (options.minViews) {
-      filteredReels = filteredReels.filter(
-        reel =>
-          typeof reel.views_count === "number" &&
-          reel.views_count >= options.minViews!
-      )
-    }
-
-    if (options.maxDaysOld && options.maxDaysOld > 0) {
-      const cutoffDate = new Date()
-      cutoffDate.setDate(cutoffDate.getDate() - options.maxDaysOld)
-
-      filteredReels = filteredReels.filter(
-        reel => reel.publication_date && reel.publication_date >= cutoffDate
-      )
-    }
-
-    return filteredReels
-  } catch (error) {
-    console.error("Error in scrapeInstagramReels:", error)
-    throw error
-  }
+export interface UserContentInteraction {
+  id: number
+  user_id: number
+  reels_id: number
+  is_favorite?: boolean
+  is_hidden?: boolean
+  notes?: string
+  created_at?: Date
+  updated_at?: Date
 }

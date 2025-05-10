@@ -1,7 +1,12 @@
-import { NeonToolkit } from "@neondatabase/toolkit"
+import { neon } from "@neondatabase/serverless"
 import dotenv from "dotenv"
 import path from "path"
+import { fileURLToPath } from "url"
 import { v4 as uuidv4 } from "uuid"
+
+// Получаем dirname для ES модулей
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Загружаем переменные окружения
 dotenv.config({ path: path.join(__dirname, "../.env") })
@@ -65,7 +70,10 @@ export interface TrackingHashtag {
   last_parsed_at?: Date
 }
 
-export interface ParsingLogEntry {
+/**
+ * Лог процесса парсинга
+ */
+export interface ParsingLog {
   run_id: string
   project_id: number
   source_type: "competitor" | "hashtag"
@@ -79,8 +87,18 @@ export interface ParsingLogEntry {
   error_details?: any
 }
 
+/**
+ * Reel с информацией об источнике
+ */
+export interface ReelWithSource extends InstagramReel {
+  id: number
+  source_type: string
+  source_id: number
+  source_name?: string
+}
+
 // Состояние подключения к базе данных
-let toolkit: NeonToolkit | null = null
+let sql: any = null
 let initialized = false
 
 /**
@@ -93,7 +111,7 @@ export async function initializeNeonStorage(): Promise<void> {
     }
 
     if (!initialized) {
-      toolkit = new NeonToolkit(process.env.NEON_DATABASE_URL)
+      sql = neon(process.env.NEON_DATABASE_URL)
       initialized = true
     }
   } catch (error) {
@@ -106,7 +124,7 @@ export async function initializeNeonStorage(): Promise<void> {
  * Закрывает подключение к Neon
  */
 export async function closeNeonStorage(): Promise<void> {
-  toolkit = null
+  sql = null
   initialized = false
 }
 
@@ -114,7 +132,7 @@ export async function closeNeonStorage(): Promise<void> {
  * Проверяет, инициализировано ли подключение к базе данных
  */
 function ensureInitialized(): void {
-  if (!initialized || !toolkit) {
+  if (!initialized || !sql) {
     throw new Error(
       "Neon хранилище не инициализировано. Вызовите initializeNeonStorage() перед использованием."
     )
@@ -135,7 +153,7 @@ export async function createUser(
   ensureInitialized()
 
   try {
-    const userRes = await toolkit!.sql`
+    const userRes = await sql`
       INSERT INTO Users (telegram_id, username, first_name, last_name)
       VALUES (${telegramId}, ${username || null}, ${firstName || null}, ${lastName || null})
       ON CONFLICT (telegram_id) DO UPDATE 
@@ -162,7 +180,7 @@ export async function getUserByTelegramId(
   ensureInitialized()
 
   try {
-    const userRes = await toolkit!.sql`
+    const userRes = await sql`
       SELECT id, telegram_id, username, first_name, last_name, subscription_level, subscription_expires_at
       FROM Users
       WHERE telegram_id = ${telegramId}
@@ -187,7 +205,7 @@ export async function createProject(
   ensureInitialized()
 
   try {
-    const projectRes = await toolkit!.sql`
+    const projectRes = await sql`
       INSERT INTO Projects (user_id, name, description, industry)
       VALUES (${userId}, ${name}, ${description || null}, ${industry || null})
       RETURNING id, user_id, name, description, industry, is_active
@@ -207,7 +225,7 @@ export async function getProjectsByUserId(userId: number): Promise<Project[]> {
   ensureInitialized()
 
   try {
-    const projectsRes = await toolkit!.sql`
+    const projectsRes = await sql`
       SELECT id, user_id, name, description, industry, is_active
       FROM Projects
       WHERE user_id = ${userId}
@@ -236,7 +254,7 @@ export async function addCompetitorAccount(
   ensureInitialized()
 
   try {
-    const accountRes = await toolkit!.sql`
+    const accountRes = await sql`
       INSERT INTO CompetitorAccounts (project_id, instagram_url, account_name, notes, priority)
       VALUES (${projectId}, ${instagramUrl}, ${accountName || null}, ${notes || null}, ${priority})
       RETURNING id, project_id, instagram_url, instagram_username, account_name, notes, is_active, priority, last_parsed_at
@@ -266,14 +284,17 @@ export async function getCompetitorAccounts(
     `
 
     const params = [projectId]
+    let paramCount = 2
 
     if (activeOnly) {
-      query += " AND is_active = true"
+      query += ` AND is_active = $${paramCount++}`
+      params.push(true)
     }
 
     query += " ORDER BY priority ASC, created_at ASC"
 
-    const accountsRes = await toolkit!.sql.unsafe(query, params)
+    // Выполняем запрос, вызывая sql.query
+    const accountsRes = await sql.query(query, params)
 
     return accountsRes as CompetitorAccount[]
   } catch (error) {
@@ -300,7 +321,7 @@ export async function addTrackingHashtag(
       ? hashtag.substring(1)
       : hashtag
 
-    const hashtagRes = await toolkit!.sql`
+    const hashtagRes = await sql`
       INSERT INTO TrackingHashtags (project_id, hashtag, display_name, notes, priority)
       VALUES (${projectId}, ${cleanHashtag}, ${displayName || `#${cleanHashtag}`}, ${notes || null}, ${priority})
       RETURNING id, project_id, hashtag, display_name, notes, is_active, priority, last_parsed_at
@@ -330,14 +351,17 @@ export async function getTrackingHashtags(
     `
 
     const params = [projectId]
+    let paramCount = 2
 
     if (activeOnly) {
-      query += " AND is_active = true"
+      query += ` AND is_active = $${paramCount++}`
+      params.push(true)
     }
 
     query += " ORDER BY priority ASC, created_at ASC"
 
-    const hashtagsRes = await toolkit!.sql.unsafe(query, params)
+    // Выполняем запрос, вызывая sql.query
+    const hashtagsRes = await sql.query(query, params)
 
     return hashtagsRes as TrackingHashtag[]
   } catch (error) {
@@ -365,7 +389,7 @@ export async function saveReels(
     const runId = uuidv4()
     const startTime = new Date()
 
-    await toolkit!.sql`
+    await sql`
       INSERT INTO ParsingLogs (run_id, project_id, source_type, source_id, status, start_time)
       VALUES (${runId}, ${projectId}, ${sourceType}, ${sourceId}, 'running', ${startTime})
     `
@@ -376,7 +400,7 @@ export async function saveReels(
     for (const reel of reels) {
       try {
         // Проверяем, существует ли уже такой Reel
-        const existingRes = await toolkit!.sql`
+        const existingRes = await sql`
           SELECT id FROM InstagramReels WHERE reels_url = ${reel.reels_url}
         `
 
@@ -384,7 +408,7 @@ export async function saveReels(
 
         if (existingRes.length === 0) {
           // Сохраняем новый Reel
-          const reelRes = await toolkit!.sql`
+          const reelRes = await sql`
             INSERT INTO InstagramReels (
               reels_url, publication_date, views_count, likes_count, comments_count, 
               description, author_username, author_id, audio_title, audio_artist,
@@ -412,7 +436,7 @@ export async function saveReels(
         } else {
           // Обновляем существующий Reel
           reelId = existingRes[0].id
-          await toolkit!.sql`
+          await sql`
             UPDATE InstagramReels
             SET 
               views_count = COALESCE(${reel.views_count}, views_count),
@@ -424,7 +448,7 @@ export async function saveReels(
         }
 
         // Создаем связь с источником, если такой еще нет
-        const existingLinkRes = await toolkit!.sql`
+        const existingLinkRes = await sql`
           SELECT id FROM ContentSources
           WHERE reels_id = ${reelId}
             AND project_id = ${projectId}
@@ -439,7 +463,7 @@ export async function saveReels(
         if (existingLinkRes.length === 0) {
           // Создаем новую связь
           if (sourceType === "competitor") {
-            await toolkit!.sql`
+            await sql`
               INSERT INTO ContentSources (
                 reels_id, source_type, competitor_id, hashtag_id, project_id
               ) VALUES (
@@ -447,7 +471,7 @@ export async function saveReels(
               )
             `
           } else {
-            await toolkit!.sql`
+            await sql`
               INSERT INTO ContentSources (
                 reels_id, source_type, competitor_id, hashtag_id, project_id
               ) VALUES (
@@ -464,13 +488,13 @@ export async function saveReels(
 
     // Обновляем дату последнего парсинга источника
     if (sourceType === "competitor") {
-      await toolkit!.sql`
+      await sql`
         UPDATE CompetitorAccounts
         SET last_parsed_at = CURRENT_TIMESTAMP
         WHERE id = ${sourceId}
       `
     } else {
-      await toolkit!.sql`
+      await sql`
         UPDATE TrackingHashtags
         SET last_parsed_at = CURRENT_TIMESTAMP
         WHERE id = ${sourceId}
@@ -479,7 +503,7 @@ export async function saveReels(
 
     // Завершаем запись лога парсинга
     const endTime = new Date()
-    await toolkit!.sql`
+    await sql`
       UPDATE ParsingLogs
       SET 
         status = ${errors > 0 ? "error" : "completed"},
@@ -600,10 +624,10 @@ export async function getReels(
     params.push(limit, offset)
 
     // Выполняем запросы
-    const totalRes = await toolkit!.sql.unsafe(countQuery, params.slice(0, -2))
+    const totalRes = await sql.query(countQuery, params.slice(0, -2))
     const total = parseInt(totalRes[0].count)
 
-    const reelsRes = await toolkit!.sql.unsafe(query, params)
+    const reelsRes = await sql.query(query, params)
 
     return {
       reels: reelsRes as any[],
@@ -629,7 +653,7 @@ export async function getProjectStats(projectId: number): Promise<{
 
   try {
     // Общее количество Reels и просмотров
-    const statsRes = await toolkit!.sql`
+    const statsRes = await sql`
       SELECT
         COUNT(DISTINCT r.id) as total_reels,
         SUM(r.views_count) as total_views,
@@ -641,7 +665,7 @@ export async function getProjectStats(projectId: number): Promise<{
     `
 
     // Получаем самые популярные Reels
-    const popularReelsRes = await toolkit!.sql`
+    const popularReelsRes = await sql`
       SELECT 
         r.id,
         r.reels_url,
@@ -683,7 +707,7 @@ export async function addToFavorites(
   ensureInitialized()
 
   try {
-    await toolkit!.sql`
+    await sql`
       INSERT INTO UserContentInteractions (user_id, reels_id, is_favorite)
       VALUES (${userId}, ${reelId}, true)
       ON CONFLICT (user_id, reels_id) 
@@ -705,7 +729,7 @@ export async function removeFromFavorites(
   ensureInitialized()
 
   try {
-    await toolkit!.sql`
+    await sql`
       UPDATE UserContentInteractions
       SET is_favorite = false, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = ${userId} AND reels_id = ${reelId}
@@ -730,14 +754,14 @@ export async function getFavoriteReels(
   ensureInitialized()
 
   try {
-    const totalRes = await toolkit!.sql`
+    const totalRes = await sql`
       SELECT COUNT(*) as count
       FROM UserContentInteractions uci
       JOIN InstagramReels r ON uci.reels_id = r.id
       WHERE uci.user_id = ${userId} AND uci.is_favorite = true
     `
 
-    const reelsRes = await toolkit!.sql`
+    const reelsRes = await sql`
       SELECT 
         r.id,
         r.reels_url,
@@ -776,7 +800,7 @@ export async function hideReel(userId: number, reelId: number): Promise<void> {
   ensureInitialized()
 
   try {
-    await toolkit!.sql`
+    await sql`
       INSERT INTO UserContentInteractions (user_id, reels_id, is_hidden)
       VALUES (${userId}, ${reelId}, true)
       ON CONFLICT (user_id, reels_id) 
@@ -802,7 +826,7 @@ export async function getReelInteraction(
   ensureInitialized()
 
   try {
-    const interactionRes = await toolkit!.sql`
+    const interactionRes = await sql`
       SELECT is_favorite, is_hidden, notes
       FROM UserContentInteractions
       WHERE user_id = ${userId} AND reels_id = ${reelId}
@@ -823,11 +847,11 @@ export async function getReelInteraction(
 export async function getParsingLogs(
   projectId: number,
   limit: number = 50
-): Promise<ParsingLogEntry[]> {
+): Promise<ParsingLog[]> {
   ensureInitialized()
 
   try {
-    const logsRes = await toolkit!.sql`
+    const logsRes = await sql`
       SELECT 
         run_id, project_id, source_type, source_id, status,
         reels_added_count, errors_count, start_time, end_time,
@@ -838,7 +862,7 @@ export async function getParsingLogs(
       LIMIT ${limit}
     `
 
-    return logsRes as ParsingLogEntry[]
+    return logsRes as ParsingLog[]
   } catch (error) {
     console.error("Ошибка при получении логов парсинга:", error)
     throw error

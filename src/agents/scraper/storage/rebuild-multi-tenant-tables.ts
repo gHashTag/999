@@ -1,9 +1,14 @@
 import dotenv from "dotenv"
 import path from "path"
+import { fileURLToPath } from "url"
 import * as crypto from "crypto"
 import { neon } from "@neondatabase/serverless"
 
-// Загружаем переменные окружения из файла .env
+// Получаем dirname для ES модулей
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Загружаем переменные окружения
 dotenv.config({ path: path.join(__dirname, "../.env") })
 
 /**
@@ -52,7 +57,8 @@ async function rebuildMultiTenantDatabase() {
 
     // Сначала удаляем зависимые таблицы, затем основные
     for (const table of tables) {
-      await sql`DROP TABLE IF EXISTS ${table} CASCADE`
+      // Используем sql.raw для безопасной динамической вставки имени таблицы
+      await sql`DROP TABLE IF EXISTS "${sql.unsafe(table)}" CASCADE`
       console.log(`  ✓ Таблица "${table}" удалена`)
     }
 

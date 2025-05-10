@@ -1,5 +1,11 @@
 import dotenv from "dotenv"
 import path from "path"
+import { fileURLToPath } from "url"
+
+// Получаем dirname для ES модулей
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 import {
   initializeNeonStorage,
   closeNeonStorage,
@@ -19,6 +25,7 @@ dotenv.config({ path: path.join(__dirname, "../../.env") })
 // Конфигурация
 const TELEGRAM_ID = process.env.DEMO_USER_ID || "12345678"
 const APIFY_TOKEN = process.env.APIFY_TOKEN
+const DEMO_MODE = !APIFY_TOKEN || APIFY_TOKEN === "your_apify_token_here"
 
 // Список аккаунтов конкурентов из документации AGENT_SCRAPER
 const COMPETITOR_ACCOUNTS = [
@@ -40,9 +47,48 @@ function extractAccountName(url: string): string {
   return parts[parts.length - 1]
 }
 
+// Функция для генерации фиктивных данных для демо-режима
+function generateDemoReels(sources: Array<{ type: string; value: string }>) {
+  const now = new Date()
+  const demoReels = []
+
+  for (let i = 0; i < 20; i++) {
+    const source = sources[Math.floor(Math.random() * sources.length)]
+    const authorUsername = source.value
+
+    // Случайная дата публикации за последние 14 дней
+    const pubDate = new Date(now)
+    pubDate.setDate(now.getDate() - Math.floor(Math.random() * 14))
+
+    // Случайное количество просмотров от 50,000 до 500,000
+    const views = Math.floor(Math.random() * 450000) + 50000
+
+    demoReels.push({
+      reels_url: `https://www.instagram.com/reel/demo-id-${i}/`,
+      publication_date: pubDate,
+      views_count: views,
+      likes_count: Math.floor(views * 0.1),
+      comments_count: Math.floor(views * 0.01),
+      description: `Демонстрационный Reel #${i} для тестирования базы данных #aesthetics #beauty`,
+      author_username: authorUsername,
+      author_id: `user-${Math.floor(Math.random() * 10000)}`,
+      audio_title: `Demo Song ${i}`,
+      audio_artist: `Artist ${i % 5}`,
+      thumbnail_url: `https://demo-thumbnails.com/thumb${i}.jpg`,
+      duration_seconds: Math.floor(Math.random() * 30) + 10,
+      raw_data: { demoData: true },
+    })
+  }
+
+  return demoReels
+}
+
 async function main() {
-  if (!APIFY_TOKEN) {
+  if (!DEMO_MODE && !APIFY_TOKEN) {
     console.error("Ошибка: Не указан APIFY_TOKEN в .env файле")
+    console.log(
+      "Используйте --demo для запуска в демонстрационном режиме без API ключа"
+    )
     process.exit(1)
   }
 
@@ -87,21 +133,28 @@ async function main() {
 
     // 3. Добавляем аккаунты конкурентов
     console.log("Добавление аккаунтов конкурентов:")
-
-    // Получаем существующих конкурентов, чтобы избежать дублирования
     const existingCompetitors = await getCompetitorAccounts(project.id)
-    const existingUrls = existingCompetitors.map(c => c.instagram_url)
 
-    // Фильтруем только новых конкурентов
-    const newCompetitors = COMPETITOR_ACCOUNTS.filter(
-      url => !existingUrls.includes(url)
+    // Если existingCompetitors не массив, создаем пустой массив
+    const existingCompetitorsList = Array.isArray(existingCompetitors)
+      ? existingCompetitors
+      : []
+
+    // Получаем список URL уже добавленных конкурентов
+    const existingUrls = existingCompetitorsList.map(comp =>
+      comp.instagram_url.toLowerCase()
     )
 
-    if (newCompetitors.length === 0) {
+    // Фильтруем и добавляем только новых конкурентов
+    const competitorsToAdd = COMPETITOR_ACCOUNTS.filter(
+      url => !existingUrls.includes(url.toLowerCase())
+    )
+
+    if (competitorsToAdd.length === 0) {
       console.log("Все конкуренты уже добавлены в проект.")
     } else {
       // Добавляем новых конкурентов
-      for (const url of newCompetitors) {
+      for (const url of competitorsToAdd) {
         const accountName = extractAccountName(url)
         const competitor = await addCompetitorAccount(
           project.id,
@@ -112,50 +165,86 @@ async function main() {
       }
     }
 
-    // 4. Запускаем скрапинг данных
+    // 4. Запускаем скрапинг данных или генерируем демо-данные
     console.log("\nЗапуск скрапинга данных по конкурентам...")
 
-    // Получаем всех конкурентов для текущего проекта
+    // Получаем всех добавленных конкурентов
     const competitors = await getCompetitorAccounts(project.id)
-
-    // Формируем источники для скрапинга
-    const sources = competitors.map(competitor => ({
-      type: "username" as const,
-      value: extractAccountName(competitor.instagram_url),
-    }))
-
+    console.log("Тип competitors:", typeof competitors)
     console.log(
-      `Начинаем скрапинг для ${sources.length} аккаунтов конкурентов...`
+      "Результат getCompetitorAccounts:",
+      JSON.stringify(competitors, null, 2).substring(0, 500)
     )
 
-    // Запускаем скрапинг с фильтрами из документации
-    const reels = await scrapeInstagramReels(APIFY_TOKEN, sources, {
-      maxDaysOld: 14, // не старше 14 дней
-      minViews: 50000, // не менее 50,000 просмотров
-    })
+    const competitorsList = Array.isArray(competitors) ? competitors : []
+    console.log("Длина competitorsList:", competitorsList.length)
 
-    console.log(`Получено ${reels.length} Reels, соответствующих критериям.`)
+    if (competitorsList.length === 0) {
+      console.log("Не найдено аккаунтов конкурентов для скрапинга.")
+      return
+    }
 
-    // 5. Сохраняем полученные Reels в базу данных
-    if (reels.length > 0) {
-      // Маппинг для связи с источниками
-      const contentSources = reels.map(reel => {
-        const competitor = competitors.find(comp =>
-          comp.instagram_url.includes(reel.author_username || "")
+    // Выбираем первого конкурента для демонстрации
+    const targetCompetitor = competitorsList[0]
+
+    if (DEMO_MODE) {
+      console.log(
+        `ДЕМО-РЕЖИМ: Симуляция скрапинга для ${targetCompetitor.instagram_url}`
+      )
+
+      // Создаем демо-данные
+      const demoReels = [
+        {
+          reels_url: "https://www.instagram.com/reel/demo123456/",
+          publication_date: new Date(),
+          views_count: 75000,
+          likes_count: 1500,
+          description:
+            "Демо-запись: Процедура для лица с использованием передовой технологии",
+          author_username:
+            targetCompetitor.instagram_username ||
+            extractAccountName(targetCompetitor.instagram_url),
+        },
+        {
+          reels_url: "https://www.instagram.com/reel/demo789012/",
+          publication_date: new Date(),
+          views_count: 120000,
+          likes_count: 3200,
+          description: "Демо-запись: Результаты инъекций филлеров до и после",
+          author_username:
+            targetCompetitor.instagram_username ||
+            extractAccountName(targetCompetitor.instagram_url),
+        },
+      ]
+
+      // Сохраняем демо-данные
+      await saveReels(demoReels, project.id, "competitor", targetCompetitor.id)
+      console.log(
+        `Сохранено ${demoReels.length} демо Reels в базу данных Neon.`
+      )
+    } else {
+      // Запуск реального скрапинга с Apify
+      try {
+        console.log(`Запуск скрапинга для ${targetCompetitor.instagram_url}...`)
+
+        // Запускаем скрапинг
+        const reels = await scrapeInstagramReels(
+          targetCompetitor.instagram_url,
+          {
+            apifyToken: APIFY_TOKEN,
+            minViews: 50000,
+            maxAgeDays: 14,
+          }
         )
 
-        return {
-          reelsUrl: reel.reels_url,
-          sourceId: competitor?.id,
-          sourceType: "account",
-        }
-      })
+        console.log(`Получено ${reels.length} Reels от Apify.`)
 
-      // Сохраняем данные в базу
-      const savedCount = await saveReels(project.id, reels, contentSources)
-      console.log(`Сохранено ${savedCount} Reels в базу данных Neon.`)
-    } else {
-      console.log("Нет данных для сохранения в базу.")
+        // Сохраняем данные в базу
+        await saveReels(reels, project.id, "competitor", targetCompetitor.id)
+        console.log(`Сохранено ${reels.length} Reels в базу данных Neon.`)
+      } catch (error) {
+        console.error("Ошибка при скрапинге:", error)
+      }
     }
 
     console.log("\nРабота скрипта успешно завершена!")
