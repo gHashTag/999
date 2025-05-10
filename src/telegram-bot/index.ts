@@ -14,6 +14,9 @@ import {
   saveReels,
 } from "../agents/scraper"
 import dotenv from "dotenv"
+// Импорт модуля Instagram Scraper Bot
+import { setupInstagramScraperBot } from "./modules/instagram-scraper-bot"
+import type { ScraperBotContext } from "./modules/instagram-scraper-bot/types"
 
 // Загружаем переменные окружения
 dotenv.config()
@@ -24,7 +27,15 @@ if (!token) {
   console.error("ОШИБКА: TELEGRAM_BOT_TOKEN не указан в переменных окружения")
   process.exit(1)
 }
-const bot = new Telegraf(token)
+const bot = new Telegraf<ScraperBotContext>(token)
+
+// Настройка модуля Instagram Scraper Bot
+const scraperBot = setupInstagramScraperBot(bot, {
+  enableLogging: true,
+  minViews: parseInt(process.env.MIN_VIEWS || "50000"),
+  maxAgeDays: parseInt(process.env.MAX_AGE_DAYS || "14"),
+  apifyToken: process.env.APIFY_TOKEN,
+})
 
 // Middleware для логирования
 bot.use(async (ctx, next) => {
@@ -108,59 +119,8 @@ bot.help(async ctx => {
   )
 })
 
-// Обработка команды /projects
-bot.command("projects", async ctx => {
-  try {
-    await initializeNeonStorage()
-
-    const user = await getUserByTelegramId(ctx.from.id)
-
-    if (!user) {
-      await ctx.reply(
-        "Вы не зарегистрированы. Используйте /start для начала работы."
-      )
-      await closeNeonStorage()
-      return
-    }
-
-    const projects = await getProjectsByUserId(user.id)
-
-    if (!projects || projects.length === 0) {
-      await ctx.reply("У вас пока нет проектов. Хотите создать новый?", {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "Создать проект", callback_data: "create_project" }],
-          ],
-        },
-      })
-    } else {
-      const projectButtons = projects.map(project => [
-        {
-          text: `${project.name} (${project.is_active ? "Активен" : "Неактивен"})`,
-          callback_data: `project_${project.id}`,
-        },
-      ])
-
-      projectButtons.push([
-        { text: "Создать новый проект", callback_data: "create_project" },
-      ])
-
-      await ctx.reply("Ваши проекты:", {
-        reply_markup: {
-          inline_keyboard: projectButtons,
-        },
-      })
-    }
-
-    await closeNeonStorage()
-  } catch (error) {
-    console.error("Ошибка при получении проектов:", error)
-    await ctx.reply(
-      "Произошла ошибка при получении проектов. Пожалуйста, попробуйте позже."
-    )
-    await closeNeonStorage()
-  }
-})
+// Обработка команды /projects - перенаправляем на модуль
+bot.command("projects", ctx => scraperBot.enterProjectsScene(ctx))
 
 // Обработка команды /competitors
 bot.command("competitors", async ctx => {
@@ -459,15 +419,10 @@ bot.hears("🔍 Запустить скрапинг", ctx =>
       })
     )
 )
-bot.hears("📊 Мои проекты", ctx =>
-  bot.telegram
-    .sendMessage(ctx.chat.id, "Загружаю список проектов...")
-    .then(() => {
-      if (ctx.chat && ctx.chat.id) {
-        return bot.command.projects.trigger(ctx)
-      }
-    })
-)
+
+// Обработка кнопки "Мои проекты" - перенаправляем на модуль
+bot.hears("📊 Мои проекты", ctx => scraperBot.enterProjectsScene(ctx))
+
 bot.hears("📋 Мои конкуренты", ctx =>
   bot.telegram
     .sendMessage(ctx.chat.id, "Загружаю список конкурентов...")
