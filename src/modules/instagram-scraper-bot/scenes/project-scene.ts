@@ -1,4 +1,4 @@
-import { Scenes, Markup } from "telegraf"
+import { Scenes } from "telegraf"
 import {
   initializeNeonStorage,
   closeNeonStorage,
@@ -7,6 +7,11 @@ import {
   createProject,
 } from "../../../agents/scraper"
 import { ScraperBotContext, ScraperSceneStep } from "../types"
+import {
+  generateProjectsKeyboard,
+  generateProjectMenuKeyboard,
+  generateNewProjectKeyboard,
+} from "./components/project-keyboard"
 
 /**
  * Сцена для управления проектами
@@ -31,30 +36,14 @@ projectScene.enter(async ctx => {
 
     const projects = await getProjectsByUserId(user.id)
 
-    if (!projects || projects.length === 0) {
-      await ctx.reply("У вас пока нет проектов. Хотите создать новый?", {
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback("Создать проект", "create_project")],
-          [Markup.button.callback("Выйти", "exit_scene")],
-        ]),
-      })
-    } else {
-      const projectButtons = projects.map(project => [
-        Markup.button.callback(
-          `${project.name} (${project.is_active ? "Активен" : "Неактивен"})`,
-          `project_${project.id}`
-        ),
-      ])
-
-      projectButtons.push([
-        Markup.button.callback("Создать новый проект", "create_project"),
-      ])
-      projectButtons.push([Markup.button.callback("Выйти", "exit_scene")])
-
-      await ctx.reply("Ваши проекты:", {
-        reply_markup: Markup.inlineKeyboard(projectButtons),
-      })
-    }
+    await ctx.reply(
+      projects && projects.length > 0
+        ? "Ваши проекты:"
+        : "У вас пока нет проектов. Хотите создать новый?",
+      {
+        reply_markup: generateProjectsKeyboard(projects),
+      }
+    )
 
     await closeNeonStorage()
   } catch (error) {
@@ -111,21 +100,7 @@ projectScene.on("text", async ctx => {
       const project = await createProject(user.id, projectName)
 
       await ctx.reply(`Проект "${projectName}" успешно создан!`, {
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback("К списку проектов", "back_to_projects")],
-          [
-            Markup.button.callback(
-              "Добавить конкурента",
-              `add_competitor_${project.id}`
-            ),
-          ],
-          [
-            Markup.button.callback(
-              "Добавить хэштег",
-              `add_hashtag_${project.id}`
-            ),
-          ],
-        ]),
+        reply_markup: generateNewProjectKeyboard(project.id),
       })
 
       // Сбрасываем шаг
@@ -161,28 +136,7 @@ projectScene.action(/project_(\d+)/, async ctx => {
     // Здесь можно загрузить детали проекта и показать меню управления
 
     await ctx.reply(`Проект #${projectId}. Выберите действие:`, {
-      reply_markup: Markup.inlineKeyboard([
-        [
-          Markup.button.callback(
-            "Добавить конкурента",
-            `add_competitor_${projectId}`
-          ),
-        ],
-        [Markup.button.callback("Добавить хэштег", `add_hashtag_${projectId}`)],
-        [
-          Markup.button.callback(
-            "Запустить скрапинг",
-            `scrape_project_${projectId}`
-          ),
-        ],
-        [
-          Markup.button.callback(
-            "Просмотреть Reels",
-            `show_reels_${projectId}`
-          ),
-        ],
-        [Markup.button.callback("Назад к проектам", "back_to_projects")],
-      ]),
+      reply_markup: generateProjectMenuKeyboard(projectId),
     })
 
     await closeNeonStorage()
