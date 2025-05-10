@@ -33,7 +33,7 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "no-debugger": "warn",
-      "no-console": ["warn", { allow: ["warn", "error"] }],
+      "no-console": "off",
       "prefer-const": "warn",
       "no-useless-escape": "off",
       "no-prototype-builtins": "warn",

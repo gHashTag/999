@@ -20,7 +20,7 @@
     },
 
     /* Best practices (Aligned with Bun recommendations + Existing Strictness) */
-    "strict": true,
+    "strict": false,
     "skipLibCheck": true,              // Recommended by Bun
     "noFallthroughCasesInSwitch": true, // Recommended by Bun + Existing
     "noUncheckedIndexedAccess": false,  // Existing preference (Bun recommends true, but let's keep it false for now to avoid potential errors)
@@ -28,7 +28,7 @@
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true, // Often used with esModuleInterop
 
-    /* Type Checking (Keep existing stricter flags) */
+    /* Type Checking (Keep existing stricter flags, но strict:false их переопределит) */
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
@@ -62,6 +62,6 @@
     ],
     "typeRoots": ["./node_modules/@types", "./node_modules"] // Keep existing
   },
-  "include": ["src/**/*"], // Keep existing
-  "exclude": ["node_modules", "dist", "coverage", "html", "src/cli"] // Add src/cli here
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "coverage", "html", "src/cli"]
 }

@@ -9,17 +9,17 @@ import type {
   SystemEvents,
 } from "@/types/agents" // Import necessary types
 
-// Define a more specific event type based on AGENT_ContentFactory.mdc
+// Обновляем ContentFactoryEventTrigger для MVP
 export interface ContentFactoryEventTrigger {
-  // Renamed to avoid conflict if ContentFactoryEvent is used elsewhere
   name: "content.factory.run"
   data: {
     eventId: string
-    accountsToParse?: string[]
-    hashtagsToParse?: string[]
-    filter_criteria?: Record<string, unknown>
-    ai_generation_rules?: Record<string, unknown>
-    // Add other relevant fields from AGENT_ContentFactory.mdc input
+    competitor_urls: string[]
+    // Остальные поля, специфичные для Reels, пока убираем или делаем опциональными для MVP
+    // accountsToParse?: string[]
+    // hashtagsToParse?: string[]
+    // filter_criteria?: Record<string, unknown>
+    // ai_generation_rules?: Record<string, unknown>
   }
 }
 
@@ -35,19 +35,19 @@ export const contentFactoryWorkflow = inngest.createFunction(
     step: any
     logger: BaseLogger
   }) => {
-    // Added types for handler args
-    logger.info("🚀 Content Factory Workflow started", {
-      eventData: event.data,
-    })
+    logger.info(
+      "🚀 Content Factory Workflow started for MVP (Profile Parsing)",
+      {
+        eventData: event.data,
+      }
+    )
 
-    // Mock SystemEvents for now
     const mockSystemEvents: SystemEvents = {
       emit: async (eventName: string, payload: Record<string, unknown>) => {
         logger.info(`Mock SystemEvent emitted: ${eventName}`, payload)
       },
     }
 
-    // Create the model adapter
     const modelAdapter = openai({
       model: "deepseek/deepseek-coder",
       apiKey: process.env.DEEPSEEK_API_KEY || "MOCK_DEEPSEEK_API_KEY",
@@ -66,58 +66,57 @@ export const contentFactoryWorkflow = inngest.createFunction(
     }
 
     const contentFactoryAgent = createContentFactoryAgent(agentDeps)
-
     logger.info(
       `🤖 ContentFactoryAgent '${contentFactoryAgent.name}' initialized.`
     )
 
+    // Готовим входные данные для агента на основе event.data
+    const agentInput = {
+      competitor_urls: event.data.competitor_urls,
+      // Можно добавить другие метаданные из event.data, если они нужны агенту
+    }
+
     const agentCallResult: AgentResult = await step.run(
-      "run-content-factory-agent",
+      "run-content-factory-agent-mvp-profile-parsing",
       async () => {
-        logger.info("Executing contentFactoryAgent.run with input:", event.data)
-        // В реальном сценарии мы бы передали что-то осмысленное в agent.run()
-        // Например, propmt, сформированный на основе event.data
-        // const result = await contentFactoryAgent.run("Parse Instagram content based on event data");
-        // Пока мокируем ответ для простоты
+        logger.info("Executing contentFactoryAgent.run with input:", agentInput)
+        // В реальном сценарии:
+        // const result = await contentFactoryAgent.run(agentInput)
+        // return result
+
+        // Пока мокируем ответ для простоты и для тестов
+        // Этот мок должен симулировать успешное завершение парсинга профилей
         return {
           output: [
             {
               type: "text",
-              content:
-                "Mocked agent output: Parsed reels and AI content links.",
+              content: `Mocked agent output: Processed ${agentInput.competitor_urls.length} competitor profiles. Data saved to Neon DB.`,
             },
           ],
           state: {
-            status: "COMPLETED_MOCKED", // Обновленный статус
-            parsed_reels: [
-              {
-                link: "mock.com/reel1",
-                views: 100,
-                description: "mock reel",
-                source: "mock_account",
-              },
-            ],
-            ai_content_links: ["mock.com/ai_reel1"],
-            manual_content_links: [],
+            status: "PROFILES_PARSED_AND_SAVED",
+            processed_count: agentInput.competitor_urls.length,
+            errors: [],
           },
-        } as AgentResult // Явное приведение типа
+        } as AgentResult
       }
     )
 
-    logger.info("✅ Agent execution completed", { agentCallResult })
+    logger.info("✅ Agent execution for profile parsing completed", {
+      agentCallResult,
+    })
 
-    // Пример дальнейшей обработки результата
-    if (agentCallResult.state?.status === "COMPLETED_MOCKED") {
-      logger.info("Processing COMPLETED_MOCKED state:", {
-        parsed_reels: agentCallResult.state.parsed_reels,
-        ai_content_links: agentCallResult.state.ai_content_links,
+    if (agentCallResult.state?.status === "PROFILES_PARSED_AND_SAVED") {
+      logger.info("Workflow logic for PROFILES_PARSED_AND_SAVED state:", {
+        processed_count: agentCallResult.state.processed_count,
       })
+      // Здесь может быть логика для запуска следующего этапа (например, парсинг Reels для этих конкурентов)
     }
 
     return {
-      message: "Content Factory Workflow executed.",
+      message: "Content Factory Workflow (MVP - Profile Parsing) executed.",
       finalStatus: agentCallResult.state?.status,
-      data: agentCallResult.state, // Возвращаем все состояние для возможного использования
+      data: agentCallResult.state,
     }
   }
 )

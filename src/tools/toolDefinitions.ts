@@ -11,7 +11,7 @@ import { type Tool } from "@inngest/agent-kit"
 import { createTerminalTool } from "./definitions/terminal/createTerminalTool"
 // Remove unused createCreateOrUpdateFilesTool import
 // import { createCreateOrUpdateFilesTool } from "./definitions/createOrUpdateFiles"
-import { createReadFilesTool } from "./definitions/readFiles/createReadFilesTool"
+import { someTool } from "./definitions/readFiles/createReadFilesTool"
 // Remove unused runCode and processArtifact imports
 // import { createRunCodeTool } from "./definitions/runCode"
 // import { createProcessArtifactTool } from "./definitions/processArtifact"
@@ -37,7 +37,7 @@ export function getAllTools(
   // const askHumanTool = createAskHumanTool(log, eventId)
   // Remove fileTool (createOrUpdateFiles)
   // const fileTool = createCreateOrUpdateFilesTool(log, getSandbox, eventId, sandboxId)
-  const readFileTool = createReadFilesTool(log, getSandbox, eventId, sandboxId)
+  // const readFileTool = createReadFilesTool(log, getSandbox, eventId, sandboxId) // Убрали вызов, так как someTool уже создан
   // Remove runCodeTool
   // const runCodeTool = createRunCodeTool(log, eventId, sandboxId)
   // Remove processArtifactTool
@@ -62,7 +62,7 @@ export function getAllTools(
     terminalTool,
     // askHumanTool, // Removed
     // fileTool, // Removed
-    readFileTool,
+    someTool, // Исправлено: добавляем импортированный someTool
     // runCodeTool, // Removed
     // processArtifactTool, // Removed
     updateStateTool,

@@ -12,12 +12,15 @@ import type { AgentDependencies } from "../../types/agents"
 describe("createContentFactoryAgent", () => {
   let mockDeps: AgentDependencies
   let originalApifyToken: string | undefined
+  let originalNeonApiKey: string | undefined
 
   beforeEach(async () => {
     mockDeps = await createFullMockDependencies({})
     // Сохраняем оригинальное значение APIFY_TOKEN и очищаем его для изоляции тестов
     originalApifyToken = process.env.APIFY_TOKEN
+    originalNeonApiKey = process.env.NEON_API_KEY
     delete process.env.APIFY_TOKEN
+    delete process.env.NEON_API_KEY
   })
 
   afterEach(() => {
@@ -26,6 +29,11 @@ describe("createContentFactoryAgent", () => {
       process.env.APIFY_TOKEN = originalApifyToken
     } else {
       delete process.env.APIFY_TOKEN
+    }
+    if (originalNeonApiKey !== undefined) {
+      process.env.NEON_API_KEY = originalNeonApiKey
+    } else {
+      delete process.env.NEON_API_KEY
     }
   })
 
@@ -38,24 +46,17 @@ describe("createContentFactoryAgent", () => {
     expect(agent.system).toBe(AGENT_CONTENT_FACTORY_SYSTEM_PROMPT)
   })
 
-  it("should not configure mcpServers if APIFY_TOKEN is not set", () => {
-    delete process.env.APIFY_TOKEN // Убедимся, что токен не установлен
+  it("should not configure any mcpServers if no API keys are set", () => {
+    delete process.env.APIFY_TOKEN // Убедимся, что токены не установлены
+    delete process.env.NEON_API_KEY
     const agent = createContentFactoryAgent(mockDeps)
-    // Ожидаем, что mcpServers будет undefined или пустым массивом
-    // В createContentFactoryAgent, если mcpServersList пуст, mcpServers будет undefined
     expect(agent.mcpServers).toBeUndefined()
   })
 
-  it("should configure mcpServers for Apify if APIFY_TOKEN is set", () => {
+  it("should configure mcpServer for Apify ONLY if only APIFY_TOKEN is set", () => {
     const testApifyToken = "test_apify_token_123"
     process.env.APIFY_TOKEN = testApifyToken
-
-    // Чтобы createSmitheryUrl не вызывался с реальным токеном в тестах,
-    // и чтобы мы могли проверить его вызов, мы можем его замокать.
-    // Однако, createContentFactoryAgent уже содержит логику создания конфига внутри себя.
-    // Поэтому мы просто создаем агента и проверяем результат.
-    // Важно: этот тест проверит, что логика *внутри* createContentFactoryAgent
-    // пытается создать конфиг. Он не проверяет сам createSmitheryUrl.
+    delete process.env.NEON_API_KEY // Убедимся, что NEON_API_KEY не установлен
 
     const agent = createContentFactoryAgent(mockDeps)
 
@@ -64,17 +65,50 @@ describe("createContentFactoryAgent", () => {
     const mcpConfig = agent.mcpServers?.[0]
     expect(mcpConfig?.name).toBe("apifyInstagramParser")
     expect(mcpConfig?.transport?.type).toBe("ws")
-    // Проверяем, что URL содержит ожидаемый хост и токен (в моковом виде, если бы мы мокали createSmitheryUrl)
-    // В данном случае URL генерируется createSmitheryUrl, который мы не мокаем здесь,
-    // но он должен содержать переданный токен.
-    // Для более точной проверки URL можно было бы мокать createSmitheryUrl.
     expect(mcpConfig?.transport?.url).toContain(
       "actors-mcp-server.apify.actor/ws"
     )
-    // Проверка самого токена в URL затруднительна без мока createSmitheryUrl,
-    // так как он может быть закодирован или преобразован.
-    // Но мы можем проверить, что агент был создан с токеном.
-    // Это косвенно проверяется тем, что apifyMcpServerConfig был создан.
+  })
+
+  it("should configure mcpServer for Neon ONLY if only NEON_API_KEY is set", () => {
+    const testNeonKey = "test_neon_api_key_456"
+    process.env.NEON_API_KEY = testNeonKey
+    delete process.env.APIFY_TOKEN // Убедимся, что APIFY_TOKEN не установлен
+
+    const agent = createContentFactoryAgent(mockDeps)
+
+    expect(agent.mcpServers).toBeDefined()
+    expect(agent.mcpServers).toHaveLength(1)
+    const mcpConfig = agent.mcpServers?.[0]
+    expect(mcpConfig?.name).toBe("neonDatabase")
+    expect(mcpConfig?.transport?.type).toBe("ws")
+    expect(mcpConfig?.transport?.url).toContain("server.smithery.ai/neon/ws")
+  })
+
+  it("should configure mcpServers for both Apify and Neon if both API keys are set", () => {
+    const testApifyToken = "test_apify_token_789"
+    const testNeonKey = "test_neon_api_key_101"
+    process.env.APIFY_TOKEN = testApifyToken
+    process.env.NEON_API_KEY = testNeonKey
+
+    const agent = createContentFactoryAgent(mockDeps)
+
+    expect(agent.mcpServers).toBeDefined()
+    expect(agent.mcpServers).toHaveLength(2)
+
+    const apifyConfig = agent.mcpServers?.find(
+      s => s.name === "apifyInstagramParser"
+    )
+    expect(apifyConfig).toBeDefined()
+    expect(apifyConfig?.transport?.type).toBe("ws")
+    expect(apifyConfig?.transport?.url).toContain(
+      "actors-mcp-server.apify.actor/ws"
+    )
+
+    const neonConfig = agent.mcpServers?.find(s => s.name === "neonDatabase")
+    expect(neonConfig).toBeDefined()
+    expect(neonConfig?.transport?.type).toBe("ws")
+    expect(neonConfig?.transport?.url).toContain("server.smithery.ai/neon/ws")
   })
 
   it("should use the provided model from dependencies", () => {

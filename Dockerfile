@@ -5,10 +5,11 @@ FROM node:20-slim
 WORKDIR /app
 
 # Install pnpm globally
-RUN npm install -g pnpm
+RUN npm install -g bun typescript ts-node
 
 # Copy package.json and pnpm-lock.yaml first to leverage Docker cache
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
+RUN bun install
 
 # Install project dependencies
 # Consider running this step when the container starts if caching node_modules locally is preferred
@@ -23,4 +24,4 @@ COPY . .
 # Define the command to run when the container starts
 # Using tail -f /dev/null keeps the container running for interactive use or background tasks
 # Alternatively, define an entrypoint script later.
-CMD ["tail", "-f", "/dev/null"] 
+CMD ["bun", "run", "index.ts"] 
